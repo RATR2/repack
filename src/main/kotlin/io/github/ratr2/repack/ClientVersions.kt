@@ -1,7 +1,7 @@
 package io.github.ratr2.repack
 
+import com.github.retrooper.packetevents.PacketEvents
 import com.viaversion.viaversion.api.Via
-import io.github.ratr2.repack.pack.PackVariant
 import org.bukkit.entity.Player
 import java.util.UUID
 
@@ -14,8 +14,8 @@ class ClientVersions(plugin: Repack) {
     val hasViaBackwards = plugin.server.pluginManager.isPluginEnabled("ViaBackwards")
 
     fun protocolOf(player: Player): Int {
-        val protocol = viaLookup?.invoke(player.uniqueId) ?: return PackVariant.SERVER_PROTOCOL
-        return if (protocol > 0) protocol else PackVariant.SERVER_PROTOCOL
+        val protocol = viaLookup?.invoke(player.uniqueId) ?: return serverProtocol()
+        return if (protocol > 0) protocol else serverProtocol()
     }
 
     private fun serverProtocol(): Int = PacketEvents.getAPI().serverManager.version.protocolVersion

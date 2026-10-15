@@ -14,25 +14,38 @@ repositories {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:26.3.build.+")
+    compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
     // The PacketEvents plugin has to be installed (plugin.yml depends on it), so it is not packaged.
     compileOnly("com.github.retrooper:packetevents-spigot:2.14.0")
     compileOnly("com.github.SkriptLang:Skript:2.17.0")
     compileOnly("com.viaversion:viaversion-api:5.12.1")
-    compileOnly("com.sk89q.worldguard:worldguard-bukkit:7.0.19")
-    compileOnly("com.sk89q.worldedit:worldedit-bukkit:7.4.6")
+    // Only their own classes are needed: their dependency versions would clash with the Paper API's.
+    for (notation in listOf(
+        "com.sk89q.worldguard:worldguard-bukkit:7.0.15",
+        "com.sk89q.worldguard:worldguard-core:7.0.15",
+        "com.sk89q.worldedit:worldedit-bukkit:7.4.2",
+        "com.sk89q.worldedit:worldedit-core:7.4.2",
+    )) {
+        compileOnly(notation) { isTransitive = false }
+    }
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
 
     testImplementation(kotlin("test"))
     testImplementation("com.google.code.gson:gson:2.14.0")
-    testImplementation("io.papermc.paper:paper-api:26.3.build.+")
+    testImplementation("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
 }
 
 kotlin {
+    // Built with JDK 25, but the classes are Java 21 ones so the jar also loads on the Java 21 that 1.21.x servers run.
     jvmToolchain(25)
+    compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
 }
 
 tasks {
+    withType<JavaCompile> {
+        options.release.set(21)
+    }
+
     build {
         dependsOn(shadowJar)
     }

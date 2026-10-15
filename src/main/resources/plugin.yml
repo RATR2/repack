@@ -2,7 +2,7 @@ name: repack
 version: '${version}'
 
 main: io.github.ratr2.repack.Repack
-api-version: '26.3'
+api-version: '1.21'
 load: POSTWORLD
 depend: [packetevents]
 softdepend: [WorldGuard, ViaVersion, ViaBackwards, Skript]

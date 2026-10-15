@@ -6,7 +6,7 @@
 
 [![Issues](https://img.shields.io/github/issues/RATR2/repack?style=for-the-badge&logo=github)](https://github.com/RATR2/repack/issues)
 [![Loaders](https://img.shields.io/badge/loaders-paper-blue?style=for-the-badge)](#install)
-[![Minecraft](https://img.shields.io/badge/minecraft-26.3-blue?style=for-the-badge)](#install)
+[![Minecraft](https://img.shields.io/badge/minecraft-1.21.4%20to%2026.3-blue?style=for-the-badge)](#install)
 [![Clients](https://img.shields.io/badge/clients-1.21.4%20to%2026.3-blue?style=for-the-badge)](#install)
 [![License](https://img.shields.io/github/license/RATR2/repack?style=for-the-badge&logo=github)](LICENSE)
 [![Status](https://img.shields.io/badge/status-in--development-yellow?style=for-the-badge)](#status)
@@ -32,7 +32,7 @@ Drop a `.bbmodel` file into the plugin folder and you have a custom block. Repac
 
 ## Install
 
-Needs Paper 26.3 and the [PacketEvents](https://github.com/retrooper/packetevents) plugin (the Spigot jar, 2.14.0 or newer). Clients from 1.21.4 to 26.3 are supported through [ViaVersion](https://github.com/ViaVersion/ViaVersion) (optional), and Repack sends each player the pack that fits their version.
+Needs Paper 1.21.4 or newer (built with Java 25, but runs on Java 21 and up) and the [PacketEvents](https://github.com/retrooper/packetevents) plugin (the Spigot jar, 2.14.0 or newer). Clients from 1.21.4 to 26.3 are supported, older or newer ones than the server through [ViaVersion](https://github.com/ViaVersion/ViaVersion) (optional), and Repack sends each player the pack that fits their version.
 
 1. Put `repack.jar` and `packetevents-spigot-2.14.0.jar` in `plugins/`.
 2. Start the server. The first time, Repack adds a ready-made `table` block (`models/table.bbmodel` and `blocks/table.yml`). Set `install-defaults: false` before the first start to skip it.
