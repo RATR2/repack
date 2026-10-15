@@ -12,7 +12,10 @@ repositories {
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:26.3.build.+")
-    implementation("com.github.retrooper:packetevents-spigot:2.14.0")
+    // Paper already ships adventure, so only PacketEvents itself is shaded.
+    implementation("com.github.retrooper:packetevents-spigot:2.14.0") {
+        exclude(group = "net.kyori")
+    }
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
 
     testImplementation(kotlin("test"))
