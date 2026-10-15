@@ -19,7 +19,7 @@ class BlockItems(plugin: Repack) {
 
     fun create(definition: BlockDefinition, amount: Int = 1): ItemStack {
         val item = ItemStack(definition.item.base, amount.coerceIn(1, 99))
-        item.setData(DataComponentTypes.ITEM_MODEL, Key.key(ItemModelGenerator.NAMESPACE, definition.model))
+        item.setData(DataComponentTypes.ITEM_MODEL, Key.key(ItemModelGenerator.NAMESPACE, definition.item.model ?: definition.model))
         val name = definition.item.name ?: definition.id.split('_', '-').joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }
         item.setData(DataComponentTypes.ITEM_NAME, legacy.deserialize(name))
         if (definition.item.lore.isNotEmpty()) {

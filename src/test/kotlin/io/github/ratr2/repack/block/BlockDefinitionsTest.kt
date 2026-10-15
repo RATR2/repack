@@ -42,6 +42,12 @@ class BlockDefinitionsTest {
     }
 
     @Test
+    fun `the item can use its own model`() {
+        assertNull(parse("").item.model)
+        assertEquals("table_item", parse("item: {model: Table_Item}").item.model)
+    }
+
+    @Test
     fun `reads every section`() {
         val definition = parse(
             """

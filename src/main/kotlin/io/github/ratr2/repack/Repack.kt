@@ -4,6 +4,8 @@ import io.github.ratr2.repack.block.BlockDefinition
 import io.github.ratr2.repack.block.BlockDefinitions
 import io.github.ratr2.repack.block.BlockEvents
 import io.github.ratr2.repack.block.BlockItems
+import io.github.ratr2.repack.block.BlockMenu
+import io.github.ratr2.repack.block.GiveCommand
 import io.github.ratr2.repack.block.BlockTemplate
 import io.github.ratr2.repack.block.Loot
 import io.github.ratr2.repack.block.PlacedBlocks
@@ -38,6 +40,8 @@ class Repack : JavaPlugin() {
         private set
     lateinit var host: SharedHost
         private set
+    lateinit var menu: BlockMenu
+        private set
     private lateinit var display: DisplayManager
 
     override fun onEnable() {
@@ -58,6 +62,9 @@ class Repack : JavaPlugin() {
         reloadDefinitions()
         server.pluginManager.registerEvents(blocks, this)
         server.pluginManager.registerEvents(display, this)
+        menu = BlockMenu(this)
+        server.pluginManager.registerEvents(menu, this)
+        server.pluginManager.registerEvents(GiveCommand(this), this)
         BlockEvents(this, blocks, items, Loot(items), Protections.detect(this)).also {
             server.pluginManager.registerEvents(it, this)
             it.start()
@@ -152,7 +159,10 @@ class Repack : JavaPlugin() {
     private fun applyDefinitions() {
         blocks.definitions = (fileDefinitions + registered).filterKeys { it !in unregistered }
         registerRecipes()
-        if (::display.isInitialized && server.pluginManager.isPluginEnabled(this)) display.refreshAll()
+        if (::display.isInitialized && server.pluginManager.isPluginEnabled(this)) {
+            display.refreshAll()
+            server.onlinePlayers.forEach { it.updateCommands() }
+        }
     }
 
     private val recipeKeys = ArrayList<NamespacedKey>()

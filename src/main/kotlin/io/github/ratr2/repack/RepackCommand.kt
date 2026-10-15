@@ -28,6 +28,7 @@ import java.util.concurrent.CompletableFuture
  * /repack place <id> [pos]    places a custom block (at your feet by default)
  * /repack remove [pos]        removes the custom block there
  * /repack list                lists the ids that can be placed
+ * /repack menu              opens a screen with every block item to take
  * /repack give <id> [amount] [players]   gives the item that places a custom block
  * /repack reload [blocks|config|host|all]   reads the block files (default), the config, or restarts the pack server on the new port
  * ```
@@ -69,6 +70,13 @@ class RepackCommand(private val plugin: Repack) {
                 )
         )
         .then(Commands.literal("list").executes(::list))
+        .then(
+            Commands.literal("menu").executes {
+                val player = it.source.sender as? Player
+                if (player == null) reply(it, "Only players can open the menu.", NamedTextColor.RED) else plugin.menu.open(player)
+                Command.SINGLE_SUCCESS
+            }
+        )
         .then(
             Commands.literal("give").then(
                 Commands.argument("id", StringArgumentType.word())
