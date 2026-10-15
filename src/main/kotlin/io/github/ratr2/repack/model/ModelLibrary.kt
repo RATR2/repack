@@ -16,6 +16,10 @@ object ModelLibrary {
 
     fun idOf(file: File): String = file.nameWithoutExtension.lowercase().replace(INVALID, "_")
 
+    /** The ids the files in [folder] would get, without parsing them. */
+    fun ids(folder: File): Set<String> =
+        folder.listFiles { f -> f.isFile && f.extension == "bbmodel" }.orEmpty().mapTo(HashSet(), ::idOf)
+
     fun build(folder: File): LibraryResult {
         val files = HashMap<String, ByteArray>()
         val models = ArrayList<String>()
