@@ -1,10 +1,11 @@
 package io.github.ratr2.repack.model
 
+import io.github.ratr2.repack.pack.PackVariant
 import java.io.File
 
-/** The pack files for every model in the models folder, and what went wrong along the way. */
+/** The pack files for every model in the models folder, for each version of the pack, and what went wrong along the way. */
 class LibraryResult(
-    val files: Map<String, ByteArray>,
+    val files: Map<PackVariant, Map<String, ByteArray>>,
     val models: List<String>,
     val warnings: List<String>,
     val errors: List<String>,
@@ -22,7 +23,7 @@ object ModelLibrary {
         folder.listFiles { f -> f.isFile && f.extension.equals("bbmodel", ignoreCase = true) }.orEmpty().mapTo(HashSet(), ::idOf)
 
     fun build(folder: File): LibraryResult {
-        val files = HashMap<String, ByteArray>()
+        val files = PackVariant.entries.associateWith { HashMap<String, ByteArray>() }
         val models = ArrayList<String>()
         val warnings = ArrayList<String>()
         val errors = ArrayList<String>()
@@ -35,10 +36,14 @@ object ModelLibrary {
                 continue
             }
             try {
-                val generated = ItemModelGenerator.generate(id, BbParser.parse(id, source.readText()))
-                files += generated.files
+                val model = BbParser.parse(id, source.readText())
+                for ((variant, variantFiles) in files) {
+                    val generated = ItemModelGenerator.generate(id, model, variant.shelf)
+                    variantFiles += generated.files
+                    // The warnings are the same in every version, so they are only listed once.
+                    if (variant == PackVariant.entries.first()) generated.warnings.mapTo(warnings) { "$id: $it" }
+                }
                 models += id
-                generated.warnings.mapTo(warnings) { "$id: $it" }
             } catch (e: BbParseException) {
                 errors += "${source.name}: ${e.message}"
             }

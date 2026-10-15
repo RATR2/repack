@@ -22,7 +22,8 @@ object ItemModelGenerator {
     /** Rotation angles a vanilla element can have around its single axis. */
     private val ANGLES = setOf(-45.0, -22.5, 0.0, 22.5, 45.0)
 
-    fun generate(id: String, model: BbModel): GeneratedModel {
+    /** [shelf] keeps the `on_shelf` display setting, which only game versions from 1.21.9 know. */
+    fun generate(id: String, model: BbModel, shelf: Boolean = true): GeneratedModel {
         val files = HashMap<String, ByteArray>()
         val warnings = ArrayList<String>(model.warnings)
 
@@ -42,7 +43,7 @@ object ItemModelGenerator {
         val block = JsonObject().apply {
             add("textures", textures)
             add("elements", elements)
-            displayOf(model.display, warnings)?.let { add("display", it) }
+            displayOf(model.display, warnings, shelf)?.let { add("display", it) }
         }
         files["assets/$NAMESPACE/models/block/$id.json"] = block.toString().toByteArray(Charsets.UTF_8)
 
@@ -57,10 +58,11 @@ object ItemModelGenerator {
     }
 
     /** Vanilla accepts translation between -80 and 80 and scale between -4 and 4 in a display transform. */
-    private fun displayOf(display: Map<String, DisplayTransform>, warnings: MutableList<String>): JsonObject? {
+    private fun displayOf(display: Map<String, DisplayTransform>, warnings: MutableList<String>, shelf: Boolean): JsonObject? {
         if (display.isEmpty()) return null
         val result = JsonObject()
         for ((context, transform) in display) {
+            if (context == "on_shelf" && !shelf) continue
             val entry = JsonObject()
             transform.rotation?.let { entry.add("rotation", it.toJsonArray()) }
             transform.translation?.let { values ->

@@ -1,9 +1,11 @@
 package io.github.ratr2.repack.pack
 
+import io.github.ratr2.repack.ClientVersions
 import io.github.ratr2.repack.Repack
 import net.kyori.adventure.resource.ResourcePackInfo
 import net.kyori.adventure.resource.ResourcePackRequest
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -14,7 +16,12 @@ import java.util.UUID
  * Sends the published pack to players. It has its own pack id, so a client keeps it next to other server packs (such as
  * Distortion's) and replacing it never touches them.
  */
-class PackSender(private val plugin: Repack, private val store: PackStore, private val host: SharedHost) : Listener {
+class PackSender(
+    private val plugin: Repack,
+    private val store: PackStore,
+    private val host: SharedHost,
+    private val versions: ClientVersions,
+) : Listener {
 
     private val id: UUID = UUID.nameUUIDFromBytes("repack-pack".toByteArray())
 
@@ -23,13 +30,21 @@ class PackSender(private val plugin: Repack, private val store: PackStore, priva
      * same player. Returns how many are queued, 0 when nothing is published.
      */
     fun send(players: Collection<Player>): Int {
-        if (store.published == null) return 0
+        if (!store.hasPublished) return 0
         players.forEach { player -> host.enqueue(player.uniqueId) { if (player.isOnline) sendNow(player) } }
         return players.size
     }
 
+    /** The version of the pack for the client this player connected with, or null for a client too old for any of them. */
+    private fun variantOf(player: Player) = PackVariant.forProtocol(versions.protocolOf(player))
+
     private fun sendNow(player: Player) {
-        val pack = store.published ?: return
+        val variant = variantOf(player)
+        if (variant == null) {
+            notice(player, "Repack custom blocks are not available on your client version: they need Minecraft 1.21.4 or newer.")
+            return
+        }
+        val pack = store.published[variant] ?: return
         val config = plugin.config
         val request = ResourcePackRequest.resourcePackRequest()
             .packs(ResourcePackInfo.resourcePackInfo(id, host.urlOf("${pack.sha1}.zip"), pack.sha1))
@@ -37,6 +52,10 @@ class PackSender(private val plugin: Repack, private val store: PackStore, priva
             .prompt(Component.text(config.getString("resource-pack.prompt").orEmpty()))
             .build()
         player.sendResourcePacks(request)
+    }
+
+    private fun notice(player: Player, message: String) {
+        if (plugin.config.getBoolean("client-notices", true)) player.sendMessage(Component.text(message, NamedTextColor.YELLOW))
     }
 
     /** Waits a moment after joining, so the pack does not arrive in the same instant as everything else the server sends. */

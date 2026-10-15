@@ -10,6 +10,7 @@ import io.github.ratr2.repack.block.PlacedBlocks
 import io.github.ratr2.repack.display.DisplayManager
 import io.github.ratr2.repack.model.ModelLibrary
 import io.github.ratr2.repack.pack.PackBuilder
+import io.github.ratr2.repack.pack.PackVariant
 import io.github.ratr2.repack.pack.PackEntry
 import io.github.ratr2.repack.pack.PackSender
 import io.github.ratr2.repack.pack.SharedHost
@@ -45,7 +46,9 @@ class Repack : JavaPlugin() {
         installDefaults()
         store = PackStore(dataFolder)
         host = SharedHost(this, "repack", 8086) { name -> store.file(name.removeSuffix(".zip"))?.readBytes() }.also { it.start() }
-        sender = PackSender(this, store, host)
+        val versions = ClientVersions(this)
+        sender = PackSender(this, store, host, versions)
+        if (versions.hasViaBackwards) logger.warning("ViaBackwards found: clients older than 1.21.4 will not be able to see Repack blocks.")
         server.pluginManager.registerEvents(sender, this)
 
         blocks = PlacedBlocks(this)
@@ -61,7 +64,7 @@ class Repack : JavaPlugin() {
         }
         blocks.start()
         RepackAPI.plugin = this
-        if (store.published == null) logger.info("No pack published yet: run /repack build, then /repack push, to send players the pack.")
+        if (!store.hasPublished) logger.info("No pack published yet: run /repack build, then /repack push, to send players the pack.")
         lastStamp = stamp()
         server.scheduler.runTaskTimer(this, Runnable { refreshIfChanged() }, WATCH_TICKS, WATCH_TICKS)
         if (server.pluginManager.isPluginEnabled("Skript")) {
@@ -207,15 +210,20 @@ class Repack : JavaPlugin() {
         return true
     }
 
-    /** Regenerates the pack from the .bbmodel files in the models folder. Does not change the published pack. */
+    /** Regenerates every version of the pack from the .bbmodel files in the models folder. Does not change what is published. */
     fun rebuild(): BuildReport {
         val library = ModelLibrary.build(modelsFolder)
-        val files = HashMap(library.files)
-        files["pack.mcmeta"] = PackBuilder.meta("Repack custom blocks")
         library.warnings.forEach { logger.warning(it) }
         library.errors.forEach { logger.severe(it) }
         val definitionErrors = reloadDefinitions()
-        return BuildReport(store.add(PackBuilder.zip(files)), library.models, library.warnings, library.errors + definitionErrors)
+        val entries = LinkedHashMap<PackVariant, PackEntry>()
+        for (variant in PackVariant.entries) {
+            val files = HashMap(library.files.getValue(variant))
+            files["pack.mcmeta"] = PackBuilder.meta(variant)
+            files["pack.png"] = PackBuilder.icon()
+            entries[variant] = store.add(variant, PackBuilder.zip(files))
+        }
+        return BuildReport(entries, library.models, library.warnings, library.errors + definitionErrors)
     }
 }
 
@@ -224,4 +232,4 @@ private val ID = Regex("[a-z0-9_-]+")
 /** How often the models and blocks folders are checked for changes: every 5 seconds. */
 private const val WATCH_TICKS = 100L
 
-class BuildReport(val entry: PackEntry, val models: List<String>, val warnings: List<String>, val errors: List<String>)
+class BuildReport(val entries: Map<PackVariant, PackEntry>, val models: List<String>, val warnings: List<String>, val errors: List<String>)

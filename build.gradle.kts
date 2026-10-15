@@ -9,6 +9,7 @@ repositories {
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://repo.codemc.io/repository/maven-releases/")
     maven("https://maven.enginehub.org/repo/")
+    maven("https://repo.viaversion.com")
     maven("https://repo.skriptlang.org/releases")
 }
 
@@ -17,6 +18,7 @@ dependencies {
     // The PacketEvents plugin has to be installed (plugin.yml depends on it), so it is not packaged.
     compileOnly("com.github.retrooper:packetevents-spigot:2.14.0")
     compileOnly("com.github.SkriptLang:Skript:2.17.0")
+    compileOnly("com.viaversion:viaversion-api:5.12.1")
     compileOnly("com.sk89q.worldguard:worldguard-bukkit:7.0.19")
     compileOnly("com.sk89q.worldedit:worldedit-bukkit:7.4.6")
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
