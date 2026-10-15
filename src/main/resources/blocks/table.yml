@@ -1,6 +1,6 @@
 # The Infusion Table, as the Ethereal server's Skript built it (features/4table.sk), without the custom menus and the particles.
 # Every old rule is here:
-#   - a real smithing table under the model, with the model scaled to 1.01 x 1.15 x 1.01 so it covers the smithing table
+#   - a real smithing table under the model, with the model scaled to 1.01 x 1.08 x 1.01 and raised 0.04 so it covers the smithing table
 #   - lit at full brightness
 #   - right-clicking does not open the smithing table menu (the Skript cancelled it; sneaking with an empty hand too)
 #   - breaking it drops the table item
@@ -29,8 +29,8 @@ explosion:
 piston: block
 
 display:
-  offset: [0, 0, 0]
-  scale: [1.01, 1.15, 1.01]
+  offset: [0, 0.04, 0]
+  scale: [1.01, 1.08, 1.01]
   view-range: 1.0
   brightness: 15
   rotate-to-placer: false
