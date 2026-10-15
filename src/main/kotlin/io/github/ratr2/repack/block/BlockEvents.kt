@@ -148,7 +148,8 @@ class BlockEvents(
             plugin.server.pluginManager.callEvent(custom)
             if (custom.isCancelled) {
                 event.isCancelled = true
-            } else if (!hit.definition.vanillaInteraction) {
+            } else if (!hit.definition.vanillaInteraction && (event.action == Action.RIGHT_CLICK_BLOCK || hit.definition.proxyMode == ProxyMode.CUSTOM)) {
+                // Denying a left click would also stop the proxy block's own digging, which vanilla mode relies on.
                 event.setUseInteractedBlock(Event.Result.DENY)
             }
             return
