@@ -48,6 +48,19 @@ object RepackAPI {
         return api.blocks.definitionOf(id)?.let { api.items.create(it, amount) }
     }
 
+    /**
+     * Adds a block type with the default settings that shows [model], a file in the models folder without its extension.
+     * Lasts until the next reload. Returns an error message, or null when it worked.
+     */
+    @JvmStatic
+    fun register(id: String, model: String): String? = plugin?.registerBlock(id, model) ?: "Repack is not running."
+
+    @JvmStatic
+    fun unregister(id: String): Boolean = plugin?.unregisterBlock(id) ?: false
+
+    @JvmStatic
+    fun reload(): List<String> = plugin?.reloadDefinitions() ?: emptyList()
+
     @JvmStatic
     fun ids(): Set<String> = plugin?.blocks?.types ?: emptySet()
 }
