@@ -4,6 +4,7 @@ import com.github.retrooper.packetevents.PacketEvents
 import com.github.retrooper.packetevents.protocol.component.ComponentTypes
 import com.github.retrooper.packetevents.protocol.component.builtin.item.ItemModel
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData
+import com.github.retrooper.packetevents.protocol.entity.pose.EntityPose
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes
 import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes
 import com.github.retrooper.packetevents.protocol.item.type.ItemTypes
@@ -137,6 +138,8 @@ class DisplayManager(private val blocks: PlacedBlocks) : Listener, PlacementList
             .build()
 
         val data = ArrayList<EntityData<*>>()
+        // Dying poses are the smallest ones, to see whether they take the hitbox away.
+        data += EntityData(POSE, EntityDataTypes.ENTITY_POSE, EntityPose.DYING)
         if (options.scaleX != 1f || options.scaleY != 1f || options.scaleZ != 1f) {
             data += EntityData(SCALE, EntityDataTypes.VECTOR3F, Vector3f(options.scaleX, options.scaleY, options.scaleZ))
         }
@@ -149,6 +152,7 @@ class DisplayManager(private val blocks: PlacedBlocks) : Listener, PlacementList
 
     private companion object {
         // Display entity metadata indexes for Minecraft 1.21.4 to 26.3 (position/rotation interpolation exists from 1.21.2).
+        const val POSE = 6
         const val SCALE = 12
         const val BRIGHTNESS = 16
         const val VIEW_RANGE = 17
