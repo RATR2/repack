@@ -11,6 +11,7 @@ import com.github.retrooper.packetevents.protocol.world.Location as PacketLocati
 import com.github.retrooper.packetevents.resources.ResourceLocation
 import com.github.retrooper.packetevents.util.Vector3d
 import com.github.retrooper.packetevents.util.Vector3f
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBundle
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerDestroyEntities
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityMetadata
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity
@@ -109,12 +110,15 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
             block.yaw.toFloat(),
             0f,
         )
+        // One bundle, so the client applies the spawn and the item in the same tick and never draws the display without its model.
         val players = PacketEvents.getAPI().playerManager
+        players.sendPacket(player, WrapperPlayServerBundle())
         players.sendPacket(
             player,
             WrapperPlayServerSpawnEntity(entityId, UUID.randomUUID(), EntityTypes.ITEM_DISPLAY, location, block.yaw.toFloat(), 0, Vector3d.zero()),
         )
         players.sendPacket(player, WrapperPlayServerEntityMetadata(entityId, metadata(definition)))
+        players.sendPacket(player, WrapperPlayServerBundle())
     }
 
     private fun hide(player: Player, key: Key) {
