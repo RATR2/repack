@@ -1,16 +1,10 @@
 # Example Skript for Repack. Copy it to plugins/Skript/scripts/ and run /sk reload repack-example.
 # It uses the bundled "table" block (plugins/Repack/blocks/table.yml). Needs Skript 2.13 or newer.
 
-# Right clicking the table. The table's block file already stops the smithing table menu from opening.
+# Any click on the table (left clicks too, since digging starts with one). The table's block file already stops the smithing table
+# menu from opening, so this is where you would open your own menu.
 on custom block interact of "table":
-    if action is not right click:
-        stop
-    cancel event
-    if player is sneaking:
-        send "&7You peek under the table." to player
-    else:
-        send "&aThe infusion table hums." to player
-        play sound "block.amethyst_block.chime" with volume 1 pitch 1.2 at event-block
+    send "&7You touched the table." to player
 
 # Starting to dig a block: keep players without the right permission from breaking it.
 on custom block break start of "table":
@@ -22,9 +16,14 @@ on custom block break start of "table":
 on custom block explode of "table":
     uncancel event
 
-# The vanilla click event works as well, for blocks you do not want a dedicated event for.
+# The vanilla click event works as well, and tells right clicks apart from left clicks.
 on right click:
     if event-block is a custom block with id "table":
+        if player is sneaking:
+            send "&7You peek under the table." to player
+        else:
+            send "&aThe infusion table hums." to player
+            play sound "block.amethyst_block.chime" with volume 1 and pitch 1.2 at event-block
         if player's tool is a stick:
             send "Custom block id: %custom block id of event-block%" to player
 
@@ -44,7 +43,7 @@ command /tableremove:
     permission: example.table.place
     trigger:
         remove custom block at location 2 meters in front of player
-        
+
 command /customblocks:
     permission: example.table.give
     trigger:
