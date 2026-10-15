@@ -11,9 +11,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Locale;
 
 /**
- * {@code on custom block break [of "table"]:}, {@code on custom block explode:}, {@code on custom block piston:} and one pattern
- * for every other thing that can happen to a custom block's proxy block (see BlockAction). The event starts cancelled when the
- * block resists that action; {@code uncancel event} lets it through and {@code cancel event} stops it.
+ * on custom block break [of "table"]:, explode:, piston: and so on, one pattern per BlockAction. The event starts cancelled
+ * when the block resists that action; uncancel event lets it through.
  */
 public class EvtCustomBlockAction extends SkriptEvent {
 

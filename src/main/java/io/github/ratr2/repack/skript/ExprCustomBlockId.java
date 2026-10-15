@@ -9,7 +9,7 @@ import org.bukkit.block.Block;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
-/** {@code custom block id of event-block}: the id, or nothing when the block is not a custom block. */
+/** custom block id of event-block: the id, or nothing when the block is not a custom block. */
 public class ExprCustomBlockId extends SimpleExpression<String> {
 
     static final String[] PATTERNS = {"[the] custom block id of %block%", "%block%'s custom block id"};

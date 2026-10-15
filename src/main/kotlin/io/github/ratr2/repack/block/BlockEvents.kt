@@ -48,13 +48,11 @@ import org.bukkit.util.BoundingBox
 import java.util.UUID
 
 /**
- * Turns what happens to proxy blocks into what happens to custom blocks. For every way a block can be changed or used (the same
- * list protection plugins such as WorldGuard guard) it applies the block's defaults, then fires a [CustomBlockEvent] so anything
- * else can see it and change the outcome.
+ * Turns what happens to proxy blocks into what happens to custom blocks. For every way a block can be changed or used, it applies
+ * the block's defaults, then fires a CustomBlockEvent so anything else can change the outcome.
  *
- * Deciding and acting are split in two. At normal priority the event is fired and the Bukkit event is cancelled or trimmed, the
- * same moment other plugins decide. At monitor priority, when the outcome is final, the custom block is removed if its proxy
- * really is going away. Removing it earlier would lose the block whenever a protection plugin stepped in afterwards.
+ * The event is fired and the Bukkit event cancelled or trimmed at normal priority, alongside other plugins. The custom block is
+ * only removed at monitor priority, once the outcome is final, so a protection plugin stepping in later can't lose the block.
  */
 private const val DENY_COOLDOWN_MILLIS = 3000L
 private const val MINING_REACH = 6
@@ -75,7 +73,7 @@ class BlockEvents(
     private val mining = HashMap<UUID, Mining>()
     private val lastDenied = HashMap<UUID, Long>()
 
-    /** Players whose break we are finishing ourselves, so [onBreak] can tell it from a vanilla one. */
+    /** Players whose break we are finishing ourselves, so onBreak can tell it from a vanilla one. */
     private val completing = HashSet<UUID>()
 
     fun start() {

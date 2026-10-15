@@ -8,7 +8,7 @@ import io.github.ratr2.repack.RepackAPI;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
-/** {@code loop all custom block ids:} every block type that can be placed right now. */
+/** loop all custom block ids: every block type that can be placed right now. */
 public class ExprCustomBlockIds extends SimpleExpression<String> {
 
     static final String[] PATTERNS = {"[all [of the]] custom block ids"};

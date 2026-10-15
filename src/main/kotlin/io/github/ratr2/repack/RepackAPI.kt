@@ -18,30 +18,30 @@ object RepackAPI {
     @Volatile
     internal var plugin: Repack? = null
 
-    /** Places the custom block [id] at [location]. False if the id is unknown, the spot is taken or the plugin is disabled. */
+    /** Places the custom block id at location. False if the id is unknown, the spot is taken or the plugin is disabled. */
     @JvmStatic
     fun place(location: Location, id: String): Boolean = place(location, id, 0f)
 
-    /** As above, facing [yaw] degrees for blocks set to rotate to the placer. */
+    /** As above, facing yaw degrees for blocks set to rotate to the placer. */
     @JvmStatic
     fun place(location: Location, id: String, yaw: Float): Boolean = plugin?.blocks?.place(location, id, yaw) ?: false
 
-    /** Removes the custom block at [location]; false if there was none. */
+    /** Removes the custom block at location; false if there was none. */
     @JvmStatic
     fun remove(location: Location): Boolean = plugin?.blocks?.remove(location.block) ?: false
 
-    /** The id of the custom block at [block], or null when it is not a custom block. */
+    /** The id of the custom block at block, or null when it is not a custom block. */
     @JvmStatic
     fun idAt(block: Block): String? = plugin?.blocks?.idAt(block)
 
-    /** True when [block] is a custom block, and, if [id] is given, one with that id. */
+    /** True when block is a custom block, and, if id is given, one with that id. */
     @JvmStatic
     fun isCustomBlock(block: Block, id: String?): Boolean {
         val found = idAt(block) ?: return false
         return id == null || found == id
     }
 
-    /** The item that places the custom block [id], or null for an unknown id. */
+    /** The item that places the custom block id, or null for an unknown id. */
     @JvmStatic
     fun item(id: String, amount: Int): ItemStack? {
         val api = plugin ?: return null
@@ -49,7 +49,7 @@ object RepackAPI {
     }
 
     /**
-     * Adds a block type with the default settings that shows [model], a file in the models folder without its extension.
+     * Adds a block type with the default settings that shows model, a file in the models folder without its extension.
      * Lasts until the next reload. Returns an error message, or null when it worked.
      */
     @JvmStatic

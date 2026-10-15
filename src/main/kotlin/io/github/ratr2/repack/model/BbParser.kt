@@ -56,7 +56,7 @@ object BbParser {
         return BbModel(name, textures, cubes, parseDisplay(root), warnings)
     }
 
-    /** The Display tab. Names a block model never uses are left out, and a name an older client does not know would stop its model loading, which is what [ItemModelGenerator] guards against for `on_shelf`. */
+    /** The Display tab. Names a block model never uses are left out, and a name an older client does not know would stop its model loading, which is what ItemModelGenerator guards against for `on_shelf`. */
     private fun parseDisplay(root: JsonObject): Map<String, DisplayTransform> {
         val display = root.obj("display") ?: return emptyMap()
         val result = LinkedHashMap<String, DisplayTransform>()

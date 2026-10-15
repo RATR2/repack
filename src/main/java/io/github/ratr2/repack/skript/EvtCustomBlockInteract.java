@@ -10,8 +10,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Arrays;
 
 /**
- * {@code on custom block interact [of "table"]:} fires when a player clicks a custom block, with event-block, event-player and
- * event-string (the id). {@code cancel event} stops the click.
+ * on custom block interact [of "table"]: fires when a player clicks a custom block, with event-block, event-player and
+ * event-string (the id). cancel event stops the click.
  */
 public class EvtCustomBlockInteract extends SkriptEvent {
 

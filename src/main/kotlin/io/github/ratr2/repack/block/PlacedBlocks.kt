@@ -24,9 +24,8 @@ interface PlacementListener {
 /**
  * Every custom block in a loaded chunk, and the persistence behind it.
  *
- * A custom block is a hidden proxy block (barrier by default) at a position, plus a model shown on top of it. The proxy is what
- * players click and collide with. The list of custom blocks per chunk lives in that chunk's persistent data, so it survives
- * restarts and is saved with the world. The model itself is never saved: it is shown to players as they load the chunk.
+ * A custom block is a hidden proxy block (barrier by default) with a model shown on top. The list per chunk lives in the chunk's
+ * persistent data, so it is saved with the world; the model itself is never saved.
  */
 class PlacedBlocks(private val plugin: Repack) : Listener {
 
@@ -69,7 +68,7 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
 
     fun definitionAt(block: Block): BlockDefinition? = dataAt(block)?.let { definitions[it.id] }
 
-    /** Places the custom block [id] at [location], facing [yaw] degrees. False if the id is unknown or the spot is taken. */
+    /** Places the custom block id at location, facing yaw degrees. False if the id is unknown or the spot is taken. */
     fun place(location: Location, id: String, yaw: Float = 0f): Boolean {
         val world = location.world ?: return false
         val definition = definitions[id] ?: return false
@@ -87,7 +86,7 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
         return true
     }
 
-    /** Removes the custom block and its proxy at [block]. False if there was none. */
+    /** Removes the custom block and its proxy at block. False if there was none. */
     fun remove(block: Block): Boolean {
         if (dataAt(block) == null) return false
         forget(block)

@@ -9,7 +9,7 @@ import org.bukkit.Location;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
-/** {@code place custom block "table" at player's location facing player's yaw} */
+/** place custom block "table" at player's location facing player's yaw */
 public class EffPlaceCustomBlock extends Effect {
 
     static final String[] PATTERNS = {"place [a] custom block %string% at %locations% [facing %-number%]"};

@@ -163,7 +163,7 @@ class Repack : JavaPlugin() {
     }
 
     /**
-     * Reads the block files again, which also undoes [registerBlock] and [unregisterBlock]. With [only], just those block ids are
+     * Reads the block files again, which also undoes registerBlock and unregisterBlock. With only, just those block ids are
      * read and refreshed, and every other block is left exactly as it is.
      */
     fun reloadDefinitions(only: Set<String>? = null): List<String> {
@@ -195,7 +195,7 @@ class Repack : JavaPlugin() {
 
     private val recipeKeys = HashMap<String, NamespacedKey>()
 
-    /** Registers the crafting recipe of every block that has one (or of [only] those ids), replacing the ones from before. */
+    /** Registers the crafting recipe of every block that has one (or of only those ids), replacing the ones from before. */
     private fun registerRecipes(only: Set<String>? = null) {
         val stale = recipeKeys.keys.filter { only == null || it in only }
         stale.forEach { server.removeRecipe(recipeKeys.remove(it)!!) }
@@ -227,7 +227,7 @@ class Repack : JavaPlugin() {
     }
 
     /**
-     * Adds a block type with the default settings that shows [model] (a file in the models folder, without extension). It lasts
+     * Adds a block type with the default settings that shows model (a file in the models folder, without extension). It lasts
      * until the next reload. Returns an error message, or null when it worked.
      */
     fun registerBlock(id: String, model: String): String? {

@@ -10,8 +10,8 @@ import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * {@code register custom block "table" using model "ritual_table"}, {@code unregister custom block "table"} and
- * {@code reload custom blocks}. Registered and unregistered blocks last until the next reload.
+ * register custom block "table" using model "ritual_table", unregister custom block "table" and
+ * reload custom blocks. Registered and unregistered blocks last until the next reload.
  */
 public class EffRegisterCustomBlock extends Effect {
 

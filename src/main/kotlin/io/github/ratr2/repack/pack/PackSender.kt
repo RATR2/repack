@@ -44,7 +44,7 @@ class PackSender(
     }
 
     /**
-     * Sends the published pack to [players], each when it is their turn: spaced out from packs other plugins here send to the
+     * Sends the published pack to players, each when it is their turn: spaced out from packs other plugins here send to the
      * same player. Returns how many are queued, 0 when nothing is published.
      */
     fun send(players: Collection<Player>): Int {

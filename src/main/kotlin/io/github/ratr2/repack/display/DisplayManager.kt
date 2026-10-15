@@ -82,7 +82,7 @@ class DisplayManager(private val blocks: PlacedBlocks) : Listener, PlacementList
         shown.remove(event.player.uniqueId)
     }
 
-    /** Sends the models again to everyone, for after the definitions or the pack changed. With [only], just blocks with those ids. */
+    /** Sends the models again to everyone, for after the definitions or the pack changed. With only, just blocks with those ids. */
     fun refreshAll(only: Set<String>? = null) {
         for (world in Bukkit.getWorlds()) {
             for (player in world.players) {

@@ -8,8 +8,8 @@ import java.security.MessageDigest
 data class PackEntry(val sha1: String, val size: Int)
 
 /**
- * Keeps built packs under `packs/<sha1>.zip` and remembers, for each [PackVariant], which one is built (the latest output of
- * /repack build) and which is published (the one players are sent). Building never changes what players get; only [publish] does.
+ * Keeps built packs under `packs/<sha1>.zip` and remembers, for each PackVariant, which one is built (the latest output of
+ * /repack build) and which is published (the one players are sent). Building never changes what players get; only publish does.
  */
 class PackStore(private val dataFolder: File) {
 

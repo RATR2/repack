@@ -18,7 +18,7 @@ object ModelLibrary {
 
     fun idOf(file: File): String = file.nameWithoutExtension.lowercase().replace(INVALID, "_")
 
-    /** The ids the files in [folder] would get, without parsing them. */
+    /** The ids the files in folder would get, without parsing them. */
     fun ids(folder: File): Set<String> =
         folder.listFiles { f -> f.isFile && f.extension.equals("bbmodel", ignoreCase = true) }.orEmpty().mapTo(HashSet(), ::idOf)
 

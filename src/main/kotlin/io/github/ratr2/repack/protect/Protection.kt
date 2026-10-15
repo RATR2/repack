@@ -10,9 +10,8 @@ import org.bukkit.block.Block
 import org.bukkit.entity.Player
 
 /**
- * Asks a protection plugin whether a player may do something to a block, for the places where Repack acts before a normal
- * Bukkit event exists (starting to mine a block, clicking one). Placing and finishing a break go through real Bukkit events, which
- * protection plugins already handle.
+ * Asks a protection plugin whether a player may do something to a block, where no Bukkit event exists yet (starting to mine,
+ * clicking). Placing and finishing a break use real Bukkit events, which protection plugins already handle.
  */
 interface Protection {
     fun canBreak(player: Player, block: Block): Boolean

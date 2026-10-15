@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Predicate;
 
-/** {@code if event-block is a custom block with id "table"} */
+/** if event-block is a custom block with id "table" */
 public class CondIsCustomBlock extends Condition {
 
     static final String[] PATTERNS = {

@@ -19,18 +19,13 @@ import java.util.function.Function
 import java.util.function.Supplier
 
 /**
- * A resource pack web server that several plugins share. Whichever plugin starts first hosts it; the others find it and serve
- * their packs under it instead of opening a port of their own. This file is identical in Distortion and Repack (only the package
- * line differs), and the two talk through a service made only of JDK types, because each plugin has its own copy of every class.
+ * A resource pack web server that several plugins share. Whichever plugin starts first hosts it and the others serve their
+ * packs under it. This file is identical in Distortion and Repack (only the package line differs); the two talk through a
+ * service of JDK types only, since each plugin has its own copy of every class.
  *
- * Files are served at `/<source>/<file>`, where the source is the plugin's name for its packs. The plugin that hosts decides the
- * address and port, so the other plugin's own `public-host` and `port` settings are not used while it is a guest.
- *
- * The same service also spaces out pack sends: [enqueue] makes sure two plugins never push packs to the same player in the same
- * moment, which keeps the client from handling them all at once.
- *
- * When a player joins, [joined] has the host send the packs of every plugin that [offer]s one in a single request, so the client
- * shows one prompt for all of them. The host's `resource-pack.join-delay-ticks` sets how long after joining that happens.
+ * Files are served at `/<source>/<file>`. The host decides the address and port, so a guest's `public-host` and `port` are
+ * ignored. enqueue spaces out pack sends to the same player, and joined sends every plugin's pack in one request after
+ * `resource-pack.join-delay-ticks`.
  */
 class SharedHost(
     private val plugin: JavaPlugin,
@@ -152,7 +147,7 @@ class SharedHost(
         }, delay)
     }
 
-    /** Runs [task] when it is this player's turn, at least [GAP_KEY] ticks after the last pack send to them by any plugin here. */
+    /** Runs task when it is this player's turn, at least GAP_KEY ticks after the last pack send to them by any plugin here. */
     fun enqueue(player: UUID, task: Runnable) {
         ensure()
         val queue = (remote?.get("queue") as? BiConsumer<*, *>)?.takeIf { mode == Mode.GUEST }

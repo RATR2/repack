@@ -8,7 +8,7 @@ import kotlin.math.abs
 class GeneratedModel(val files: Map<String, ByteArray>, val warnings: List<String>)
 
 /**
- * Turns a [BbModel] into a vanilla block model and an item model definition (`assets/<ns>/items/<id>.json`), which is what an
+ * Turns a BbModel into a vanilla block model and an item model definition (`assets/<ns>/items/<id>.json`), which is what an
  * item display shows. Needs 1.21.4 or newer for the item model definition.
  */
 object ItemModelGenerator {
@@ -22,7 +22,7 @@ object ItemModelGenerator {
     /** Rotation angles a vanilla element can have around its single axis. */
     private val ANGLES = setOf(-45.0, -22.5, 0.0, 22.5, 45.0)
 
-    /** [shelf] keeps the `on_shelf` display setting, which only game versions from 1.21.9 know. */
+    /** shelf keeps the `on_shelf` display setting, which only game versions from 1.21.9 know. */
     fun generate(id: String, model: BbModel, shelf: Boolean = true): GeneratedModel {
         val files = HashMap<String, ByteArray>()
         val warnings = ArrayList<String>(model.warnings)
