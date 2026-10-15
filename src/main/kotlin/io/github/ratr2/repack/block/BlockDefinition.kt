@@ -63,6 +63,22 @@ class Breaking(
     val xp: Int,
 )
 
+/**
+ * Which of the model's Display tab settings (hand, inventory, ground, item frame, head) the placed block is drawn with. NONE
+ * draws the model as it is.
+ */
+enum class DisplayContext(val value: Byte) {
+    NONE(0),
+    THIRDPERSON_LEFTHAND(1),
+    THIRDPERSON_RIGHTHAND(2),
+    FIRSTPERSON_LEFTHAND(3),
+    FIRSTPERSON_RIGHTHAND(4),
+    HEAD(5),
+    GUI(6),
+    GROUND(7),
+    FIXED(8),
+}
+
 class DisplayOptions(
     val offsetX: Double,
     val offsetY: Double,
@@ -73,6 +89,7 @@ class DisplayOptions(
     /** Fixed light level 0 to 15 for the model, or null to light it like the world around it. */
     val brightness: Int?,
     val rotateToPlacer: Boolean,
+    val context: DisplayContext,
 )
 
 class ItemOptions(val baseName: String, val name: String?, val lore: List<String>) {

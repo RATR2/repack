@@ -35,6 +35,7 @@ class BlockDefinitionsTest {
         assertEquals(ToolType.ANY, definition.breaking.tool)
         assertNull(definition.breaking.tier)
         assertEquals(PistonBehavior.BLOCK, definition.piston)
+        assertEquals(DisplayContext.NONE, definition.display.context)
         assertEquals(1, definition.drops.size)
         assertIs<SelfDrop>(definition.drops[0])
         assertEquals("PAPER", definition.item.baseName)
@@ -54,7 +55,7 @@ class BlockDefinitionsTest {
               - block: self
             explosion: {resistant: true}
             piston: destroy
-            display: {offset: [0, 0.5, 0], scale: 2.0, view-range: 0.5, brightness: 15, rotate-to-placer: true}
+            display: {offset: [0, 0.5, 0], scale: 2.0, view-range: 0.5, brightness: 15, rotate-to-placer: true, context: head}
             item: {base: PAPER, name: "&bTable", lore: ["one", "two"]}
             """.trimIndent()
         )
@@ -77,6 +78,7 @@ class BlockDefinitionsTest {
         assertEquals(2f, definition.display.scale)
         assertEquals(15, definition.display.brightness)
         assertTrue(definition.display.rotateToPlacer)
+        assertEquals(DisplayContext.HEAD, definition.display.context)
         assertEquals(listOf("one", "two"), definition.item.lore)
     }
 
@@ -96,6 +98,7 @@ class BlockDefinitionsTest {
         assertTrue("drops[0]" in message("drops: [{amount: 2}]"))
         assertTrue("display.brightness" in message("display: {brightness: 20}"))
         assertTrue("display.offset" in message("display: {offset: [1, 2]}"))
+        assertTrue("display.context" in message("display: {context: sideways}"))
     }
 
     @Test

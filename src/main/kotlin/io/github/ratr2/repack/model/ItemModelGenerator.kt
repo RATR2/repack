@@ -41,6 +41,7 @@ object ItemModelGenerator {
         val block = JsonObject().apply {
             add("textures", textures)
             add("elements", elements)
+            displayOf(model.display, warnings)?.let { add("display", it) }
         }
         files["assets/$NAMESPACE/models/block/$id.json"] = block.toString().toByteArray(Charsets.UTF_8)
 
@@ -53,6 +54,30 @@ object ItemModelGenerator {
         files["assets/$NAMESPACE/items/$id.json"] = item.toString().toByteArray(Charsets.UTF_8)
         return GeneratedModel(files, warnings)
     }
+
+    /** Vanilla accepts translation between -80 and 80 and scale between -4 and 4 in a display transform. */
+    private fun displayOf(display: Map<String, DisplayTransform>, warnings: MutableList<String>): JsonObject? {
+        if (display.isEmpty()) return null
+        val result = JsonObject()
+        for ((context, transform) in display) {
+            val entry = JsonObject()
+            transform.rotation?.let { entry.add("rotation", it.toJsonArray()) }
+            transform.translation?.let { values ->
+                val clamped = values.map { it.coerceIn(-80.0, 80.0) }
+                if (clamped != values) warnings += "Display '$context' moves the model further than the 80 units vanilla allows; clamped."
+                entry.add("translation", clamped.toJsonArray())
+            }
+            transform.scale?.let { values ->
+                val clamped = values.map { it.coerceIn(-4.0, 4.0) }
+                if (clamped != values) warnings += "Display '$context' scales the model beyond 4 times, which vanilla does not allow; clamped."
+                entry.add("scale", clamped.toJsonArray())
+            }
+            if (entry.size() > 0) result.add(context, entry)
+        }
+        return result.takeIf { it.size() > 0 }
+    }
+
+    private fun List<Double>.toJsonArray() = JsonArray().also { array -> forEach { array.add(it) } }
 
     private fun elementOf(cube: BbCube, textures: List<BbTexture>, usable: JsonObject, warnings: MutableList<String>): JsonObject? {
         val faces = JsonObject()

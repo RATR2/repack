@@ -80,6 +80,27 @@ class ModelPipelineTest {
     }
 
     @Test
+    fun `carries the display tab into the block model and clamps what vanilla would reject`() {
+        val withDisplay = bbmodel(plainCube).replace(
+            "\"textures\"",
+            """"display": {"gui": {"rotation": [39.29, -40, 6.09], "scale": [0.6, 0.6, 0.6]},
+                "head": {"translation": [0, 120, 0], "scale": [8, 8, 8]},
+                "fixed": {"rotation": [-90, 0, 0], "translation": [0, 0, -6.75]},
+                "on_shelf": {"translation": [0, 0, 4.75]}},
+              "textures"""",
+        )
+        val generated = ItemModelGenerator.generate("t", BbParser.parse("t", withDisplay))
+        val display = JsonParser.parseString(String(generated.files.getValue("assets/repack/models/block/t.json"))).asJsonObject.getAsJsonObject("display")
+        assertEquals(setOf("gui", "head", "fixed"), display.keySet())
+        assertEquals(0.6, display.getAsJsonObject("gui").getAsJsonArray("scale")[0].asDouble)
+        assertEquals(80.0, display.getAsJsonObject("head").getAsJsonArray("translation")[1].asDouble)
+        assertEquals(4.0, display.getAsJsonObject("head").getAsJsonArray("scale")[0].asDouble)
+        assertEquals(-90.0, display.getAsJsonObject("fixed").getAsJsonArray("rotation")[0].asDouble)
+        assertTrue(generated.warnings.any { "80 units" in it })
+        assertTrue(generated.warnings.any { "4 times" in it })
+    }
+
+    @Test
     fun `parses real model files when REPACK_SAMPLES points at a folder`() {
         val folder = System.getenv("REPACK_SAMPLES")?.let(::File)?.takeIf { it.isDirectory } ?: return
         val files = folder.listFiles { f -> f.extension == "bbmodel" }.orEmpty()

@@ -36,6 +36,8 @@ import org.bukkit.event.entity.EntityChangeBlockEvent
 import org.bukkit.event.entity.EntityExplodeEvent
 import org.bukkit.event.entity.EntityInteractEvent
 import org.bukkit.event.player.PlayerBucketEmptyEvent
+import org.bukkit.event.player.PlayerAnimationEvent
+import org.bukkit.event.player.PlayerAnimationType
 import org.bukkit.event.player.PlayerBucketEvent
 import org.bukkit.event.player.PlayerBucketFillEvent
 import org.bukkit.event.player.PlayerInteractEvent
@@ -55,6 +57,8 @@ import java.util.UUID
  * really is going away. Removing it earlier would lose the block whenever a protection plugin stepped in afterwards.
  */
 private const val DENY_COOLDOWN_MILLIS = 3000L
+private const val MINING_REACH = 6
+private const val SWING_TIMEOUT_MILLIS = 700L
 
 class BlockEvents(
     private val plugin: Repack,
@@ -64,7 +68,7 @@ class BlockEvents(
     private val protection: Protection,
 ) : Listener {
 
-    private class Mining(val block: Block, val definition: BlockDefinition, val startedAt: Long)
+    private class Mining(val block: Block, val definition: BlockDefinition, val startedAt: Long, var lastActive: Long)
 
     private class Hit(val block: Block, val id: String, val definition: BlockDefinition)
 
@@ -101,6 +105,10 @@ class BlockEvents(
         player.sendMessage(Component.text(text, NamedTextColor.RED))
     }
 
+    private fun debug(message: String) {
+        if (plugin.config.getBoolean("debug", false)) plugin.logger.info("[debug] $message")
+    }
+
     private fun dropLoot(hit: Hit) {
         loot.roll(hit.definition).forEach { hit.block.world.dropItemNaturally(hit.block.location.toCenterLocation(), it) }
     }
@@ -128,6 +136,13 @@ class BlockEvents(
                 event.setUseInteractedBlock(Event.Result.DENY)
                 deny(player)
                 return
+            }
+            if (event.action == Action.LEFT_CLICK_BLOCK) {
+                debug("${player.name} left clicked ${hit.id}")
+                if (!beginMining(player, hit, event)) {
+                    event.setUseInteractedBlock(Event.Result.DENY)
+                    return
+                }
             }
             val custom = CustomBlockInteractEvent(player, block, hit.id, event.action, event.hand)
             plugin.server.pluginManager.callEvent(custom)
@@ -173,9 +188,8 @@ class BlockEvents(
     }
 
     /**
-     * Starts the mining timer for a custom block the player has begun to dig, or keeps the one already running for it. Returns
-     * false when the dig is refused. Called from the block damage event and from the left click, because some proxy blocks
-     * (the barrier) may never send the first.
+     * Starts the mining timer for a custom block the player began to dig, or keeps the running one. False if the dig is
+     * refused. Called from the damage event and the left click, since some proxies (barrier) may never send the first.
      */
     private fun beginMining(player: Player, hit: Hit, cause: Event): Boolean {
         if (player.gameMode != GameMode.SURVIVAL && player.gameMode != GameMode.ADVENTURE) return true
@@ -201,25 +215,21 @@ class BlockEvents(
 
     @EventHandler(ignoreCancelled = true)
     fun onDamage(event: BlockDamageEvent) {
-        val player = event.player
-        if (player.gameMode != GameMode.SURVIVAL && player.gameMode != GameMode.ADVENTURE) return
         val hit = hit(event.block) ?: return
-
-        if (!protection.canBreak(player, event.block)) {
-            event.isCancelled = true
-            deny(player)
-            return
-        }
-        if (fire(hit, BlockAction.BREAK_START, player, event, cancelledByDefault = false).isCancelled) {
+        debug("block damage event for ${hit.id}")
+        if (!beginMining(event.player, hit, event)) {
             event.isCancelled = true
             return
         }
-        if (hit.definition.proxyMode != ProxyMode.CUSTOM) return
+        // Vanilla would otherwise finish the block instantly, instead of on our timer.
+        if (hit.definition.proxyMode == ProxyMode.CUSTOM) event.instaBreak = false
+    }
 
-        // Vanilla would otherwise finish the block on its own schedule, or instantly, instead of ours.
-        event.instaBreak = false
-        val current = mining[player.uniqueId]
-        if (current == null || current.block != event.block) mining[player.uniqueId] = Mining(event.block, hit.definition, System.currentTimeMillis())
+    /** Swings keep a dig alive: the client swings every few ticks while the button is held, and stops when it lets go. */
+    @EventHandler
+    fun onSwing(event: PlayerAnimationEvent) {
+        if (event.animationType != PlayerAnimationType.ARM_SWING) return
+        mining[event.player.uniqueId]?.lastActive = System.currentTimeMillis()
     }
 
     @EventHandler
@@ -243,6 +253,13 @@ class BlockEvents(
             val player = plugin.server.getPlayer(playerId)
             if (player == null || blocks.idAt(session.block) == null) {
                 mining.remove(playerId)
+                continue
+            }
+            // Stopped digging: looked away, or no swing for a moment (the abort packet does not always arrive for every proxy).
+            if (player.getTargetBlockExact(MINING_REACH) != session.block || now - session.lastActive > SWING_TIMEOUT_MILLIS) {
+                mining.remove(playerId)
+                player.sendBlockDamage(session.block.location, 0f)
+                debug("${player.name} stopped mining ${session.definition.id}")
                 continue
             }
             val progress = ((now - session.startedAt) / (session.definition.breaking.time * 1000.0)).toFloat().coerceAtMost(1f)
