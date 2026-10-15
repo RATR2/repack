@@ -8,6 +8,7 @@ import com.mojang.brigadier.suggestion.Suggestions
 import com.mojang.brigadier.suggestion.SuggestionsBuilder
 import com.mojang.brigadier.tree.LiteralCommandNode
 import io.github.ratr2.repack.pack.PackEntry
+import io.github.ratr2.repack.pack.PackVariant
 import io.papermc.paper.command.brigadier.CommandSourceStack
 import io.papermc.paper.command.brigadier.Commands
 import io.papermc.paper.command.brigadier.argument.ArgumentTypes
@@ -107,11 +108,10 @@ class RepackCommand(private val plugin: Repack) {
 
     private fun build(context: CommandContext<CommandSourceStack>): Int {
         val report = plugin.rebuild()
-        val entry = report.entry
         reply(
             context,
-            "Built pack ${short(entry)} (${entry.size} bytes) from ${report.models.size} model(s). " +
-                "Players still get the published pack until you run /repack push.",
+            "Built ${report.entries.entries.joinToString { (variant, entry) -> "${variant.id} ${short(entry)}" }} from ${report.models.size} model(s). " +
+                "Players still get the published packs until you run /repack push.",
             NamedTextColor.GREEN,
         )
         report.errors.take(MAX_LINES).forEach { reply(context, it, NamedTextColor.RED) }
@@ -122,24 +122,25 @@ class RepackCommand(private val plugin: Repack) {
     }
 
     private fun push(context: CommandContext<CommandSourceStack>, targets: List<Player>): Int {
-        val entry = plugin.store.publish()
-        if (entry == null) {
+        val published = plugin.store.publish()
+        if (published.isEmpty()) {
             reply(context, "Nothing built yet. Run /repack build first.", NamedTextColor.RED)
             return 0
         }
         val sent = plugin.sender.send(targets)
-        reply(context, "Published ${short(entry)} and sent it to $sent player(s).", NamedTextColor.GREEN)
+        reply(context, "Published ${published.entries.joinToString { (variant, entry) -> "${variant.id} ${short(entry)}" }} and sent it to $sent player(s).", NamedTextColor.GREEN)
         return Command.SINGLE_SUCCESS
     }
 
     private fun status(context: CommandContext<CommandSourceStack>): Int {
-        val built = plugin.store.built
-        val published = plugin.store.published
-        reply(context, "Built: ${built?.let(::short) ?: "none"}. Published: ${published?.let(::short) ?: "none"}.", NamedTextColor.YELLOW)
-        reply(context, "Pack server: ${plugin.host.description}.", NamedTextColor.YELLOW)
-        if (built != null && built != published) {
-            reply(context, "The built pack has not been pushed yet.", NamedTextColor.YELLOW)
+        val store = plugin.store
+        for (variant in PackVariant.entries) {
+            val built = store.built[variant]
+            val published = store.published[variant]
+            val note = if (built != null && built != published) " (the built one has not been pushed yet)" else ""
+            reply(context, "${variant.id} (${variant.label}): built ${built?.let(::short) ?: "none"}, published ${published?.let(::short) ?: "none"}$note", NamedTextColor.YELLOW)
         }
+        reply(context, "Pack server: ${plugin.host.description}.", NamedTextColor.YELLOW)
         return Command.SINGLE_SUCCESS
     }
 

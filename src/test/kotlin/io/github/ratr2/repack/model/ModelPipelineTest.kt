@@ -91,13 +91,31 @@ class ModelPipelineTest {
         )
         val generated = ItemModelGenerator.generate("t", BbParser.parse("t", withDisplay))
         val display = JsonParser.parseString(String(generated.files.getValue("assets/repack/models/block/t.json"))).asJsonObject.getAsJsonObject("display")
-        assertEquals(setOf("gui", "head", "fixed"), display.keySet())
+        assertEquals(setOf("gui", "head", "fixed", "on_shelf"), display.keySet())
         assertEquals(0.6, display.getAsJsonObject("gui").getAsJsonArray("scale")[0].asDouble)
         assertEquals(80.0, display.getAsJsonObject("head").getAsJsonArray("translation")[1].asDouble)
         assertEquals(4.0, display.getAsJsonObject("head").getAsJsonArray("scale")[0].asDouble)
         assertEquals(-90.0, display.getAsJsonObject("fixed").getAsJsonArray("rotation")[0].asDouble)
         assertTrue(generated.warnings.any { "80 units" in it })
         assertTrue(generated.warnings.any { "4 times" in it })
+    }
+
+    @Test
+    fun `the shelf display setting is left out of the pack for clients before 1_21_9`() {
+        val withShelf = bbmodel(plainCube).replace(
+            "\"textures\"",
+            """"display": {"gui": {"scale": [0.6, 0.6, 0.6]}, "on_shelf": {"translation": [0, 0, 4.75]}}, "textures"""",
+        )
+        val model = BbParser.parse("s", withShelf)
+        assertEquals(setOf("gui", "on_shelf"), model.display.keys)
+
+        fun keys(shelf: Boolean): Set<String> {
+            val generated = ItemModelGenerator.generate("s", model, shelf)
+            return JsonParser.parseString(String(generated.files.getValue("assets/repack/models/block/s.json"))).asJsonObject
+                .getAsJsonObject("display").keySet()
+        }
+        assertEquals(setOf("gui", "on_shelf"), keys(shelf = true))
+        assertEquals(setOf("gui"), keys(shelf = false))
     }
 
     @Test

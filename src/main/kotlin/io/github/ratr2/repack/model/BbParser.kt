@@ -12,9 +12,10 @@ import java.util.Base64
  */
 object BbParser {
 
-    /** The display contexts a block model can set in every Minecraft version from 1.21.4 on. */
+    /** The display contexts Blockbench can set that a block model uses. `on_shelf` only exists from Minecraft 1.21.9, so the generator drops it for older packs. */
     val DISPLAY_CONTEXTS = listOf(
         "thirdperson_righthand", "thirdperson_lefthand", "firstperson_righthand", "firstperson_lefthand", "gui", "head", "ground", "fixed",
+        "on_shelf",
     )
 
     fun parse(name: String, json: String): BbModel {
@@ -55,7 +56,7 @@ object BbParser {
         return BbModel(name, textures, cubes, parseDisplay(root), warnings)
     }
 
-    /** The Display tab. Only the contexts every supported client knows are kept: a name an older client does not know would stop the model loading. */
+    /** The Display tab. Names a block model never uses are left out, and a name an older client does not know would stop its model loading, which is what [ItemModelGenerator] guards against for `on_shelf`. */
     private fun parseDisplay(root: JsonObject): Map<String, DisplayTransform> {
         val display = root.obj("display") ?: return emptyMap()
         val result = LinkedHashMap<String, DisplayTransform>()
