@@ -1,6 +1,7 @@
 package io.github.ratr2.repack
 
 import com.github.retrooper.packetevents.PacketEvents
+import io.github.ratr2.repack.block.PlacedBlocks
 import io.github.ratr2.repack.model.ModelLibrary
 import io.github.ratr2.repack.pack.PackBuilder
 import io.github.ratr2.repack.pack.PackEntry
@@ -18,6 +19,8 @@ class Repack : JavaPlugin() {
         private set
     lateinit var sender: PackSender
         private set
+    lateinit var blocks: PlacedBlocks
+        private set
     private lateinit var host: PackHost
 
     override fun onLoad() {
@@ -33,6 +36,12 @@ class Repack : JavaPlugin() {
         sender = PackSender(this, store, host)
         server.pluginManager.registerEvents(sender, this)
 
+        blocks = PlacedBlocks(this)
+        blocks.types = ModelLibrary.ids(modelsFolder)
+        server.pluginManager.registerEvents(blocks, this)
+        blocks.start()
+        RepackAPI.plugin = this
+
         val command = RepackCommand(this)
         lifecycleManager.registerEventHandler(LifecycleEvents.COMMANDS) { event ->
             event.registrar().register(command.node(), "Build and push the custom block resource pack")
@@ -40,6 +49,7 @@ class Repack : JavaPlugin() {
     }
 
     override fun onDisable() {
+        RepackAPI.plugin = null
         if (::host.isInitialized) host.stop()
         PacketEvents.getAPI().terminate()
     }
@@ -54,6 +64,7 @@ class Repack : JavaPlugin() {
         files["pack.mcmeta"] = PackBuilder.meta("Repack custom blocks")
         library.warnings.forEach { logger.warning(it) }
         library.errors.forEach { logger.severe(it) }
+        blocks.types = library.models.toSet()
         return BuildReport(store.add(PackBuilder.zip(files)), library.models, library.warnings, library.errors)
     }
 }
