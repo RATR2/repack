@@ -10,6 +10,9 @@ import java.net.InetSocketAddress
 import java.net.URI
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import net.kyori.adventure.resource.ResourcePackInfo
+import net.kyori.adventure.resource.ResourcePackRequest
+import net.kyori.adventure.text.Component
 import java.util.function.BiConsumer
 import java.util.function.Consumer
 import java.util.function.Function
@@ -25,6 +28,9 @@ import java.util.function.Supplier
  *
  * The same service also spaces out pack sends: [enqueue] makes sure two plugins never push packs to the same player in the same
  * moment, which keeps the client from handling them all at once.
+ *
+ * When a player joins, [joined] has the host send the packs of every plugin that [offer]s one in a single request, so the client
+ * shows one prompt for all of them. The host's `resource-pack.join-delay-ticks` sets how long after joining that happens.
  */
 class SharedHost(
     private val plugin: JavaPlugin,
@@ -41,6 +47,19 @@ class SharedHost(
 
     /** What this plugin serves, and what guests have added. Lives as long as the plugin, through port changes. */
     private val sources = ConcurrentHashMap<String, Function<String, ByteArray?>>()
+
+    /**
+     * What this plugin sends a player who joins: id, url, sha1, required and prompt, or null for nothing. Kept so it can be handed
+     * to whichever plugin hosts, now or later. JDK types only, like the rest of the service.
+     */
+    @Volatile
+    private var ownProvider: Function<UUID, Map<String, String>?>? = null
+
+    /** The providers of every plugin that uses this host, by source. Only used by the host. */
+    private val providers = ConcurrentHashMap<String, Function<UUID, Map<String, String>?>>()
+
+    /** Players whose join packs are already scheduled, so two plugins reporting the same join cause one send. */
+    private val pendingJoins = ConcurrentHashMap.newKeySet<UUID>()
 
     /** The service this plugin publishes while it hosts. */
     private var service: MutableMap<String, Any>? = null
@@ -86,6 +105,51 @@ class SharedHost(
     fun urlOf(file: String): URI {
         ensure()
         return URI("$baseUrl/$source/$file")
+    }
+
+    /** Says what this plugin sends a joining player. Return null when there is nothing to send that player. */
+    fun offer(provider: (UUID) -> Map<String, String>?) {
+        ownProvider = Function { provider(it) }
+        ensure()
+        when (mode) {
+            Mode.HOST -> providers[source] = ownProvider!!
+            Mode.GUEST -> remote?.let(::register)
+            Mode.NONE -> {}
+        }
+    }
+
+    /**
+     * Reports a join. The host waits its join delay, then sends the packs of all plugins in one request. Every plugin calls this
+     * for the same join; only the first call per player does anything.
+     */
+    fun joined(player: UUID) {
+        ensure()
+        val join = (remote?.get("join") as? Consumer<*>)?.takeIf { mode == Mode.GUEST }
+        if (join != null) {
+            @Suppress("UNCHECKED_CAST")
+            (join as Consumer<UUID>).accept(player)
+        } else {
+            dispatchJoin(player)
+        }
+    }
+
+    private fun dispatchJoin(player: UUID) {
+        if (!pendingJoins.add(player)) return
+        val delay = plugin.config.getInt("resource-pack.join-delay-ticks", 40).coerceAtLeast(0).toLong()
+        plugin.server.scheduler.runTaskLater(plugin, Runnable {
+            pendingJoins.remove(player)
+            val online = Bukkit.getPlayer(player) ?: return@Runnable
+            val offers = providers.toSortedMap().values.mapNotNull { runCatching { it.apply(player) }.getOrNull() }
+            if (offers.isEmpty()) return@Runnable
+            val prompt = offers.map { it["prompt"].orEmpty() }.firstOrNull { it.isNotBlank() }.orEmpty()
+            val request = ResourcePackRequest.resourcePackRequest()
+                .packs(offers.map { ResourcePackInfo.resourcePackInfo(UUID.fromString(it["id"]), URI(it["url"]!!), it["sha1"]!!) })
+                .required(offers.any { it["required"] == "true" })
+                .prompt(Component.text(prompt))
+                .build()
+            nextSlot[player] = Bukkit.getCurrentTick() + plugin.config.getInt(GAP_KEY, 20).coerceAtLeast(0)
+            online.sendResourcePacks(request)
+        }, delay)
     }
 
     /** Runs [task] when it is this player's turn, at least [GAP_KEY] ticks after the last pack send to them by any plugin here. */
@@ -149,6 +213,7 @@ class SharedHost(
     @Suppress("UNCHECKED_CAST")
     private fun register(host: Map<*, *>) {
         (host["register"] as BiConsumer<String, Function<String, ByteArray?>>).accept(source, Function { resolver(it) })
+        ownProvider?.let { (host["offer"] as BiConsumer<String, Function<UUID, Map<String, String>?>>).accept(source, it) }
     }
 
     private fun join(host: Map<*, *>) {
@@ -162,6 +227,7 @@ class SharedHost(
         val server = bind() ?: return
         http = server
         sources[source] = Function { resolver(it) }
+        ownProvider?.let { providers[source] = it }
         publish()
         mode = Mode.HOST
         plugin.logger.info("Pack server started at $ownBase")
@@ -173,7 +239,9 @@ class SharedHost(
         map["owner"] = plugin.name
         map["baseUrl"] = Supplier { ownBase }
         map["register"] = BiConsumer<String, Function<String, ByteArray?>> { name, provider -> sources[name] = provider }
-        map["unregister"] = Consumer<String> { sources.remove(it) }
+        map["offer"] = BiConsumer<String, Function<UUID, Map<String, String>?>> { name, provider -> providers[name] = provider }
+        map["join"] = Consumer<UUID> { dispatchJoin(it) }
+        map["unregister"] = Consumer<String> { sources.remove(it); providers.remove(it) }
         map["sources"] = Supplier<Set<String>> { sources.keys.toSet() }
         map["queue"] = BiConsumer<UUID, Runnable> { player, task -> schedule(player, task) }
         service = map
@@ -189,6 +257,7 @@ class SharedHost(
                 service?.let { Bukkit.getServicesManager().unregister(it) }
                 service = null
                 sources.clear()
+                providers.clear()
             }
             Mode.GUEST -> (remote?.get("unregister") as? Consumer<*>)?.let {
                 @Suppress("UNCHECKED_CAST")
@@ -247,7 +316,7 @@ class SharedHost(
     companion object {
         const val SHARE = "resource-pack.share-host"
         const val GAP_KEY = "resource-pack.send-gap-ticks"
-        private const val VERSION = 1
+        private const val VERSION = 2
     }
 }
 
