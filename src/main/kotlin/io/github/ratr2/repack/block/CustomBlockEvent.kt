@@ -14,6 +14,17 @@ enum class BlockAction {
     PISTON,
     BURN,
     ENTITY_CHANGE,
+    ENTITY_INTERACT,
+    FADE,
+    /** A liquid would flow into it. Cancelled by default. */
+    FLUID,
+    /** A bucket would be emptied into it or filled from it. Cancelled by default. */
+    BUCKET,
+    /** A growing structure or bone meal would replace it. Cancelled by default. */
+    GROW,
+    PHYSICS,
+    /** Another block broke it, such as flowing water. Cannot be cancelled. */
+    BROKEN_BY_BLOCK,
 }
 
 /**

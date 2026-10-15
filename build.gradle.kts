@@ -8,6 +8,7 @@ repositories {
     mavenCentral()
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://repo.codemc.io/repository/maven-releases/")
+    maven("https://maven.enginehub.org/repo/")
 }
 
 dependencies {
@@ -16,6 +17,8 @@ dependencies {
     implementation("com.github.retrooper:packetevents-spigot:2.14.0") {
         exclude(group = "net.kyori")
     }
+    compileOnly("com.sk89q.worldguard:worldguard-bukkit:7.0.19")
+    compileOnly("com.sk89q.worldedit:worldedit-bukkit:7.4.6")
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
 
     testImplementation(kotlin("test"))
