@@ -18,7 +18,7 @@ enum class Direction(val key: String) {
     DOWN("down"),
 }
 
-/** [uv] is x1, y1, x2, y2 in the texture's own UV space (see [BbTexture.uvWidth]). */
+/** uv is x1, y1, x2, y2 in the texture's own UV space (see BbTexture.uvWidth). */
 class BbFace(val uv: List<Double>, val rotation: Int, val texture: Int)
 
 class BbCube(
@@ -38,10 +38,6 @@ class DisplayTransform(val rotation: List<Double>?, val translation: List<Double
 
 class BbTexture(val name: String, val png: ByteArray, val uvWidth: Int, val uvHeight: Int)
 
-/**
- * A parsed .bbmodel, reduced to what a static block needs: cubes and textures.
- * [warnings] lists things in the file that the plugin ignores or cannot represent.
- */
 class BbModel(
     val name: String,
     val textures: List<BbTexture>,

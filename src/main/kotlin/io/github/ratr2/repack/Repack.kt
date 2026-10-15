@@ -217,10 +217,22 @@ class Repack : JavaPlugin() {
         }
     }
 
-    /**
-     * Reads the block files again, which also undoes [registerBlock] and [unregisterBlock]. With [only], just those block ids are
-     * read and refreshed, and every other block is left exactly as it is.
-     */
+    /** Brings `config.yml` up to date, then reads it again. */
+    private fun migrateConfig() {
+        val shippedConfig = getResource("config.yml")?.reader()?.use { it.readText() } ?: return
+        val defaults = YamlConfiguration().apply { loadFromString(shippedConfig) }
+        ConfigMigrator.gatherBackups(dataFolder, backupsFolder)
+        ConfigMigrator.gatherBackups(blocksFolder, File(backupsFolder, "blocks"))
+        ConfigMigrator.migrate(File(dataFolder, "config.yml"), ConfigVersions.of(shippedConfig), CONFIG_MIGRATIONS, defaults, backupsFolder)?.let(logger::info)
+        reloadConfig()
+    }
+
+    /** Brings every settings file in `blocks/` up to date, so the parser only ever sees the current layout. */
+    private fun migrateBlockFiles() {
+        val files = blocksFolder.listFiles { f -> f.isFile && f.extension == "yml" && !f.name.startsWith("_") }.orEmpty()
+        for (file in files.sortedBy { it.name }) ConfigMigrator.migrate(file, BlockTemplate.version, backups = File(backupsFolder, "blocks"))?.let(logger::info)
+    }
+
     fun reloadDefinitions(only: Set<String>? = null): List<String> {
         createMissingBlockFiles()
         val loaded = BlockDefinitions.load(blocksFolder, ModelLibrary.ids(modelsFolder), only)
@@ -250,7 +262,6 @@ class Repack : JavaPlugin() {
 
     private val recipeKeys = HashMap<String, NamespacedKey>()
 
-    /** Registers the crafting recipe of every block that has one (or of [only] those ids), replacing the ones from before. */
     private fun registerRecipes(only: Set<String>? = null) {
         val stale = recipeKeys.keys.filter { only == null || it in only }
         stale.forEach { server.removeRecipe(recipeKeys.remove(it)!!) }
@@ -281,10 +292,6 @@ class Repack : JavaPlugin() {
         logger.info("Installed the bundled table: models/table.bbmodel and blocks/table.yml.")
     }
 
-    /**
-     * Adds a block type with the default settings that shows [model] (a file in the models folder, without extension). It lasts
-     * until the next reload. Returns an error message, or null when it worked.
-     */
     fun registerBlock(id: String, model: String): String? {
         if (!ID.matches(id)) return "Block ids use only a-z, 0-9, _ and -."
         if (model !in ModelLibrary.ids(modelsFolder)) return "There is no model file '$model.bbmodel'."

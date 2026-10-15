@@ -9,7 +9,6 @@ import org.bukkit.Location;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
-/** {@code remove custom block at event-location}: removes the block and its model, with no drops. */
 public class EffRemoveCustomBlock extends Effect {
 
     static final String[] PATTERNS = {"remove [the] custom block[s] at %locations%"};

@@ -28,10 +28,9 @@ enum class BlockAction {
 }
 
 /**
- * Fired for everything that happens to a custom block's proxy block, after the block's own defaults have been applied: the event
- * starts out cancelled when the definition says the block resists that action (a piston on a block set to `piston: block`, an
- * explosion on a block set to `explosion.resistant`). A listener can cancel or un-cancel it, and the outcome is what happens.
- * [cause] is the Bukkit event behind it, when there is one.
+ * Fired for everything that happens to a custom block's proxy block, after the block's defaults are applied. It starts out
+ * cancelled when the block resists that action (`piston: block`, `explosion.resistant`); a listener can cancel or un-cancel it.
+ * cause is the Bukkit event behind it, when there is one.
  */
 class CustomBlockEvent(
     val block: Block,

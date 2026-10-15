@@ -29,7 +29,7 @@ object BukkitMaterials : MaterialRules {
  */
 object BlockDefinitions {
 
-    /** Reads every block file, or just the ids in [only]. */
+    /** Reads every block file, or just the ids in only. */
     fun load(blocksFolder: File, modelIds: Set<String>, only: Set<String>? = null): LoadedDefinitions {
         val definitions = LinkedHashMap<String, BlockDefinition>()
         val errors = ArrayList<String>()

@@ -42,10 +42,10 @@ class PackSender(
         )
     }
 
-    /**
-     * Sends the published pack to [players], each when it is their turn: spaced out from packs other plugins here send to the
-     * same player. Returns how many are queued, 0 when nothing is published.
-     */
+    /** What a joining player gets: the newest build, or with `resource-pack.join-latest-build: false` only what was last pushed. */
+    private fun packForJoin(variant: PackEra): PackEntry? =
+        if (plugin.config.getBoolean("resource-pack.join-latest-build", true)) store.built[variant] ?: store.published[variant] else store.published[variant]
+
     fun send(players: Collection<Player>): Int {
         if (!store.hasPublished) return 0
         players.forEach { player -> host.enqueue(player.uniqueId) { if (player.isOnline) sendNow(player) } }

@@ -1,10 +1,5 @@
 package io.github.ratr2.repack.pack
 
-/**
- * One version of the pack. Models are the same in each, but a setting a newer game understands would stop an older one loading
- * the model, so each version range gets the pack built for it, and a player is sent the one for the client they connected with.
- * [minProtocol] and [maxProtocol] are the protocol numbers ViaVersion lists for the releases it covers.
- */
 enum class PackVariant(val id: String, val label: String, val minProtocol: Int, val maxProtocol: Int, val shelf: Boolean) {
     /** 1.21.4 to 1.21.8: no shelf display setting, which first appears in 1.21.9. */
     LEGACY("legacy", "1.21.4 to 1.21.8", 769, 772, shelf = false),

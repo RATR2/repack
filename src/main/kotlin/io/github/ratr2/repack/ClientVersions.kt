@@ -17,6 +17,8 @@ class ClientVersions(plugin: Repack) {
         val protocol = viaLookup?.invoke(player.uniqueId) ?: return PackVariant.SERVER_PROTOCOL
         return if (protocol > 0) protocol else PackVariant.SERVER_PROTOCOL
     }
+
+    private fun serverProtocol(): Int = PacketEvents.getAPI().serverManager.version.protocolVersion
 }
 
 /** Kept apart so ViaVersion's classes are only loaded when the plugin is installed. */

@@ -78,7 +78,23 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
         shown.remove(event.player.uniqueId)
     }
 
-    /** Sends the models again to everyone, for after the definitions or the pack changed. With [only], just blocks with those ids. */
+    /** Takes every model away from one player. [showAllFor] gives them back. */
+    fun hideAllFor(player: Player) {
+        shown[player.uniqueId]?.keys?.toList()?.forEach { hide(player, it) }
+    }
+
+    /** Shows one player every model in the chunks they have. */
+    fun showAllFor(player: Player) {
+        val world = player.world
+        for (chunk in world.loadedChunks) {
+            if (!player.isChunkSent(Chunk.getChunkKey(chunk.x, chunk.z))) continue
+            for ((pos, block) in blocks.inChunk(chunk)) {
+                val definition = blocks.definitionOf(block.id) ?: continue
+                show(player, world, pos, block, definition)
+            }
+        }
+    }
+
     fun refreshAll(only: Set<String>? = null) {
         for (world in Bukkit.getWorlds()) {
             for (player in world.players) {

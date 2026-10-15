@@ -10,7 +10,7 @@ import org.bukkit.event.Event;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
-/** {@code give player custom block item "table" x 2}: the item that places a custom block. */
+/** give player custom block item "table" x 2: the item that places a custom block. */
 public class ExprCustomBlockItem extends SimpleExpression<ItemType> {
 
     static final String[] PATTERNS = {"[the] custom block item %string% [(x|times) %-number%]"};
