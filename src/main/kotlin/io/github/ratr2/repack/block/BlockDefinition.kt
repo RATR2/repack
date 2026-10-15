@@ -3,7 +3,7 @@ package io.github.ratr2.repack.block
 import org.bukkit.Material
 import java.util.Random
 
-/** vanilla: the proxy block's own mining and drops apply. custom: the `breaking` and `drops` settings apply instead. */
+/** vanilla: the proxy block's own mining speed applies. custom: `breaking.time` applies instead. Drops always come from `drops`. */
 enum class ProxyMode { VANILLA, CUSTOM }
 
 /** What a piston does when it would push or pull the block. */
@@ -63,7 +63,6 @@ class Breaking(
     /** When true, breaking without the right tool gives no drops (the block still breaks). */
     val dropsNeedTool: Boolean,
     val xp: Int,
-    val creativeInstant: Boolean,
 )
 
 class DisplayOptions(
@@ -90,6 +89,8 @@ class BlockDefinition(
     val model: String,
     val proxyBlockName: String,
     val proxyMode: ProxyMode,
+    /** When false (the default) right-clicking does not do what the proxy block normally does, such as opening a smithing table. */
+    val vanillaInteraction: Boolean,
     val breaking: Breaking,
     val drops: List<Drop>,
     val explosionResistant: Boolean,

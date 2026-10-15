@@ -2,6 +2,7 @@ package io.github.ratr2.repack
 
 import org.bukkit.Location
 import org.bukkit.block.Block
+import org.bukkit.inventory.ItemStack
 
 /**
  * Static entry points for other plugins, callable directly or via reflection, on the main thread:
@@ -19,7 +20,11 @@ object RepackAPI {
 
     /** Places the custom block [id] at [location]. False if the id is unknown, the spot is taken or the plugin is disabled. */
     @JvmStatic
-    fun place(location: Location, id: String): Boolean = plugin?.blocks?.place(location, id) ?: false
+    fun place(location: Location, id: String): Boolean = place(location, id, 0f)
+
+    /** As above, facing [yaw] degrees for blocks set to rotate to the placer. */
+    @JvmStatic
+    fun place(location: Location, id: String, yaw: Float): Boolean = plugin?.blocks?.place(location, id, yaw) ?: false
 
     /** Removes the custom block at [location]; false if there was none. */
     @JvmStatic
@@ -34,6 +39,13 @@ object RepackAPI {
     fun isCustomBlock(block: Block, id: String?): Boolean {
         val found = idAt(block) ?: return false
         return id == null || found == id
+    }
+
+    /** The item that places the custom block [id], or null for an unknown id. */
+    @JvmStatic
+    fun item(id: String, amount: Int): ItemStack? {
+        val api = plugin ?: return null
+        return api.blocks.definitionOf(id)?.let { api.items.create(it, amount) }
     }
 
     /** Ids that can be placed right now. */

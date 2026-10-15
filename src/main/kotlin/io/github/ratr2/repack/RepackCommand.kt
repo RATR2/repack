@@ -1,6 +1,7 @@
 package io.github.ratr2.repack
 
 import com.mojang.brigadier.Command
+import com.mojang.brigadier.arguments.IntegerArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.context.CommandContext
 import com.mojang.brigadier.suggestion.Suggestions
@@ -26,6 +27,8 @@ import java.util.concurrent.CompletableFuture
  * /repack place <id> [pos]    places a custom block (at your feet by default)
  * /repack remove [pos]        removes the custom block there
  * /repack list                lists the ids that can be placed
+ * /repack give <id> [amount] [players]   gives the item that places a custom block
+ * /repack reload              reads the block files again
  * ```
  */
 class RepackCommand(private val plugin: Repack) {
@@ -65,6 +68,25 @@ class RepackCommand(private val plugin: Repack) {
                 )
         )
         .then(Commands.literal("list").executes(::list))
+        .then(
+            Commands.literal("give").then(
+                Commands.argument("id", StringArgumentType.word())
+                    .suggests(::suggestIds)
+                    .executes { give(it, 1, listOfNotNull(it.source.sender as? Player)) }
+                    .then(
+                        Commands.argument("amount", IntegerArgumentType.integer(1, 64))
+                            .executes { give(it, IntegerArgumentType.getInteger(it, "amount"), listOfNotNull(it.source.sender as? Player)) }
+                            .then(
+                                Commands.argument("players", ArgumentTypes.players())
+                                    .executes {
+                                        val targets = it.getArgument("players", PlayerSelectorArgumentResolver::class.java).resolve(it.source)
+                                        give(it, IntegerArgumentType.getInteger(it, "amount"), targets)
+                                    }
+                            )
+                    )
+            )
+        )
+        .then(Commands.literal("reload").executes(::reload))
         .build()
 
     private fun positionOf(context: CommandContext<CommandSourceStack>): Location =
@@ -115,7 +137,8 @@ class RepackCommand(private val plugin: Repack) {
 
     private fun place(context: CommandContext<CommandSourceStack>, location: Location): Int {
         val id = StringArgumentType.getString(context, "id")
-        if (!plugin.blocks.place(location, id)) {
+        val yaw = (context.source.sender as? Player)?.location?.yaw ?: 0f
+        if (!plugin.blocks.place(location, id, yaw)) {
             val reason = if (id !in plugin.blocks.types) "There is no model with the id '$id'." else "That spot is taken."
             reply(context, reason, NamedTextColor.RED)
             return 0
@@ -136,6 +159,32 @@ class RepackCommand(private val plugin: Repack) {
     private fun list(context: CommandContext<CommandSourceStack>): Int {
         val ids = plugin.blocks.types.sorted()
         reply(context, if (ids.isEmpty()) "No models yet. Put .bbmodel files in plugins/Repack/models." else ids.joinToString(", "), NamedTextColor.YELLOW)
+        return Command.SINGLE_SUCCESS
+    }
+
+    private fun give(context: CommandContext<CommandSourceStack>, amount: Int, targets: List<Player>): Int {
+        val id = StringArgumentType.getString(context, "id")
+        val definition = plugin.blocks.definitionOf(id)
+        if (definition == null) {
+            reply(context, "There is no block with the id '$id'.", NamedTextColor.RED)
+            return 0
+        }
+        if (targets.isEmpty()) {
+            reply(context, "Name a player to give it to.", NamedTextColor.RED)
+            return 0
+        }
+        targets.forEach { player ->
+            val left = player.inventory.addItem(plugin.items.create(definition, amount))
+            left.values.forEach { player.world.dropItemNaturally(player.location, it) }
+        }
+        reply(context, "Gave $amount x $id to ${targets.size} player(s).", NamedTextColor.GREEN)
+        return Command.SINGLE_SUCCESS
+    }
+
+    private fun reload(context: CommandContext<CommandSourceStack>): Int {
+        val errors = plugin.reloadDefinitions()
+        errors.take(MAX_LINES).forEach { reply(context, it, NamedTextColor.RED) }
+        reply(context, "Loaded ${plugin.blocks.types.size} block type(s)${if (errors.isEmpty()) "" else ", ${errors.size} with errors"}.", NamedTextColor.GREEN)
         return Command.SINGLE_SUCCESS
     }
 
