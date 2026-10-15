@@ -25,6 +25,23 @@ class PackSender(
 
     private val id: UUID = UUID.nameUUIDFromBytes("repack-pack".toByteArray())
 
+    init {
+        host.offer(::joinOffer)
+    }
+
+    private fun joinOffer(playerId: UUID): Map<String, String>? {
+        val player = plugin.server.getPlayer(playerId) ?: return null
+        val pack = variantOf(player)?.let(store.published::get) ?: return null
+        val config = plugin.config
+        return mapOf(
+            "id" to id.toString(),
+            "url" to host.urlOf("${pack.sha1}.zip").toString(),
+            "sha1" to pack.sha1,
+            "required" to config.getBoolean("resource-pack.required", false).toString(),
+            "prompt" to config.getString("resource-pack.prompt").orEmpty(),
+        )
+    }
+
     /**
      * Sends the published pack to [players], each when it is their turn: spaced out from packs other plugins here send to the
      * same player. Returns how many are queued, 0 when nothing is published.
@@ -57,11 +74,13 @@ class PackSender(
         if (plugin.config.getBoolean("client-notices", true)) player.sendMessage(Component.text(message, NamedTextColor.YELLOW))
     }
 
-    /** Waits a moment after joining, so the pack does not arrive in the same instant as everything else the server sends. */
     @EventHandler
     fun onJoin(event: PlayerJoinEvent) {
         val player = event.player
-        val delay = plugin.config.getInt("resource-pack.join-delay-ticks", 40).coerceAtLeast(0).toLong()
-        plugin.server.scheduler.runTaskLater(plugin, Runnable { if (player.isOnline) send(listOf(player)) }, delay)
+        if (variantOf(player) == null) {
+            notice(player, "Repack custom blocks are not available on your client version: they need Minecraft 1.21.4 or newer.")
+            return
+        }
+        host.joined(player.uniqueId)
     }
 }
