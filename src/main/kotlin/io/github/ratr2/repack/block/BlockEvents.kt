@@ -1,9 +1,16 @@
 package io.github.ratr2.repack.block
 
+import com.destroystokyo.paper.event.block.BlockDestroyEvent
 import io.github.ratr2.repack.Repack
+import io.github.ratr2.repack.protect.Protection
+import io.papermc.paper.event.block.BlockBreakBlockEvent
+import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.format.NamedTextColor
+import org.bukkit.ExplosionResult
 import org.bukkit.GameMode
 import org.bukkit.Material
 import org.bukkit.block.Block
+import org.bukkit.block.BlockState
 import org.bukkit.entity.ExperienceOrb
 import org.bukkit.entity.LivingEntity
 import org.bukkit.entity.Player
@@ -17,30 +24,47 @@ import org.bukkit.event.block.BlockBurnEvent
 import org.bukkit.event.block.BlockDamageAbortEvent
 import org.bukkit.event.block.BlockDamageEvent
 import org.bukkit.event.block.BlockExplodeEvent
+import org.bukkit.event.block.BlockFadeEvent
+import org.bukkit.event.block.BlockFertilizeEvent
+import org.bukkit.event.block.BlockFromToEvent
 import org.bukkit.event.block.BlockPistonEvent
 import org.bukkit.event.block.BlockPistonExtendEvent
 import org.bukkit.event.block.BlockPistonRetractEvent
 import org.bukkit.event.block.BlockPlaceEvent
+import org.bukkit.event.block.LeavesDecayEvent
 import org.bukkit.event.entity.EntityChangeBlockEvent
 import org.bukkit.event.entity.EntityExplodeEvent
+import org.bukkit.event.entity.EntityInteractEvent
+import org.bukkit.event.player.PlayerBucketEmptyEvent
+import org.bukkit.event.player.PlayerBucketEvent
+import org.bukkit.event.player.PlayerBucketFillEvent
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.player.PlayerQuitEvent
+import org.bukkit.event.world.StructureGrowEvent
 import org.bukkit.inventory.EquipmentSlot
 import org.bukkit.util.BoundingBox
 import java.util.UUID
 
 /**
- * Turns what happens to proxy blocks into what happens to custom blocks: applies each block's defaults (mining time, drops,
- * explosion and piston behaviour), then fires a [CustomBlockEvent] so anything else can see it and change the outcome.
+ * Turns what happens to proxy blocks into what happens to custom blocks. For every way a block can be changed or used (the same
+ * list protection plugins such as WorldGuard guard) it applies the block's defaults, then fires a [CustomBlockEvent] so anything
+ * else can see it and change the outcome.
+ *
+ * Deciding and acting are split in two. At normal priority the event is fired and the Bukkit event is cancelled or trimmed, the
+ * same moment other plugins decide. At monitor priority, when the outcome is final, the custom block is removed if its proxy
+ * really is going away. Removing it earlier would lose the block whenever a protection plugin stepped in afterwards.
  */
 class BlockEvents(
     private val plugin: Repack,
     private val blocks: PlacedBlocks,
     private val items: BlockItems,
     private val loot: Loot,
+    private val protection: Protection,
 ) : Listener {
 
     private class Mining(val block: Block, val definition: BlockDefinition, val startedAt: Long)
+
+    private class Hit(val block: Block, val id: String, val definition: BlockDefinition)
 
     private val mining = HashMap<UUID, Mining>()
 
@@ -52,27 +76,56 @@ class BlockEvents(
         plugin.server.scheduler.runTaskTimer(plugin, Runnable(blocks::validate), 40L, 40L)
     }
 
-    private fun fire(block: Block, id: String, definition: BlockDefinition, action: BlockAction, player: Player?, cause: Event?, cancelledByDefault: Boolean): CustomBlockEvent {
-        val event = CustomBlockEvent(block, id, definition, action, player, cause, cancelledByDefault)
+    private fun hit(block: Block): Hit? {
+        val data = blocks.dataAt(block) ?: return null
+        val definition = blocks.definitionOf(data.id) ?: return null
+        return Hit(block, data.id, definition)
+    }
+
+    private fun fire(hit: Hit, action: BlockAction, player: Player?, cause: Event?, cancelledByDefault: Boolean): CustomBlockEvent {
+        val event = CustomBlockEvent(hit.block, hit.id, hit.definition, action, player, cause, cancelledByDefault)
         plugin.server.pluginManager.callEvent(event)
         return event
     }
 
-    // Clicking and placing
+    private fun deny(player: Player) {
+        val text = plugin.config.getString("messages.no-permission", "You can't do that here.").orEmpty()
+        if (text.isNotBlank()) player.sendActionBar(Component.text(text, NamedTextColor.RED))
+    }
 
-    @EventHandler(ignoreCancelled = true)
+    private fun dropLoot(hit: Hit) {
+        loot.roll(hit.definition).forEach { hit.block.world.dropItemNaturally(hit.block.location.toCenterLocation(), it) }
+    }
+
+    // Clicking and placing. Runs after protection plugins (which act at normal priority) so their verdict is visible.
+
+    @EventHandler(priority = EventPriority.HIGH)
     fun onInteract(event: PlayerInteractEvent) {
-        if (event.action != Action.RIGHT_CLICK_BLOCK && event.action != Action.LEFT_CLICK_BLOCK) return
         val block = event.clickedBlock ?: return
         val player = event.player
+        val hit = hit(block)
 
-        val id = blocks.idAt(block)
-        if (id != null && !(event.action == Action.RIGHT_CLICK_BLOCK && player.isSneaking && items.idOf(event.item) != null)) {
-            val custom = CustomBlockInteractEvent(player, block, id, event.action, event.hand)
+        if (hit != null && event.action == Action.PHYSICAL) {
+            val custom = CustomBlockInteractEvent(player, block, hit.id, event.action, null)
+            plugin.server.pluginManager.callEvent(custom)
+            if (custom.isCancelled) event.isCancelled = true
+            return
+        }
+        if (event.action != Action.RIGHT_CLICK_BLOCK && event.action != Action.LEFT_CLICK_BLOCK) return
+
+        val holdsBlockItem = items.idOf(event.item) != null
+        if (hit != null && !(event.action == Action.RIGHT_CLICK_BLOCK && player.isSneaking && holdsBlockItem)) {
+            if (event.useInteractedBlock() == Event.Result.DENY || event.isCancelled) return
+            if (!protection.canInteract(player, block)) {
+                event.setUseInteractedBlock(Event.Result.DENY)
+                deny(player)
+                return
+            }
+            val custom = CustomBlockInteractEvent(player, block, hit.id, event.action, event.hand)
             plugin.server.pluginManager.callEvent(custom)
             if (custom.isCancelled) {
                 event.isCancelled = true
-            } else if (blocks.definitionOf(id)?.vanillaInteraction == false) {
+            } else if (!hit.definition.vanillaInteraction) {
                 event.setUseInteractedBlock(Event.Result.DENY)
             }
             return
@@ -80,7 +133,8 @@ class BlockEvents(
 
         val itemId = items.idOf(event.item) ?: return
         if (event.action != Action.RIGHT_CLICK_BLOCK || event.hand == null) return
-        if (id == null && block.type.isInteractable && !player.isSneaking) return
+        if (event.useItemInHand() == Event.Result.DENY || event.isCancelled) return
+        if (hit == null && block.type.isInteractable && !player.isSneaking && event.useInteractedBlock() != Event.Result.DENY) return
         place(event, itemId, block)
     }
 
@@ -98,6 +152,7 @@ class BlockEvents(
         val replaced = target.state
         if (!blocks.place(target.location, id, player.location.yaw)) return
         val hand = event.hand ?: EquipmentSlot.HAND
+        // Protection plugins judge this like any other block placement.
         val placeEvent = BlockPlaceEvent(target, replaced, clicked, item, player, true, hand)
         plugin.server.pluginManager.callEvent(placeEvent)
         event.isCancelled = true
@@ -112,25 +167,27 @@ class BlockEvents(
 
     // Mining
 
-    @EventHandler
+    @EventHandler(ignoreCancelled = true)
     fun onDamage(event: BlockDamageEvent) {
         val player = event.player
         if (player.gameMode != GameMode.SURVIVAL && player.gameMode != GameMode.ADVENTURE) return
-        val block = event.block
-        val definition = blocks.definitionAt(block) ?: return
-        val id = blocks.idAt(block) ?: return
+        val hit = hit(event.block) ?: return
 
-        val start = fire(block, id, definition, BlockAction.BREAK_START, player, event, cancelledByDefault = false)
-        if (start.isCancelled) {
+        if (!protection.canBreak(player, event.block)) {
+            event.isCancelled = true
+            deny(player)
+            return
+        }
+        if (fire(hit, BlockAction.BREAK_START, player, event, cancelledByDefault = false).isCancelled) {
             event.isCancelled = true
             return
         }
-        if (definition.proxyMode != ProxyMode.CUSTOM) return
+        if (hit.definition.proxyMode != ProxyMode.CUSTOM) return
 
         // Vanilla would otherwise finish the block on its own schedule, or instantly, instead of ours.
         event.instaBreak = false
         val current = mining[player.uniqueId]
-        if (current == null || current.block != block) mining[player.uniqueId] = Mining(block, definition, System.currentTimeMillis())
+        if (current == null || current.block != event.block) mining[player.uniqueId] = Mining(event.block, hit.definition, System.currentTimeMillis())
     }
 
     @EventHandler
@@ -183,65 +240,77 @@ class BlockEvents(
         }
     }
 
-    // Breaking
+    // Breaking by a player
 
     @EventHandler(ignoreCancelled = true)
     fun onBreak(event: BlockBreakEvent) {
-        val block = event.block
-        val definition = blocks.definitionAt(block) ?: return
-        val id = blocks.idAt(block) ?: return
+        val hit = hit(event.block) ?: return
         val player = event.player
 
         // The proxy's own mining must not finish a block that is on our timer.
-        if (definition.proxyMode == ProxyMode.CUSTOM && player.gameMode == GameMode.SURVIVAL && player.uniqueId !in completing) {
+        if (hit.definition.proxyMode == ProxyMode.CUSTOM && player.gameMode == GameMode.SURVIVAL && player.uniqueId !in completing) {
             event.isCancelled = true
             return
         }
-
-        val custom = fire(block, id, definition, BlockAction.BREAK, player, event, cancelledByDefault = false)
-        if (custom.isCancelled) {
+        if (fire(hit, BlockAction.BREAK, player, event, cancelledByDefault = false).isCancelled) {
             event.isCancelled = true
             return
         }
         event.isDropItems = false
-        event.expToDrop = if (player.gameMode == GameMode.CREATIVE) 0 else definition.breaking.xp
+        event.expToDrop = if (player.gameMode == GameMode.CREATIVE) 0 else hit.definition.breaking.xp
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     fun onBreakDone(event: BlockBreakEvent) {
-        val block = event.block
-        val definition = blocks.definitionAt(block) ?: return
+        val hit = hit(event.block) ?: return
         val player = event.player
-        blocks.forget(block)
+        blocks.forget(event.block)
         if (player.gameMode == GameMode.CREATIVE) return
-        val needsTool = definition.breaking.dropsNeedTool
-        if (needsTool && !Tools.satisfies(player.inventory.itemInMainHand.type.name, definition.breaking)) return
-        loot.roll(definition).forEach { block.world.dropItemNaturally(block.location.toCenterLocation(), it) }
+        if (hit.definition.breaking.dropsNeedTool && !Tools.satisfies(player.inventory.itemInMainHand.type.name, hit.definition.breaking)) return
+        dropLoot(hit)
     }
 
-    // Explosions, pistons, fire, entities
+    // Explosions
+
+    private fun destroys(result: ExplosionResult) = result == ExplosionResult.DESTROY || result == ExplosionResult.DESTROY_WITH_DECAY
 
     @EventHandler(ignoreCancelled = true)
-    fun onEntityExplode(event: EntityExplodeEvent) = explode(event.blockList(), event)
+    fun onEntityExplode(event: EntityExplodeEvent) {
+        if (destroys(event.explosionResult)) explode(event.blockList(), event)
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onEntityExplodeDone(event: EntityExplodeEvent) {
+        if (destroys(event.explosionResult)) exploded(event.blockList())
+    }
 
     @EventHandler(ignoreCancelled = true)
-    fun onBlockExplode(event: BlockExplodeEvent) = explode(event.blockList(), event)
+    fun onBlockExplode(event: BlockExplodeEvent) {
+        if (destroys(event.explosionResult)) explode(event.blockList(), event)
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onBlockExplodeDone(event: BlockExplodeEvent) {
+        if (destroys(event.explosionResult)) exploded(event.blockList())
+    }
 
     private fun explode(list: MutableList<Block>, cause: Event) {
         val iterator = list.iterator()
         while (iterator.hasNext()) {
-            val block = iterator.next()
-            val definition = blocks.definitionAt(block) ?: continue
-            val id = blocks.idAt(block) ?: continue
-            val custom = fire(block, id, definition, BlockAction.EXPLODE, null, cause, cancelledByDefault = definition.explosionResistant)
-            if (custom.isCancelled) {
-                iterator.remove()
-                continue
-            }
-            blocks.forget(block)
-            if (definition.explosionDrops) loot.roll(definition).forEach { block.world.dropItemNaturally(block.location.toCenterLocation(), it) }
+            val hit = hit(iterator.next()) ?: continue
+            if (fire(hit, BlockAction.EXPLODE, null, cause, cancelledByDefault = hit.definition.explosionResistant).isCancelled) iterator.remove()
         }
     }
+
+    private fun exploded(list: List<Block>) {
+        for (block in list) {
+            val hit = hit(block) ?: continue
+            blocks.forget(block)
+            if (hit.definition.explosionDrops) dropLoot(hit)
+        }
+    }
+
+    // Pistons
 
     @EventHandler(ignoreCancelled = true)
     fun onPistonExtend(event: BlockPistonExtendEvent) = piston(event, event.blocks)
@@ -251,34 +320,155 @@ class BlockEvents(
 
     private fun piston(event: BlockPistonEvent, moved: List<Block>) {
         for (block in moved) {
-            val definition = blocks.definitionAt(block) ?: continue
-            val id = blocks.idAt(block) ?: continue
-            val custom = fire(block, id, definition, BlockAction.PISTON, null, event, cancelledByDefault = definition.piston == PistonBehavior.BLOCK)
-            if (custom.isCancelled) {
+            val hit = hit(block) ?: continue
+            if (fire(hit, BlockAction.PISTON, null, event, cancelledByDefault = hit.definition.piston == PistonBehavior.BLOCK).isCancelled) {
                 event.isCancelled = true
                 return
             }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onPistonExtendDone(event: BlockPistonExtendEvent) = pistoned(event.blocks)
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onPistonRetractDone(event: BlockPistonRetractEvent) = pistoned(event.blocks)
+
+    /** A custom block the piston was allowed to move cannot move, so it is destroyed instead. */
+    private fun pistoned(moved: List<Block>) {
+        for (block in moved) {
+            val hit = hit(block) ?: continue
             blocks.forget(block)
-            loot.roll(definition).forEach { block.world.dropItemNaturally(block.location.toCenterLocation(), it) }
+            dropLoot(hit)
             block.setType(Material.AIR, false)
         }
     }
 
+    // Fire, entities, physics
+
     @EventHandler(ignoreCancelled = true)
     fun onBurn(event: BlockBurnEvent) {
-        val block = event.block
-        val definition = blocks.definitionAt(block) ?: return
-        val id = blocks.idAt(block) ?: return
-        val custom = fire(block, id, definition, BlockAction.BURN, null, event, cancelledByDefault = false)
-        if (custom.isCancelled) event.isCancelled = true else blocks.forget(block)
+        val hit = hit(event.block) ?: return
+        if (fire(hit, BlockAction.BURN, null, event, cancelledByDefault = false).isCancelled) event.isCancelled = true
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onBurnDone(event: BlockBurnEvent) {
+        if (hit(event.block) != null) blocks.forget(event.block)
     }
 
     @EventHandler(ignoreCancelled = true)
     fun onEntityChange(event: EntityChangeBlockEvent) {
-        val block = event.block
-        val definition = blocks.definitionAt(block) ?: return
-        val id = blocks.idAt(block) ?: return
-        val custom = fire(block, id, definition, BlockAction.ENTITY_CHANGE, event.entity as? Player, event, cancelledByDefault = false)
-        if (custom.isCancelled) event.isCancelled = true else if (event.to != definition.proxyBlock) blocks.forget(block)
+        val hit = hit(event.block) ?: return
+        if (fire(hit, BlockAction.ENTITY_CHANGE, event.entity as? Player, event, cancelledByDefault = false).isCancelled) event.isCancelled = true
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onEntityChangeDone(event: EntityChangeBlockEvent) {
+        val hit = hit(event.block) ?: return
+        if (event.to != hit.definition.proxyBlock) blocks.forget(event.block)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onEntityInteract(event: EntityInteractEvent) {
+        val hit = hit(event.block) ?: return
+        if (fire(hit, BlockAction.ENTITY_INTERACT, event.entity as? Player, event, cancelledByDefault = false).isCancelled) event.isCancelled = true
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onFade(event: BlockFadeEvent) {
+        val hit = hit(event.block) ?: return
+        if (fire(hit, BlockAction.FADE, null, event, cancelledByDefault = false).isCancelled) event.isCancelled = true
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onFadeDone(event: BlockFadeEvent) {
+        val hit = hit(event.block) ?: return
+        if (event.newState.type != hit.definition.proxyBlock) blocks.forget(event.block)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onLeavesDecay(event: LeavesDecayEvent) {
+        val hit = hit(event.block) ?: return
+        if (fire(hit, BlockAction.FADE, null, event, cancelledByDefault = false).isCancelled) event.isCancelled = true
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onLeavesDecayDone(event: LeavesDecayEvent) {
+        if (hit(event.block) != null) blocks.forget(event.block)
+    }
+
+    /** Liquids flowing into a block that can be replaced. Protected by default. */
+    @EventHandler(ignoreCancelled = true)
+    fun onFluid(event: BlockFromToEvent) {
+        val hit = hit(event.toBlock) ?: return
+        if (fire(hit, BlockAction.FLUID, null, event, cancelledByDefault = true).isCancelled) event.isCancelled = true
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onFluidDone(event: BlockFromToEvent) {
+        if (hit(event.toBlock) != null) blocks.forget(event.toBlock)
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    fun onBucketEmpty(event: PlayerBucketEmptyEvent) = bucket(event, event.block)
+
+    @EventHandler(ignoreCancelled = true)
+    fun onBucketFill(event: PlayerBucketFillEvent) = bucket(event, event.block)
+
+    private fun bucket(event: PlayerBucketEvent, affected: Block) {
+        val hit = hit(affected) ?: return
+        if (fire(hit, BlockAction.BUCKET, event.player, event, cancelledByDefault = true).isCancelled) event.isCancelled = true
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onBucketEmptyDone(event: PlayerBucketEmptyEvent) {
+        if (hit(event.block) != null) blocks.forget(event.block)
+    }
+
+    // Growth replacing blocks
+
+    @EventHandler(ignoreCancelled = true)
+    fun onStructureGrow(event: StructureGrowEvent) = grow(event.blocks, event)
+
+    @EventHandler(ignoreCancelled = true)
+    fun onFertilize(event: BlockFertilizeEvent) = grow(event.blocks, event)
+
+    private fun grow(states: MutableList<BlockState>, cause: Event) {
+        val iterator = states.iterator()
+        while (iterator.hasNext()) {
+            val hit = hit(iterator.next().block) ?: continue
+            if (fire(hit, BlockAction.GROW, null, cause, cancelledByDefault = true).isCancelled) iterator.remove()
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onStructureGrowDone(event: StructureGrowEvent) = grown(event.blocks)
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onFertilizeDone(event: BlockFertilizeEvent) = grown(event.blocks)
+
+    private fun grown(states: List<BlockState>) {
+        for (state in states) if (hit(state.block) != null) blocks.forget(state.block)
+    }
+
+    /** A block destroyed because it lost its support, such as a torch whose wall went away. */
+    @EventHandler(ignoreCancelled = true)
+    fun onDestroy(event: BlockDestroyEvent) {
+        val hit = hit(event.block) ?: return
+        if (fire(hit, BlockAction.PHYSICS, null, event, cancelledByDefault = false).isCancelled) event.isCancelled = true
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    fun onDestroyDone(event: BlockDestroyEvent) {
+        if (hit(event.block) != null) blocks.forget(event.block)
+    }
+
+    /** A block broken by another block, such as flowing water. This one cannot be cancelled, only observed. */
+    @EventHandler(priority = EventPriority.MONITOR)
+    fun onBrokenByBlock(event: BlockBreakBlockEvent) {
+        val hit = hit(event.block) ?: return
+        fire(hit, BlockAction.BROKEN_BY_BLOCK, null, event, cancelledByDefault = false)
+        blocks.forget(event.block)
     }
 }

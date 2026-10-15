@@ -2,6 +2,10 @@
 # BARRIER is solid and invisible; use LIGHT or STRUCTURE_VOID for a block you can walk through.
 proxy-block: BARRIER
 
+# Shown above the hotbar when a protection plugin such as WorldGuard says no. Leave empty for no message.
+messages:
+  no-permission: "You can't do that here."
+
 resource-pack:
   # Address players' clients download the pack from: your server's public IP or domain.
   # Empty uses server-ip from server.properties, or localhost if that is empty too.

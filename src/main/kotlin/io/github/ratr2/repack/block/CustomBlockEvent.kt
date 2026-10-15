@@ -25,6 +25,27 @@ enum class BlockAction {
 
     /** An entity would change it: an enderman, a wither, a falling block, and so on. */
     ENTITY_CHANGE,
+
+    /** An entity touches it, such as a mob on a pressure plate. */
+    ENTITY_INTERACT,
+
+    /** It would fade away: melting, decaying leaves. */
+    FADE,
+
+    /** A liquid would flow into it. Cancelled by default. */
+    FLUID,
+
+    /** A bucket would be emptied into it or filled from it. Cancelled by default. */
+    BUCKET,
+
+    /** A growing structure or bone meal would replace it. Cancelled by default. */
+    GROW,
+
+    /** It would be destroyed because it lost its support. */
+    PHYSICS,
+
+    /** Another block broke it, such as flowing water. Cannot be cancelled. */
+    BROKEN_BY_BLOCK,
 }
 
 /**

@@ -51,6 +51,8 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
     fun idAt(block: Block): String? = dataAt(block)?.id
 
     fun dataAt(block: Block): PlacedBlock? {
+        // Called for every liquid flow and piston push on the server, so the common case has to be cheap.
+        if (chunks.isEmpty()) return null
         val ref = ChunkRef(block.world.uid, block.x shr 4, block.z shr 4)
         val blocks = chunks[ref] ?: return null
         val pos = BlockPos(block.x, block.y, block.z)

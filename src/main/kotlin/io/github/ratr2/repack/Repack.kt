@@ -13,6 +13,7 @@ import io.github.ratr2.repack.pack.PackEntry
 import io.github.ratr2.repack.pack.PackHost
 import io.github.ratr2.repack.pack.PackSender
 import io.github.ratr2.repack.pack.PackStore
+import io.github.ratr2.repack.protect.Protections
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
 import org.bukkit.plugin.java.JavaPlugin
@@ -52,7 +53,7 @@ class Repack : JavaPlugin() {
         reloadDefinitions()
         server.pluginManager.registerEvents(blocks, this)
         server.pluginManager.registerEvents(display, this)
-        BlockEvents(this, blocks, items, Loot(items)).also {
+        BlockEvents(this, blocks, items, Loot(items), Protections.detect(this)).also {
             server.pluginManager.registerEvents(it, this)
             it.start()
         }
