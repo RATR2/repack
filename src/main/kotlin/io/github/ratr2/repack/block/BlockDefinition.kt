@@ -1,0 +1,109 @@
+package io.github.ratr2.repack.block
+
+import org.bukkit.Material
+import java.util.Random
+
+/** vanilla: the proxy block's own mining and drops apply. custom: the `breaking` and `drops` settings apply instead. */
+enum class ProxyMode { VANILLA, CUSTOM }
+
+enum class PistonBehavior { BLOCK, DESTROY }
+
+enum class ToolType(val suffix: String?) {
+    ANY(null),
+    PICKAXE("_PICKAXE"),
+    AXE("_AXE"),
+    SHOVEL("_SHOVEL"),
+    HOE("_HOE"),
+    SWORD("_SWORD"),
+    SHEARS("SHEARS"),
+}
+
+/** Minimum tool material; golden counts as wooden, as in vanilla. */
+enum class ToolTier(val prefix: String) {
+    WOODEN("WOODEN_"),
+    STONE("STONE_"),
+    IRON("IRON_"),
+    DIAMOND("DIAMOND_"),
+    NETHERITE("NETHERITE_"),
+}
+
+class AmountRange(val min: Int, val max: Int) {
+    fun roll(random: Random): Int = if (max <= min) min else min + random.nextInt(max - min + 1)
+
+    companion object {
+        /** Accepts `3` and `1-3`. */
+        fun parse(text: String): AmountRange? {
+            val parts = text.trim().split('-')
+            val min = parts.getOrNull(0)?.trim()?.toIntOrNull() ?: return null
+            val max = if (parts.size > 1) parts[1].trim().toIntOrNull() ?: return null else min
+            return if (min < 0 || max < min) null else AmountRange(min, max)
+        }
+    }
+}
+
+sealed interface Drop {
+    val chance: Double
+    val amount: AmountRange
+}
+
+/** A vanilla item. The material is looked up on first use, because Material needs a running server. */
+class ItemDrop(val materialName: String, override val amount: AmountRange, override val chance: Double) : Drop {
+    val material: Material by lazy { Material.matchMaterial(materialName)!! }
+}
+
+class SelfDrop(override val amount: AmountRange, override val chance: Double) : Drop
+
+class Breaking(
+    /** Seconds to break with a suitable tool. */
+    val time: Double,
+    val tool: ToolType,
+    val tier: ToolTier?,
+    /** When true, breaking without the right tool gives no drops (the block still breaks). */
+    val dropsNeedTool: Boolean,
+    val xp: Int,
+    val creativeInstant: Boolean,
+)
+
+class DisplayOptions(
+    val offsetX: Double,
+    val offsetY: Double,
+    val offsetZ: Double,
+    val scale: Float,
+    /** Multiplier on the client's display entity view distance (1.0 is 64 blocks). */
+    val viewRange: Float,
+    /** Fixed light level 0 to 15 for the model, or null to light it like the world around it. */
+    val brightness: Int?,
+    val rotateToPlacer: Boolean,
+)
+
+class ItemOptions(val baseName: String, val name: String?, val lore: List<String>) {
+    val base: Material by lazy { Material.matchMaterial(baseName)!! }
+}
+
+/** A shaped crafting recipe for the block's item. shape has up to three rows of up to three characters, a space is empty. */
+class RecipeOptions(
+    val shape: List<String>,
+    /** Material name for each character used in shape. */
+    val ingredients: Map<Char, String>,
+    val amount: Int,
+    val group: String?,
+    /** building, redstone, equipment or misc. */
+    val category: String?,
+    val exact: Map<Char, ByteArray> = emptyMap(),
+)
+
+class BlockDefinition(
+    val id: String,
+    val model: String,
+    val proxyBlockName: String,
+    val proxyMode: ProxyMode,
+    val breaking: Breaking,
+    val drops: List<Drop>,
+    val explosionResistant: Boolean,
+    val explosionDrops: Boolean,
+    val piston: PistonBehavior,
+    val display: DisplayOptions,
+    val item: ItemOptions,
+) {
+    val proxyBlock: Material by lazy { Material.matchMaterial(proxyBlockName)!! }
+}
