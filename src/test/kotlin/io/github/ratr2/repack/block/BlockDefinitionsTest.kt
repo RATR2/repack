@@ -75,11 +75,46 @@ class BlockDefinitionsTest {
         assertTrue(definition.explosionResistant)
         assertEquals(PistonBehavior.DESTROY, definition.piston)
         assertEquals(0.5, definition.display.offsetY)
-        assertEquals(2f, definition.display.scale)
+        assertEquals(listOf(2f, 2f, 2f), listOf(definition.display.scaleX, definition.display.scaleY, definition.display.scaleZ))
         assertEquals(15, definition.display.brightness)
         assertTrue(definition.display.rotateToPlacer)
         assertEquals(DisplayContext.HEAD, definition.display.context)
         assertEquals(listOf("one", "two"), definition.item.lore)
+    }
+
+    @Test
+    fun `the generated settings file parses and holds the defaults`() {
+        val fromTemplate = parse(BlockTemplate.render("table"))
+        val defaults = parse("")
+        assertEquals(defaults.model, fromTemplate.model)
+        assertEquals(defaults.proxyBlockName, fromTemplate.proxyBlockName)
+        assertEquals(defaults.proxyMode, fromTemplate.proxyMode)
+        assertEquals(defaults.vanillaInteraction, fromTemplate.vanillaInteraction)
+        assertEquals(defaults.breaking.time, fromTemplate.breaking.time)
+        assertEquals(defaults.breaking.tool, fromTemplate.breaking.tool)
+        assertEquals(defaults.breaking.tier, fromTemplate.breaking.tier)
+        assertEquals(defaults.breaking.xp, fromTemplate.breaking.xp)
+        assertEquals(defaults.drops.size, fromTemplate.drops.size)
+        assertEquals(defaults.explosionResistant, fromTemplate.explosionResistant)
+        assertEquals(defaults.piston, fromTemplate.piston)
+        assertEquals(defaults.display.context, fromTemplate.display.context)
+        assertEquals(defaults.display.brightness, fromTemplate.display.brightness)
+        assertEquals(listOf(1f, 1f, 1f), listOf(fromTemplate.display.scaleX, fromTemplate.display.scaleY, fromTemplate.display.scaleZ))
+        assertEquals(defaults.item.baseName, fromTemplate.item.baseName)
+        assertEquals(defaults.item.lore, fromTemplate.item.lore)
+    }
+
+    @Test
+    fun `scale is one number or one per axis`() {
+        val uniform = parse("display: {scale: 1.5}").display
+        assertEquals(listOf(1.5f, 1.5f, 1.5f), listOf(uniform.scaleX, uniform.scaleY, uniform.scaleZ))
+        val perAxis = parse("display: {scale: [1.01, 1.15, 1.01]}").display
+        assertEquals(listOf(1.01f, 1.15f, 1.01f), listOf(perAxis.scaleX, perAxis.scaleY, perAxis.scaleZ))
+        val missing = parse("").display
+        assertEquals(listOf(1f, 1f, 1f), listOf(missing.scaleX, missing.scaleY, missing.scaleZ))
+        assertFailsWith<DefinitionException> { parse("display: {scale: [1, 2]}") }
+        assertFailsWith<DefinitionException> { parse("display: {scale: 0}") }
+        assertFailsWith<DefinitionException> { parse("display: {scale: [1, -1, 1]}") }
     }
 
     @Test

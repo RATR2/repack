@@ -80,6 +80,7 @@ object BlockDefinitions {
         val display = section.getConfigurationSection("display")
         val offset = display?.getDoubleList("offset").orEmpty()
         if (offset.isNotEmpty() && offset.size != 3) throw DefinitionException("display.offset needs three numbers: x, y, z.")
+        val scale = scaleOf(display)
         val brightness = display?.takeIf { it.contains("brightness") }?.getInt("brightness")
         if (brightness != null && brightness !in 0..15) throw DefinitionException("display.brightness must be 0 to 15.")
 
@@ -103,7 +104,9 @@ object BlockDefinitions {
                 offsetX = offset.getOrElse(0) { 0.0 },
                 offsetY = offset.getOrElse(1) { 0.0 },
                 offsetZ = offset.getOrElse(2) { 0.0 },
-                scale = display?.getDouble("scale", 1.0)?.toFloat() ?: 1f,
+                scaleX = scale[0],
+                scaleY = scale[1],
+                scaleZ = scale[2],
                 viewRange = display?.getDouble("view-range", 1.0)?.toFloat() ?: 1f,
                 brightness = brightness,
                 rotateToPlacer = display?.getBoolean("rotate-to-placer", false) ?: false,
@@ -115,6 +118,19 @@ object BlockDefinitions {
                 lore = item?.getStringList("lore").orEmpty(),
             ),
         )
+    }
+
+    /** `scale: 1.5` for all three axes, or `scale: [1.01, 1.15, 1.01]` for x, y and z. */
+    private fun scaleOf(display: ConfigurationSection?): List<Float> {
+        val raw = display?.get("scale") ?: return listOf(1f, 1f, 1f)
+        val values = when (raw) {
+            is Number -> List(3) { raw.toFloat() }
+            is List<*> -> raw.map { (it as? Number)?.toFloat() ?: throw DefinitionException("display.scale needs numbers.") }
+            else -> throw DefinitionException("display.scale is a number, or three numbers: x, y, z.")
+        }
+        if (values.size != 3) throw DefinitionException("display.scale needs one number, or three: x, y, z.")
+        if (values.any { it <= 0f }) throw DefinitionException("display.scale must be above 0.")
+        return values
     }
 
     private fun drops(entries: List<Map<*, *>>, materials: MaterialRules): List<Drop> = entries.mapIndexed { index, entry ->
