@@ -38,8 +38,18 @@ class RepackCommand(private val plugin: Repack) {
         .build()
 
     private fun build(context: CommandContext<CommandSourceStack>): Int {
-        val entry = plugin.rebuild()
-        reply(context, "Built pack ${short(entry)} (${entry.size} bytes). Players still get the published pack until you run /repack push.", NamedTextColor.GREEN)
+        val report = plugin.rebuild()
+        val entry = report.entry
+        reply(
+            context,
+            "Built pack ${short(entry)} (${entry.size} bytes) from ${report.models.size} model(s). " +
+                "Players still get the published pack until you run /repack push.",
+            NamedTextColor.GREEN,
+        )
+        report.errors.take(MAX_LINES).forEach { reply(context, it, NamedTextColor.RED) }
+        report.warnings.take(MAX_LINES).forEach { reply(context, it, NamedTextColor.YELLOW) }
+        val hidden = report.errors.size + report.warnings.size - minOf(report.errors.size, MAX_LINES) - minOf(report.warnings.size, MAX_LINES)
+        if (hidden > 0) reply(context, "$hidden more in the server log.", NamedTextColor.GRAY)
         return Command.SINGLE_SUCCESS
     }
 
@@ -72,5 +82,6 @@ class RepackCommand(private val plugin: Repack) {
 
     companion object {
         const val ADMIN = "repack.admin"
+        private const val MAX_LINES = 5
     }
 }
