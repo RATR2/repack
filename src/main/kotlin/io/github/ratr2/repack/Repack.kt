@@ -11,8 +11,8 @@ import io.github.ratr2.repack.display.DisplayManager
 import io.github.ratr2.repack.model.ModelLibrary
 import io.github.ratr2.repack.pack.PackBuilder
 import io.github.ratr2.repack.pack.PackEntry
-import io.github.ratr2.repack.pack.PackHost
 import io.github.ratr2.repack.pack.PackSender
+import io.github.ratr2.repack.pack.SharedHost
 import io.github.ratr2.repack.pack.PackStore
 import io.github.ratr2.repack.protect.Protections
 import io.github.ratr2.repack.skript.SkriptHook
@@ -32,7 +32,8 @@ class Repack : JavaPlugin() {
         private set
     lateinit var items: BlockItems
         private set
-    private lateinit var host: PackHost
+    lateinit var host: SharedHost
+        private set
     private lateinit var display: DisplayManager
 
     override fun onLoad() {
@@ -45,7 +46,7 @@ class Repack : JavaPlugin() {
         saveDefaultConfig()
         saveResource("blocks/_example.yml", true)
         store = PackStore(dataFolder)
-        host = PackHost(this, store).also { it.start() }
+        host = SharedHost(this, "repack", 8086) { name -> store.file(name.removeSuffix(".zip"))?.readBytes() }.also { it.start() }
         sender = PackSender(this, store, host)
         server.pluginManager.registerEvents(sender, this)
 

@@ -11,9 +11,16 @@ resource-pack:
   # Empty uses server-ip from server.properties, or localhost if that is empty too.
   public-host: ""
   # Port of the pack's built-in HTTP server; it must be reachable by players.
-  # Distortion uses 8085, so this one defaults to 8086.
+  # Change it and run /repack reload host, no restart needed.
   port: 8086
   bind: 0.0.0.0
+  # Share one pack server with Distortion (or any other plugin using this scheme). Whichever plugin starts first hosts it and
+  # decides the address and port; the others serve under it and ignore their own public-host and port while they do.
+  share-host: true
+  # Wait this long after a player joins before sending the pack, so it does not arrive with everything else (20 ticks = 1 second).
+  join-delay-ticks: 40
+  # Minimum time between two packs reaching the same player from plugins that share the server.
+  send-gap-ticks: 20
   # Kick players who decline the pack.
   required: false
   prompt: "This server uses a resource pack for custom blocks."
