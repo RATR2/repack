@@ -19,7 +19,7 @@ object ModelLibrary {
 
     /** The ids the files in [folder] would get, without parsing them. */
     fun ids(folder: File): Set<String> =
-        folder.listFiles { f -> f.isFile && f.extension == "bbmodel" }.orEmpty().mapTo(HashSet(), ::idOf)
+        folder.listFiles { f -> f.isFile && f.extension.equals("bbmodel", ignoreCase = true) }.orEmpty().mapTo(HashSet(), ::idOf)
 
     fun build(folder: File): LibraryResult {
         val files = HashMap<String, ByteArray>()
@@ -27,7 +27,7 @@ object ModelLibrary {
         val warnings = ArrayList<String>()
         val errors = ArrayList<String>()
 
-        val sources = folder.listFiles { f -> f.isFile && f.extension == "bbmodel" }.orEmpty().sortedBy { it.name }
+        val sources = folder.listFiles { f -> f.isFile && f.extension.equals("bbmodel", ignoreCase = true) }.orEmpty().sortedBy { it.name }
         for (source in sources) {
             val id = idOf(source)
             if (id in models) {

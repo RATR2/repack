@@ -165,8 +165,15 @@ class RepackCommand(private val plugin: Repack) {
     }
 
     private fun list(context: CommandContext<CommandSourceStack>): Int {
+        plugin.refreshIfChanged()
         val ids = plugin.blocks.types.sorted()
-        reply(context, if (ids.isEmpty()) "No models yet. Put .bbmodel files in plugins/Repack/models." else ids.joinToString(", "), NamedTextColor.YELLOW)
+        if (ids.isNotEmpty()) {
+            reply(context, ids.joinToString(", "), NamedTextColor.YELLOW)
+            return Command.SINGLE_SUCCESS
+        }
+        val others = plugin.modelsFolder.listFiles { f -> f.isFile }.orEmpty().map { it.name }
+        val hint = if (others.isEmpty()) "Put .bbmodel files in plugins/Repack/models." else "Found ${others.take(3).joinToString()} there, but only .bbmodel files count, directly in that folder."
+        reply(context, "No models yet. $hint", NamedTextColor.YELLOW)
         return Command.SINGLE_SUCCESS
     }
 

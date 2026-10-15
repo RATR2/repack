@@ -55,6 +55,9 @@ class Repack : JavaPlugin() {
         }
         blocks.start()
         RepackAPI.plugin = this
+        if (store.published == null) logger.info("No pack published yet: run /repack build, then /repack push, to send players the pack.")
+        lastStamp = stamp()
+        server.scheduler.runTaskTimer(this, Runnable { refreshIfChanged() }, WATCH_TICKS, WATCH_TICKS)
         if (server.pluginManager.isPluginEnabled("Skript")) {
             try {
                 SkriptHook.register(this)
@@ -79,6 +82,29 @@ class Repack : JavaPlugin() {
 
     val blocksFolder: File
         get() = File(dataFolder, "blocks").apply { mkdirs() }
+
+    /** What the models and blocks folders looked like when the types were last read. */
+    private var lastStamp = ""
+
+    /** The file names, sizes and times in the models and blocks folders, so a change shows up as a different string. */
+    private fun stamp(): String =
+        listOf(modelsFolder, blocksFolder).joinToString("|") { folder ->
+            folder.listFiles { f -> f.isFile && !f.name.startsWith("_") }.orEmpty().sortedBy { it.name }
+                .joinToString(",") { "${it.name}:${it.length()}:${it.lastModified()}" }
+        }
+
+    /**
+     * Reads the block types again when files in the models or blocks folders were added, changed or removed. This only changes
+     * which blocks exist; the pack still needs /repack build and /repack push. Returns true when it reloaded.
+     */
+    fun refreshIfChanged(): Boolean {
+        val now = stamp()
+        if (now == lastStamp) return false
+        lastStamp = now
+        reloadDefinitions()
+        logger.info("Model or block files changed: ${blocks.types.size} block type(s) loaded.")
+        return true
+    }
 
     /** Types read from the block files, before runtime changes. */
     private var fileDefinitions: Map<String, BlockDefinition> = emptyMap()
@@ -142,5 +168,8 @@ class Repack : JavaPlugin() {
 }
 
 private val ID = Regex("[a-z0-9_-]+")
+
+/** How often the models and blocks folders are checked for changes: every 5 seconds. */
+private const val WATCH_TICKS = 100L
 
 class BuildReport(val entry: PackEntry, val models: List<String>, val warnings: List<String>, val errors: List<String>)
