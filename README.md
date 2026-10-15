@@ -119,6 +119,26 @@ In development. Built and unit tested, but not yet run on a live server, so expe
 - Models support cubes. Meshes and locators are skipped, and cube rotation is limited to what vanilla models allow (one axis, in steps of 22.5 degrees up to 45). Anything else is dropped with a warning when you build.
 - Custom mining time relies on the server seeing the start of a dig on the proxy block. If your proxy block is unbreakable in survival and mining does not start, pick a breakable proxy block.
 
+## Releasing
+
+Every push builds and tests the plugin, and the jar is kept as a workflow artifact. A release is made by a commit on `main` whose message has tags on lines of their own (a word inside a sentence does nothing):
+
+```
+add the shelf display setting
+
+tags:
+version="0.1.0"
+release
+```
+
+| Tag | |
+|---|---|
+| `version="0.1.0"` | The version. On its own it only sets `version` in `gradle.properties`. A suffix such as `0.2.0-beta.1` makes the release a pre-release. |
+| `release` | Builds that version, tags the commit `0.1.0` and publishes a GitHub release with `repack-0.1.0.jar`. The release description is the commit message without the tags. |
+| `next="0.2.0"` | What to continue with afterwards. Without it the next patch number is used. |
+
+After a release the workflow commits `bump version to 0.1.1-SNAPSHOT [skip ci]` (or `0.2.0-SNAPSHOT` with `next`), which does not start another run. The tagged commit itself still says `-SNAPSHOT` in `gradle.properties`; the jar is built with the released version.
+
 ## License
 
 See [LICENSE](LICENSE). MIT. The model parsing and pack generation are adapted from [BetterModel](https://github.com/toxicity188/BetterModel), also MIT, see [NOTICE](NOTICE).

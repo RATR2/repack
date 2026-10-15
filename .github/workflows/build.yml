@@ -1,0 +1,89 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+    paths-ignore:
+      - "**.md"
+  pull_request:
+    paths-ignore:
+      - "**.md"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # The version bump this workflow pushes after a release must not start another run.
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5.0.2
+
+      # Tags are lines of their own in the last commit message:
+      #   version="0.1.0"   the version to release, or to switch to without release
+      #   release           publish a GitHub release for it
+      #   next="0.2.0"      what to continue with afterwards (default: the next patch number, as -SNAPSHOT)
+      - name: Read the commit tags
+        id: tags
+        run: |
+          scripts/ci/parse-tags.sh "$(git log -1 --pretty=%B)" "$RUNNER_TEMP/notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Build and test
+        run: |
+          VERSION='${{ steps.tags.outputs.VERSION }}'
+          if [ -n "$VERSION" ]; then ./gradlew build -Pversion="$VERSION"; else ./gradlew build; fi
+
+      - name: Upload the jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: repack-${{ github.sha }}
+          path: build/libs/*.jar
+          if-no-files-found: error
+
+      # Only on the default branch, and only for a push (never for a pull request).
+      - name: Release
+        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && steps.tags.outputs.VERSION != '' && steps.tags.outputs.RELEASE == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.tags.outputs.VERSION }}
+          NEXT: ${{ steps.tags.outputs.NEXT }}
+        run: |
+          jar="build/libs/repack-$VERSION.jar"
+          test -f "$jar"
+          [ -s "$RUNNER_TEMP/notes.md" ] || echo "Repack $VERSION" > "$RUNNER_TEMP/notes.md"
+          flags=()
+          case "$VERSION" in *-*) flags+=(--prerelease) ;; esac
+          gh release create "$VERSION" "$jar" --target "$GITHUB_SHA" --title "$VERSION" --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}"
+
+          snapshot=$(scripts/ci/next-version.sh "$VERSION" "$NEXT")
+          scripts/ci/set-version.sh "$snapshot"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "bump version to $snapshot [skip ci]"
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
+
+      # version="X" without release: only moves the version in gradle.properties.
+      - name: Set the version
+        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && steps.tags.outputs.VERSION != '' && steps.tags.outputs.RELEASE != 'true'
+        env:
+          VERSION: ${{ steps.tags.outputs.VERSION }}
+        run: |
+          scripts/ci/set-version.sh "$VERSION"
+          git diff --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "set version to $VERSION [skip ci]"
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
