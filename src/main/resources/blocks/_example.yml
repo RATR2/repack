@@ -1,0 +1,62 @@
+# Documentation for block files. Files starting with an underscore are not loaded.
+#
+# Put a model at models/<id>.bbmodel and the block <id> exists with the defaults below. Create blocks/<id>.yml only for
+# the settings you want to change. Every key is optional.
+
+# The model this block shows, without .bbmodel. Defaults to the file name, so two blocks can share one model.
+model: example
+
+proxy:
+  # The real block under the model. Players click and collide with it, so it should be invisible.
+  # BARRIER is solid. LIGHT and STRUCTURE_VOID can be walked through (and cannot be clicked in survival).
+  block: BARRIER
+  # custom: breaking and drops below apply. vanilla: the proxy block's own mining and drops apply.
+  mode: custom
+
+breaking:
+  # Seconds to break with a suitable tool, however fast the tool is.
+  time: 1.5
+  # any, pickaxe, axe, shovel, hoe, sword or shears.
+  tool: any
+  # Weakest tool material allowed to get drops: wooden, stone, iron, diamond or netherite. Leave out for any.
+  # tier: stone
+  # When true, breaking with the wrong tool gives no drops (the block still breaks).
+  drops-need-tool: false
+  # Experience dropped when broken.
+  xp: 0
+  # Creative players break it instantly.
+  creative-instant: true
+
+# What breaking drops. Leave the key out to drop the block itself.
+# amount is a number or a range like 1-3. chance is 0 to 1.
+drops:
+  - block: self
+  - item: DIAMOND
+    amount: 1-2
+    chance: 0.25
+
+explosion:
+  # Explosions leave the block standing.
+  resistant: false
+  # When it is not resistant: whether an explosion drops its items.
+  drops: false
+
+# What a piston does: block (will not move) or destroy (removes the block, with its drops).
+piston: block
+
+display:
+  # Move the model, in blocks, from the centre of the block.
+  offset: [0, 0, 0]
+  scale: 1.0
+  # Multiplier on how far away the model is drawn (1.0 is 64 blocks).
+  view-range: 1.0
+  # Fixed light level 0 to 15 for the model. Leave out to light it like the world around it.
+  # brightness: 15
+  # Turn the model to face the player who places it, in 90 degree steps.
+  rotate-to-placer: false
+
+# The item players hold to place this block.
+item:
+  base: PAPER
+  # name: "&bExample"
+  lore: []

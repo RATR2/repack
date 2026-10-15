@@ -20,6 +20,7 @@ dependencies {
 
     testImplementation(kotlin("test"))
     testImplementation("com.google.code.gson:gson:2.14.0")
+    testImplementation("io.papermc.paper:paper-api:26.3.build.+")
 }
 
 kotlin {

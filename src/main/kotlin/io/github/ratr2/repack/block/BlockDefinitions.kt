@@ -1,0 +1,141 @@
+package io.github.ratr2.repack.block
+
+import org.bukkit.Material
+import org.bukkit.configuration.ConfigurationSection
+import org.bukkit.configuration.InvalidConfigurationException
+import org.bukkit.configuration.file.YamlConfiguration
+import java.io.File
+
+class DefinitionException(message: String) : Exception(message)
+
+class LoadedDefinitions(val definitions: Map<String, BlockDefinition>, val errors: List<String>)
+
+/** What the parser needs to know about materials, so tests can run without a server. */
+interface MaterialRules {
+    fun exists(name: String): Boolean
+    fun isBlock(name: String): Boolean
+    fun isItem(name: String): Boolean
+}
+
+object BukkitMaterials : MaterialRules {
+    override fun exists(name: String) = Material.matchMaterial(name) != null
+    override fun isBlock(name: String) = Material.matchMaterial(name)?.isBlock == true
+    override fun isItem(name: String) = Material.matchMaterial(name)?.isItem == true
+}
+
+/**
+ * Reads `blocks/<id>.yml`. A model with no file gets the defaults, so dropping a .bbmodel into `models/` is enough to have a
+ * working block. Files starting with `_` are ignored (the plugin writes `_example.yml` there as documentation).
+ */
+object BlockDefinitions {
+
+    fun load(blocksFolder: File, modelIds: Set<String>): LoadedDefinitions {
+        val definitions = LinkedHashMap<String, BlockDefinition>()
+        val errors = ArrayList<String>()
+
+        val files = blocksFolder.listFiles { f -> f.isFile && f.extension == "yml" && !f.name.startsWith("_") }.orEmpty().sortedBy { it.name }
+        for (file in files) {
+            val id = file.nameWithoutExtension.lowercase()
+            try {
+                val yaml = YamlConfiguration().apply { load(file) }
+                val definition = parse(id, yaml)
+                if (definition.model !in modelIds) {
+                    errors += "$id: model '${definition.model}' has no .bbmodel file in the models folder."
+                    continue
+                }
+                definitions[id] = definition
+            } catch (e: DefinitionException) {
+                errors += "$id: ${e.message}"
+            } catch (e: InvalidConfigurationException) {
+                errors += "$id: not valid YAML (${e.message?.lineSequence()?.firstOrNull()})"
+            }
+        }
+        for (model in modelIds.sorted()) {
+            if (model !in definitions && files.none { it.nameWithoutExtension.lowercase() == model }) {
+                definitions[model] = parse(model, YamlConfiguration())
+            }
+        }
+        return LoadedDefinitions(definitions, errors)
+    }
+
+    fun parse(id: String, section: ConfigurationSection, materials: MaterialRules = BukkitMaterials): BlockDefinition {
+        val proxy = section.getConfigurationSection("proxy")
+        val proxyBlock = material(proxy?.getString("block") ?: "BARRIER", "proxy.block", materials).also {
+            if (!materials.isBlock(it)) throw DefinitionException("proxy.block $it is not a block.")
+        }
+        val mode = enumOf(proxy?.getString("mode") ?: "custom", ProxyMode::class.java, "proxy.mode")
+
+        val breaking = section.getConfigurationSection("breaking")
+        val time = breaking?.getDouble("time", 1.0) ?: 1.0
+        if (time <= 0) throw DefinitionException("breaking.time must be above 0 seconds.")
+        val breakingOptions = Breaking(
+            time = time,
+            tool = enumOf(breaking?.getString("tool") ?: "any", ToolType::class.java, "breaking.tool"),
+            tier = breaking?.getString("tier")?.let { enumOf(it, ToolTier::class.java, "breaking.tier") },
+            dropsNeedTool = breaking?.getBoolean("drops-need-tool", false) ?: false,
+            xp = (breaking?.getInt("xp", 0) ?: 0).coerceAtLeast(0),
+            creativeInstant = breaking?.getBoolean("creative-instant", true) ?: true,
+        )
+
+        val explosion = section.getConfigurationSection("explosion")
+        val display = section.getConfigurationSection("display")
+        val offset = display?.getDoubleList("offset").orEmpty()
+        if (offset.isNotEmpty() && offset.size != 3) throw DefinitionException("display.offset needs three numbers: x, y, z.")
+        val brightness = display?.takeIf { it.contains("brightness") }?.getInt("brightness")
+        if (brightness != null && brightness !in 0..15) throw DefinitionException("display.brightness must be 0 to 15.")
+
+        val item = section.getConfigurationSection("item")
+        val itemBase = material(item?.getString("base") ?: "PAPER", "item.base", materials).also {
+            if (!materials.isItem(it)) throw DefinitionException("item.base $it is not an item.")
+        }
+
+        return BlockDefinition(
+            id = id,
+            model = section.getString("model")?.lowercase() ?: id,
+            proxyBlockName = proxyBlock,
+            proxyMode = mode,
+            breaking = breakingOptions,
+            drops = if (section.contains("drops")) drops(section.getMapList("drops"), materials) else listOf(SelfDrop(AmountRange(1, 1), 1.0)),
+            explosionResistant = explosion?.getBoolean("resistant", false) ?: false,
+            explosionDrops = explosion?.getBoolean("drops", false) ?: false,
+            piston = enumOf(section.getString("piston") ?: "block", PistonBehavior::class.java, "piston"),
+            display = DisplayOptions(
+                offsetX = offset.getOrElse(0) { 0.0 },
+                offsetY = offset.getOrElse(1) { 0.0 },
+                offsetZ = offset.getOrElse(2) { 0.0 },
+                scale = display?.getDouble("scale", 1.0)?.toFloat() ?: 1f,
+                viewRange = display?.getDouble("view-range", 1.0)?.toFloat() ?: 1f,
+                brightness = brightness,
+                rotateToPlacer = display?.getBoolean("rotate-to-placer", false) ?: false,
+            ),
+            item = ItemOptions(
+                baseName = itemBase,
+                name = item?.getString("name"),
+                lore = item?.getStringList("lore").orEmpty(),
+            ),
+        )
+    }
+
+    private fun drops(entries: List<Map<*, *>>, materials: MaterialRules): List<Drop> = entries.mapIndexed { index, entry ->
+        val where = "drops[$index]"
+        val amount = (entry["amount"]?.toString() ?: "1").let { AmountRange.parse(it) ?: throw DefinitionException("$where.amount '$it' is not a number or a range like 1-3.") }
+        val chance = (entry["chance"]?.toString() ?: "1").toDoubleOrNull()?.takeIf { it in 0.0..1.0 }
+            ?: throw DefinitionException("$where.chance must be between 0 and 1.")
+        when {
+            entry["block"]?.toString().equals("self", ignoreCase = true) -> SelfDrop(amount, chance)
+            entry["item"] != null -> ItemDrop(material(entry["item"].toString(), "$where.item", materials), amount, chance)
+            else -> throw DefinitionException("$where needs either 'item: <MATERIAL>' or 'block: self'.")
+        }
+    }
+
+    /** Returns the upper case material name, or throws if there is no such material. */
+    private fun material(name: String, where: String, materials: MaterialRules): String {
+        val clean = name.trim().uppercase()
+        if (!materials.exists(clean)) throw DefinitionException("$where '$name' is not a material.")
+        return clean
+    }
+
+    private fun <E : Enum<E>> enumOf(value: String, type: Class<E>, where: String): E =
+        type.enumConstants.firstOrNull { it.name.equals(value.trim().replace('-', '_'), ignoreCase = true) }
+            ?: throw DefinitionException("$where '$value' is not one of ${type.enumConstants.joinToString { it.name.lowercase() }}.")
+}
