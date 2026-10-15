@@ -154,7 +154,7 @@ class BlockDefinitionsTest {
         assertEquals("SMITHING_TABLE", table.proxyBlockName)
         assertEquals(ProxyMode.VANILLA, table.proxyMode)
         assertEquals(false, table.vanillaInteraction)
-        assertEquals(listOf(1.01f, 1.15f, 1.01f), listOf(table.display.scaleX, table.display.scaleY, table.display.scaleZ))
+        assertEquals(listOf(1.01f, 1.08f, 1.01f), listOf(table.display.scaleX, table.display.scaleY, table.display.scaleZ))
         assertEquals(15, table.display.brightness)
         assertEquals("SMITHING_TABLE", table.item.baseName)
         assertTrue(table.item.glint)
