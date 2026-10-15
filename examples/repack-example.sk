@@ -37,12 +37,14 @@ command /tablegive [<number=1>]:
 command /tableplace:
     permission: example.table.place
     trigger:
-        place custom block "table" at location 2 meters in front of player facing player's yaw
+        set {_spot} to 2 meters in front of player
+        place custom block "table" at {_spot} facing player's yaw
 
 command /tableremove:
     permission: example.table.place
     trigger:
-        remove custom block at location 2 meters in front of player
+        set {_spot} to 2 meters in front of player
+        remove custom block at {_spot}
 
 command /customblocks:
     permission: example.table.give
