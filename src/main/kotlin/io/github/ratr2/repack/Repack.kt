@@ -17,7 +17,11 @@ import io.github.ratr2.repack.pack.PackStore
 import io.github.ratr2.repack.protect.Protections
 import io.github.ratr2.repack.skript.SkriptHook
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
+import org.bukkit.Material
+import org.bukkit.NamespacedKey
 import org.bukkit.configuration.file.YamlConfiguration
+import org.bukkit.inventory.ShapedRecipe
+import org.bukkit.inventory.recipe.CraftingBookCategory
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 
@@ -38,6 +42,7 @@ class Repack : JavaPlugin() {
     override fun onEnable() {
         saveDefaultConfig()
         saveResource("blocks/_example.yml", true)
+        installDefaults()
         store = PackStore(dataFolder)
         host = SharedHost(this, "repack", 8086) { name -> store.file(name.removeSuffix(".zip"))?.readBytes() }.also { it.start() }
         sender = PackSender(this, store, host)
@@ -75,6 +80,7 @@ class Repack : JavaPlugin() {
 
     override fun onDisable() {
         RepackAPI.plugin = null
+        recipeKeys.forEach { server.removeRecipe(it) }
         if (::host.isInitialized) host.stop()
     }
 
@@ -199,7 +205,40 @@ class Repack : JavaPlugin() {
     /** Placed blocks keep working; types that are gone stay in the world but show nothing. */
     private fun applyDefinitions() {
         blocks.definitions = (fileDefinitions + registered).filterKeys { it !in unregistered }
+        registerRecipes()
         if (::display.isInitialized && server.pluginManager.isPluginEnabled(this)) display.refreshAll()
+    }
+
+    private val recipeKeys = ArrayList<NamespacedKey>()
+
+    /** Registers the crafting recipe of every block that has one, replacing the ones from before a reload. */
+    private fun registerRecipes() {
+        recipeKeys.forEach { server.removeRecipe(it) }
+        recipeKeys.clear()
+        for (definition in blocks.definitions.values) {
+            val options = definition.recipe ?: continue
+            val key = NamespacedKey(this, "block_${definition.id}")
+            val recipe = ShapedRecipe(key, items.create(definition, options.amount))
+            recipe.shape(*options.shape.toTypedArray())
+            val used = options.shape.joinToString("").toSet()
+            for ((char, name) in options.ingredients) if (char in used) recipe.setIngredient(char, Material.matchMaterial(name)!!)
+            options.group?.let { recipe.group = it }
+            options.category?.let { recipe.category = CraftingBookCategory.valueOf(it.uppercase()) }
+            server.addRecipe(recipe)
+            recipeKeys += key
+        }
+        if (recipeKeys.isNotEmpty()) server.updateRecipes()
+    }
+
+    /** The first time Repack runs it adds the table that comes with it. Deleting those files afterwards keeps them deleted. */
+    private fun installDefaults() {
+        val marker = File(dataFolder, ".defaults-installed")
+        if (marker.exists() || !config.getBoolean("install-defaults", true)) return
+        for (name in listOf("models/table.bbmodel", "blocks/table.yml")) {
+            if (!File(dataFolder, name).exists()) saveResource(name, false)
+        }
+        marker.writeText("The bundled table was installed. Delete this file to install it again.\n")
+        logger.info("Installed the bundled table: models/table.bbmodel and blocks/table.yml.")
     }
 
     /**

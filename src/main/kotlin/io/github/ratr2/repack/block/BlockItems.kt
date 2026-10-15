@@ -29,6 +29,7 @@ class BlockItems(private val plugin: Repack) {
                 ),
             )
         }
+        if (definition.item.glint) item.setData(DataComponentTypes.ENCHANTMENT_GLINT_OVERRIDE, true)
         item.editPersistentDataContainer { it.set(idKey, PersistentDataType.STRING, definition.id) }
         return item
     }

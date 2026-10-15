@@ -10,8 +10,8 @@ import kotlin.test.assertTrue
 
 /** Material needs a running server, so the tests use a small fixed set of names. */
 private object FakeMaterials : MaterialRules {
-    private val blocks = setOf("BARRIER", "GLASS", "STONE", "LIGHT")
-    private val items = setOf("PAPER", "DIAMOND", "STICK")
+    private val blocks = setOf("BARRIER", "GLASS", "STONE", "LIGHT", "SMITHING_TABLE")
+    private val items = setOf("PAPER", "DIAMOND", "STICK", "SMITHING_TABLE", "AMETHYST_SHARD")
     override fun exists(name: String) = name in blocks || name in items
     override fun isBlock(name: String) = name in blocks
     override fun isItem(name: String) = name in items
@@ -102,6 +102,61 @@ class BlockDefinitionsTest {
         assertEquals(listOf(1f, 1f, 1f), listOf(fromTemplate.display.scaleX, fromTemplate.display.scaleY, fromTemplate.display.scaleZ))
         assertEquals(defaults.item.baseName, fromTemplate.item.baseName)
         assertEquals(defaults.item.lore, fromTemplate.item.lore)
+    }
+
+    @Test
+    fun `reads a shaped recipe and the item glint`() {
+        val definition = parse(
+            """
+            item: {base: SMITHING_TABLE, glint: true}
+            recipe:
+              shape: ["aba", "bcb", "aba"]
+              ingredients: {a: AMETHYST_SHARD, b: DIAMOND, c: SMITHING_TABLE}
+              amount: 2
+              group: tables
+              category: Building
+            """.trimIndent()
+        )
+        assertTrue(definition.item.glint)
+        val recipe = definition.recipe!!
+        assertEquals(listOf("aba", "bcb", "aba"), recipe.shape)
+        assertEquals(mapOf('a' to "AMETHYST_SHARD", 'b' to "DIAMOND", 'c' to "SMITHING_TABLE"), recipe.ingredients)
+        assertEquals(2, recipe.amount)
+        assertEquals("tables", recipe.group)
+        assertEquals("building", recipe.category)
+        assertNull(parse("").recipe)
+        assertEquals(false, parse("").item.glint)
+    }
+
+    @Test
+    fun `bad recipes name the problem`() {
+        fun message(yaml: String) = assertFailsWith<DefinitionException> { parse(yaml) }.message.orEmpty()
+        assertTrue("recipe.shape" in message("recipe: {shape: [], ingredients: {}}"))
+        assertTrue("recipe.shape" in message("recipe: {shape: [abcd], ingredients: {a: STICK}}"))
+        assertTrue("recipe.shape uses 'b'" in message("recipe: {shape: [ab], ingredients: {a: STICK}}"))
+        assertTrue("recipe.ingredients.a" in message("recipe: {shape: [a], ingredients: {a: NOT_A_THING}}"))
+        assertTrue("single character" in message("recipe: {shape: [a], ingredients: {ab: STICK}}"))
+        assertTrue("recipe.amount" in message("recipe: {shape: [a], ingredients: {a: STICK}, amount: 99}"))
+        assertTrue("recipe.category" in message("recipe: {shape: [a], ingredients: {a: STICK}, category: potions}"))
+    }
+
+    @Test
+    fun `the bundled table settings file follows the old skript rules`() {
+        val text = javaClass.getResource("/blocks/table.yml")!!.readText()
+        val table = BlockDefinitions.parse("table", YamlConfiguration().apply { loadFromString(text) }, FakeMaterials)
+        assertEquals("table", table.model)
+        assertEquals("SMITHING_TABLE", table.proxyBlockName)
+        assertEquals(ProxyMode.VANILLA, table.proxyMode)
+        assertEquals(false, table.vanillaInteraction)
+        assertEquals(listOf(1.01f, 1.15f, 1.01f), listOf(table.display.scaleX, table.display.scaleY, table.display.scaleZ))
+        assertEquals(15, table.display.brightness)
+        assertEquals("SMITHING_TABLE", table.item.baseName)
+        assertTrue(table.item.glint)
+        assertEquals("&aInfusion Table", table.item.name)
+        assertEquals(listOf("", "&dInfuse or Craft powerful spells with this mythical table.."), table.item.lore)
+        assertIs<SelfDrop>(table.drops.single())
+        assertEquals(listOf("aba", "bcb", "aba"), table.recipe!!.shape)
+        assertEquals("etherealtable", table.recipe!!.group)
     }
 
     @Test

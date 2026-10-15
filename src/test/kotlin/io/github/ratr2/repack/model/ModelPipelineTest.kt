@@ -101,6 +101,19 @@ class ModelPipelineTest {
     }
 
     @Test
+    fun `the bundled table model parses cleanly and carries its display tab`() {
+        val text = javaClass.getResource("/models/table.bbmodel")!!.readText()
+        val model = BbParser.parse("table", text)
+        assertEquals(10, model.cubes.size)
+        assertEquals(4, model.textures.size)
+        assertTrue(model.warnings.isEmpty(), model.warnings.toString())
+        val generated = ItemModelGenerator.generate("table", model)
+        val json = JsonParser.parseString(String(generated.files.getValue("assets/repack/models/block/table.json"))).asJsonObject
+        assertTrue(json.getAsJsonObject("display").keySet().containsAll(setOf("gui", "head", "fixed", "ground")))
+        assertEquals(4, generated.files.keys.count { it.startsWith("assets/repack/textures/block/table/") })
+    }
+
+    @Test
     fun `parses real model files when REPACK_SAMPLES points at a folder`() {
         val folder = System.getenv("REPACK_SAMPLES")?.let(::File)?.takeIf { it.isDirectory } ?: return
         val files = folder.listFiles { f -> f.extension == "bbmodel" }.orEmpty()

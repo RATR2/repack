@@ -116,8 +116,36 @@ object BlockDefinitions {
                 baseName = itemBase,
                 name = item?.getString("name"),
                 lore = item?.getStringList("lore").orEmpty(),
+                glint = item?.getBoolean("glint", false) ?: false,
             ),
+            recipe = recipeOf(section.getConfigurationSection("recipe"), materials),
         )
+    }
+
+    private val CATEGORIES = setOf("building", "redstone", "equipment", "misc")
+
+    private fun recipeOf(section: ConfigurationSection?, materials: MaterialRules): RecipeOptions? {
+        section ?: return null
+        val shape = section.getStringList("shape")
+        if (shape.isEmpty() || shape.size > 3) throw DefinitionException("recipe.shape needs one to three rows.")
+        if (shape.any { it.isEmpty() || it.length > 3 }) throw DefinitionException("recipe.shape rows need one to three characters.")
+        if (shape.all { row -> row.all { it == ' ' } }) throw DefinitionException("recipe.shape has no ingredients in it.")
+        val ingredients = LinkedHashMap<Char, String>()
+        val given = section.getConfigurationSection("ingredients")
+        for (key in given?.getKeys(false).orEmpty()) {
+            if (key.length != 1) throw DefinitionException("recipe.ingredients key '$key' must be a single character.")
+            val name = material(given!!.getString(key).orEmpty(), "recipe.ingredients.$key", materials)
+            if (!materials.isItem(name)) throw DefinitionException("recipe.ingredients.$key $name is not an item.")
+            ingredients[key[0]] = name
+        }
+        for (char in shape.joinToString("").toSet() - ' ') {
+            if (char !in ingredients) throw DefinitionException("recipe.shape uses '$char' but recipe.ingredients has no '$char'.")
+        }
+        val amount = section.getInt("amount", 1)
+        if (amount !in 1..64) throw DefinitionException("recipe.amount must be 1 to 64.")
+        val category = section.getString("category")?.lowercase()
+        if (category != null && category !in CATEGORIES) throw DefinitionException("recipe.category '$category' is not one of ${CATEGORIES.joinToString()}.")
+        return RecipeOptions(shape, ingredients, amount, section.getString("group"), category)
     }
 
     /** `scale: 1.5` for all three axes, or `scale: [1.01, 1.15, 1.01]` for x, y and z. */
