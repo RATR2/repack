@@ -12,9 +12,6 @@ enum class PackVariant(val id: String, val label: String, val minProtocol: Int, 
     MODERN("modern", "1.21.9 and newer", 773, Int.MAX_VALUE, shelf = true);
 
     companion object {
-        /** The protocol this build's Paper API speaks natively. */
-        const val SERVER_PROTOCOL = 777
-
         /** The oldest client that gets a pack: 1.21.4. */
         val oldestProtocol = entries.minOf { it.minProtocol }
 
