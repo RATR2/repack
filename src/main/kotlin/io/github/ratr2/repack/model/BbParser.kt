@@ -12,6 +12,11 @@ import java.util.Base64
  */
 object BbParser {
 
+    /** The display contexts a block model can set in every Minecraft version from 1.21.4 on. */
+    val DISPLAY_CONTEXTS = listOf(
+        "thirdperson_righthand", "thirdperson_lefthand", "firstperson_righthand", "firstperson_lefthand", "gui", "head", "ground", "fixed",
+    )
+
     fun parse(name: String, json: String): BbModel {
         val root = try {
             JsonParser.parseString(json).asJsonObject
@@ -47,7 +52,24 @@ object BbParser {
         }
 
         if (cubes.isEmpty()) warnings += "The model has no cubes."
-        return BbModel(name, textures, cubes, warnings)
+        return BbModel(name, textures, cubes, parseDisplay(root), warnings)
+    }
+
+    /** The Display tab. Only the contexts every supported client knows are kept: a name an older client does not know would stop the model loading. */
+    private fun parseDisplay(root: JsonObject): Map<String, DisplayTransform> {
+        val display = root.obj("display") ?: return emptyMap()
+        val result = LinkedHashMap<String, DisplayTransform>()
+        for (context in DISPLAY_CONTEXTS) {
+            val entry = display.obj(context) ?: continue
+            result[context] = DisplayTransform(entry.numbers("rotation"), entry.numbers("translation"), entry.numbers("scale"))
+        }
+        return result
+    }
+
+    private fun JsonObject.numbers(key: String): List<Double>? {
+        val array = array(key) ?: return null
+        if (array.size() < 3) return null
+        return List(3) { array[it].asDouble }
     }
 
     private fun parseTextures(root: JsonObject, width: Int, height: Int, warnings: MutableList<String>): List<BbTexture> {

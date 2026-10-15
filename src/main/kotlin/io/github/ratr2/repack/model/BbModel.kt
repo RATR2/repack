@@ -33,6 +33,9 @@ class BbCube(
     val faces: Map<Direction, BbFace>,
 )
 
+/** One entry of Blockbench's Display tab. A missing part means no change: no rotation, no translation, scale 1. */
+class DisplayTransform(val rotation: List<Double>?, val translation: List<Double>?, val scale: List<Double>?)
+
 class BbTexture(val name: String, val png: ByteArray, val uvWidth: Int, val uvHeight: Int)
 
 /**
@@ -43,6 +46,8 @@ class BbModel(
     val name: String,
     val textures: List<BbTexture>,
     val cubes: List<BbCube>,
+    /** The Display tab settings, by Blockbench name (gui, ground, head, fixed, thirdperson_righthand and so on). */
+    val display: Map<String, DisplayTransform>,
     val warnings: List<String>,
 )
 

@@ -56,6 +56,10 @@ display:
   # brightness: 15
   # Turn the model to face the player who places it, in 90 degree steps.
   rotate-to-placer: false
+  # The model always carries the Display tab settings from Blockbench (hand, inventory, ground, item frame, head), so the block
+  # item looks right everywhere. This picks the one the placed block itself uses: none, gui, ground, fixed, head,
+  # thirdperson_righthand, thirdperson_lefthand, firstperson_righthand or firstperson_lefthand.
+  context: none
 
 # The item players hold to place this block.
 item:

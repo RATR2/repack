@@ -65,6 +65,23 @@ class Breaking(
     val xp: Int,
 )
 
+/**
+ * Which of the model's Display tab settings the placed block uses. Blockbench's Display tab sets how the model looks in the hand,
+ * in the inventory, on the ground, in an item frame and on a head; those always come along with the model. This picks the one the
+ * block itself is drawn with. NONE draws the model as it is, with none of them.
+ */
+enum class DisplayContext(val value: Byte) {
+    NONE(0),
+    THIRDPERSON_LEFTHAND(1),
+    THIRDPERSON_RIGHTHAND(2),
+    FIRSTPERSON_LEFTHAND(3),
+    FIRSTPERSON_RIGHTHAND(4),
+    HEAD(5),
+    GUI(6),
+    GROUND(7),
+    FIXED(8),
+}
+
 class DisplayOptions(
     val offsetX: Double,
     val offsetY: Double,
@@ -76,6 +93,7 @@ class DisplayOptions(
     val brightness: Int?,
     /** Turn the model to face the player who places it, in 90 degree steps. */
     val rotateToPlacer: Boolean,
+    val context: DisplayContext,
 )
 
 class ItemOptions(val baseName: String, val name: String?, val lore: List<String>) {

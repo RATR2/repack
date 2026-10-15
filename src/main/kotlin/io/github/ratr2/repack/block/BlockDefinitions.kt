@@ -107,6 +107,7 @@ object BlockDefinitions {
                 viewRange = display?.getDouble("view-range", 1.0)?.toFloat() ?: 1f,
                 brightness = brightness,
                 rotateToPlacer = display?.getBoolean("rotate-to-placer", false) ?: false,
+                context = enumOf(display?.getString("context") ?: "none", DisplayContext::class.java, "display.context"),
             ),
             item = ItemOptions(
                 baseName = itemBase,

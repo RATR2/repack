@@ -16,6 +16,7 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity
 import io.github.ratr2.repack.block.BlockDefinition
 import io.github.ratr2.repack.block.BlockPos
+import io.github.ratr2.repack.block.DisplayContext
 import io.github.ratr2.repack.block.PlacedBlock
 import io.github.ratr2.repack.block.PlacedBlocks
 import io.github.ratr2.repack.block.PlacementListener
@@ -138,6 +139,7 @@ class DisplayManager(private val blocks: PlacedBlocks) : Listener, PlacementList
         options.brightness?.let { data += EntityData(BRIGHTNESS, EntityDataTypes.INT, it shl 4 or (it shl 20)) }
         if (options.viewRange != 1f) data += EntityData(VIEW_RANGE, EntityDataTypes.FLOAT, options.viewRange)
         data += EntityData(ITEM, EntityDataTypes.ITEMSTACK, item)
+        if (options.context != DisplayContext.NONE) data += EntityData(ITEM_CONTEXT, EntityDataTypes.BYTE, options.context.value)
         return data
     }
 
@@ -147,5 +149,6 @@ class DisplayManager(private val blocks: PlacedBlocks) : Listener, PlacementList
         const val BRIGHTNESS = 16
         const val VIEW_RANGE = 17
         const val ITEM = 23
+        const val ITEM_CONTEXT = 24
     }
 }
