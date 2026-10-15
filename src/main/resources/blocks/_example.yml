@@ -49,6 +49,7 @@ piston: block
 display:
   # Move the model, in blocks, from the centre of the block.
   offset: [0, 0, 0]
+  # One number scales all three axes. Three numbers scale x, y and z: [1.01, 1.15, 1.01] is 1% wider and 15% taller.
   scale: 1.0
   # Multiplier on how far away the model is drawn (1.0 is 64 blocks).
   view-range: 1.0

@@ -37,7 +37,7 @@ Needs Paper 26.3 and the [PacketEvents](https://github.com/retrooper/packetevent
 3. Run `/repack build`, then `/repack push`.
 4. `/repack give table` and place it.
 
-To change a block, create `plugins/Repack/blocks/table.yml`. Every setting is documented in `plugins/Repack/blocks/_example.yml`, which the plugin rewrites on every start.
+Repack writes `plugins/Repack/blocks/table.yml` for every model, with every option listed at its default. Edit it to change the block, or copy it (`table2.yml`, same `model:`) for a second block that shares the model. `_example.yml` in the same folder explains each option and is rewritten on every start.
 
 ## Commands
 

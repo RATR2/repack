@@ -131,7 +131,9 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
             .build()
 
         val data = ArrayList<EntityData<*>>()
-        if (options.scale != 1f) data += EntityData(SCALE, EntityDataTypes.VECTOR3F, Vector3f(options.scale, options.scale, options.scale))
+        if (options.scaleX != 1f || options.scaleY != 1f || options.scaleZ != 1f) {
+            data += EntityData(SCALE, EntityDataTypes.VECTOR3F, Vector3f(options.scaleX, options.scaleY, options.scaleZ))
+        }
         options.brightness?.let { data += EntityData(BRIGHTNESS, EntityDataTypes.INT, it shl 4 or (it shl 20)) }
         if (options.viewRange != 1f) data += EntityData(VIEW_RANGE, EntityDataTypes.FLOAT, options.viewRange)
         data += EntityData(ITEM, EntityDataTypes.ITEMSTACK, item)

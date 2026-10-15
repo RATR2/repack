@@ -4,6 +4,7 @@ import io.github.ratr2.repack.block.BlockDefinition
 import io.github.ratr2.repack.block.BlockDefinitions
 import io.github.ratr2.repack.block.BlockEvents
 import io.github.ratr2.repack.block.BlockItems
+import io.github.ratr2.repack.block.BlockTemplate
 import io.github.ratr2.repack.block.Loot
 import io.github.ratr2.repack.block.PlacedBlocks
 import io.github.ratr2.repack.display.DisplayManager
@@ -108,8 +109,8 @@ class Repack : JavaPlugin() {
     fun refreshIfChanged(): Boolean {
         val now = stamp()
         if (now == lastStamp) return false
-        lastStamp = now
         reloadDefinitions()
+        lastStamp = stamp()
         logger.info("Model or block files changed: ${blocks.types.size} block type(s) loaded.")
         return true
     }
@@ -172,8 +173,20 @@ class Repack : JavaPlugin() {
 
     private val unregistered = HashSet<String>()
 
+    /** Writes `blocks/<id>.yml`, with every option at its default, for each model that has no settings file yet. */
+    private fun createMissingBlockFiles() {
+        if (!config.getBoolean("create-block-files", true)) return
+        for (id in ModelLibrary.ids(modelsFolder).sorted()) {
+            val file = File(blocksFolder, "$id.yml")
+            if (file.exists()) continue
+            file.writeText(BlockTemplate.render(id))
+            logger.info("Created blocks/$id.yml: edit it to change how the block behaves.")
+        }
+    }
+
     /** Reads the block files again, which also undoes [registerBlock] and [unregisterBlock]. */
     fun reloadDefinitions(): List<String> {
+        createMissingBlockFiles()
         val loaded = BlockDefinitions.load(blocksFolder, ModelLibrary.ids(modelsFolder))
         loaded.errors.forEach { logger.severe(it) }
         fileDefinitions = loaded.definitions
