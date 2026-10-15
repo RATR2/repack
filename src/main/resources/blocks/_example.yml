@@ -10,8 +10,12 @@ proxy:
   # The real block under the model. Players click and collide with it, so it should be invisible.
   # BARRIER is solid. LIGHT and STRUCTURE_VOID can be walked through (and cannot be clicked in survival).
   block: BARRIER
-  # custom: breaking and drops below apply. vanilla: the proxy block's own mining and drops apply.
+  # custom: breaking.time below sets the mining time. vanilla: the proxy block's own mining speed applies.
+  # Drops always come from the drops list.
   mode: custom
+  # When false, right-clicking does not do what the proxy block normally does (a smithing table would not open its menu).
+  # Your own handling of the click still runs. Set true to keep the proxy block's own behaviour.
+  vanilla-interaction: false
 
 breaking:
   # Seconds to break with a suitable tool, however fast the tool is.
@@ -22,10 +26,8 @@ breaking:
   # tier: stone
   # When true, breaking with the wrong tool gives no drops (the block still breaks).
   drops-need-tool: false
-  # Experience dropped when broken.
+  # Experience dropped when broken. Creative players always break blocks instantly and get no drops.
   xp: 0
-  # Creative players break it instantly.
-  creative-instant: true
 
 # What breaking drops. Leave the key out to drop the block itself.
 # amount is a number or a range like 1-3. chance is 0 to 1.

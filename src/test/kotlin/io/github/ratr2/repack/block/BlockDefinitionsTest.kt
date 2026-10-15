@@ -30,6 +30,7 @@ class BlockDefinitionsTest {
         assertEquals("table", definition.model)
         assertEquals("BARRIER", definition.proxyBlockName)
         assertEquals(ProxyMode.CUSTOM, definition.proxyMode)
+        assertEquals(false, definition.vanillaInteraction)
         assertEquals(1.0, definition.breaking.time)
         assertEquals(ToolType.ANY, definition.breaking.tool)
         assertNull(definition.breaking.tier)
@@ -44,8 +45,8 @@ class BlockDefinitionsTest {
         val definition = parse(
             """
             model: Other
-            proxy: {block: GLASS, mode: vanilla}
-            breaking: {time: 2.5, tool: pickaxe, tier: stone, drops-need-tool: true, xp: 3, creative-instant: false}
+            proxy: {block: GLASS, mode: vanilla, vanilla-interaction: true}
+            breaking: {time: 2.5, tool: pickaxe, tier: stone, drops-need-tool: true, xp: 3}
             drops:
               - item: DIAMOND
                 amount: 1-3
@@ -60,11 +61,11 @@ class BlockDefinitionsTest {
         assertEquals("other", definition.model)
         assertEquals("GLASS", definition.proxyBlockName)
         assertEquals(ProxyMode.VANILLA, definition.proxyMode)
+        assertTrue(definition.vanillaInteraction)
         assertEquals(2.5, definition.breaking.time)
         assertEquals(ToolTier.STONE, definition.breaking.tier)
         assertTrue(definition.breaking.dropsNeedTool)
         assertEquals(3, definition.breaking.xp)
-        assertEquals(false, definition.breaking.creativeInstant)
         val diamond = assertIs<ItemDrop>(definition.drops[0])
         assertEquals("DIAMOND", diamond.materialName)
         assertEquals(1..3, diamond.amount.min..diamond.amount.max)

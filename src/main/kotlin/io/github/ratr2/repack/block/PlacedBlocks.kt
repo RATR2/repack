@@ -5,21 +5,20 @@ import org.bukkit.Chunk
 import org.bukkit.Location
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
+import org.bukkit.World
 import org.bukkit.block.Block
 import org.bukkit.event.EventHandler
-import org.bukkit.event.EventPriority
 import org.bukkit.event.Listener
-import org.bukkit.event.block.Action
-import org.bukkit.event.block.BlockBreakEvent
-import org.bukkit.event.block.BlockExplodeEvent
-import org.bukkit.event.block.BlockPistonExtendEvent
-import org.bukkit.event.block.BlockPistonRetractEvent
-import org.bukkit.event.entity.EntityExplodeEvent
-import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.event.world.ChunkLoadEvent
 import org.bukkit.event.world.ChunkUnloadEvent
 import org.bukkit.persistence.PersistentDataType
 import java.util.UUID
+import java.util.concurrent.CopyOnWriteArrayList
+
+interface PlacementListener {
+    fun placed(world: World, pos: BlockPos, block: PlacedBlock, definition: BlockDefinition)
+    fun removed(world: World, pos: BlockPos, block: PlacedBlock, definition: BlockDefinition)
+}
 
 /**
  * Every custom block in a loaded chunk, and the persistence behind it.
@@ -32,65 +31,89 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
 
     private data class ChunkRef(val world: UUID, val x: Int, val z: Int)
 
-    private val chunks = HashMap<ChunkRef, MutableMap<BlockPos, String>>()
+    private val chunks = HashMap<ChunkRef, MutableMap<BlockPos, PlacedBlock>>()
     private val dataKey = NamespacedKey(plugin, "blocks")
+    val listeners = CopyOnWriteArrayList<PlacementListener>()
 
-    private val proxy: Material = plugin.config.getString("proxy-block", "BARRIER")
-        ?.let { Material.matchMaterial(it) }
-        ?.takeIf { it.isBlock }
-        ?: Material.BARRIER
-
-    /** Ids that can be placed: one per .bbmodel file in the models folder. */
     @Volatile
-    var types: Set<String> = emptySet()
+    var definitions: Map<String, BlockDefinition> = emptyMap()
+
+    val types: Set<String> get() = definitions.keys
 
     fun start() {
         plugin.server.worlds.forEach { world -> world.loadedChunks.forEach(::load) }
     }
 
-    fun idAt(block: Block): String? {
+    fun definitionOf(id: String): BlockDefinition? = definitions[id]
+
+    fun idAt(block: Block): String? = dataAt(block)?.id
+
+    fun dataAt(block: Block): PlacedBlock? {
         val ref = ChunkRef(block.world.uid, block.x shr 4, block.z shr 4)
         val blocks = chunks[ref] ?: return null
         val pos = BlockPos(block.x, block.y, block.z)
-        val id = blocks[pos] ?: return null
-        // Something else (WorldEdit, a command) replaced the proxy, so the entry is stale.
-        if (block.type != proxy) {
-            blocks.remove(pos)
-            save(block.chunk, ref)
+        val data = blocks[pos] ?: return null
+        // Something else (WorldEdit, a command) replaced the proxy, so the entry is stale. A type with no definition keeps its
+        // entry, so the data is still there if the definition comes back.
+        val definition = definitions[data.id]
+        if (definition != null && block.type != definition.proxyBlock) {
+            forget(block)
             return null
         }
-        return id
+        return data
     }
 
-    /** Places the custom block [id] at [location]. False if the id is unknown or the spot is taken. */
-    fun place(location: Location, id: String): Boolean {
-        val world = location.world ?: return false
-        if (id !in types) return false
-        val block = world.getBlockAt(location)
-        if (idAt(block) != null || (!block.type.isAir && !block.isReplaceable)) return false
+    fun definitionAt(block: Block): BlockDefinition? = dataAt(block)?.let { definitions[it.id] }
 
-        block.setType(proxy, false)
+    /** Places the custom block [id] at [location], facing [yaw] degrees. False if the id is unknown or the spot is taken. */
+    fun place(location: Location, id: String, yaw: Float = 0f): Boolean {
+        val world = location.world ?: return false
+        val definition = definitions[id] ?: return false
+        val block = world.getBlockAt(location)
+        if (dataAt(block) != null || (!block.type.isAir && !block.isReplaceable)) return false
+
+        block.setType(definition.proxyBlock, false)
         val chunk = block.chunk
         val ref = refOf(chunk)
-        chunks.getOrPut(ref) { HashMap() }[BlockPos(block.x, block.y, block.z)] = id
+        val pos = BlockPos(block.x, block.y, block.z)
+        val data = PlacedBlock(id, if (definition.display.rotateToPlacer) snap(yaw) else 0)
+        chunks.getOrPut(ref) { HashMap() }[pos] = data
         save(chunk, ref)
+        listeners.forEach { it.placed(world, pos, data, definition) }
         return true
     }
 
     /** Removes the custom block and its proxy at [block]. False if there was none. */
     fun remove(block: Block): Boolean {
-        if (idAt(block) == null) return false
+        if (dataAt(block) == null) return false
         forget(block)
         block.setType(Material.AIR, false)
         return true
     }
 
-    fun inChunk(chunk: Chunk): Map<BlockPos, String> = chunks[refOf(chunk)].orEmpty()
+    fun inChunk(chunk: Chunk): Map<BlockPos, PlacedBlock> = chunks[refOf(chunk)].orEmpty()
+
+    fun inChunk(world: World, chunkX: Int, chunkZ: Int): Map<BlockPos, PlacedBlock> = chunks[ChunkRef(world.uid, chunkX, chunkZ)].orEmpty()
 
     fun forget(block: Block) {
         val ref = ChunkRef(block.world.uid, block.x shr 4, block.z shr 4)
-        if (chunks[ref]?.remove(BlockPos(block.x, block.y, block.z)) != null) save(block.chunk, ref)
+        val pos = BlockPos(block.x, block.y, block.z)
+        val data = chunks[ref]?.remove(pos) ?: return
+        save(block.chunk, ref)
+        definitions[data.id]?.let { definition -> listeners.forEach { it.removed(block.world, pos, data, definition) } }
     }
+
+    fun validate() {
+        for ((ref, blocks) in chunks.entries.toList()) {
+            val world = plugin.server.getWorld(ref.world) ?: continue
+            for ((pos, data) in blocks.entries.toList()) {
+                val definition = definitions[data.id] ?: continue
+                if (world.getBlockAt(pos.x, pos.y, pos.z).type != definition.proxyBlock) forget(world.getBlockAt(pos.x, pos.y, pos.z))
+            }
+        }
+    }
+
+    private fun snap(yaw: Float): Int = Math.floorMod(Math.round(yaw / 90f) * 90, 360)
 
     private fun refOf(chunk: Chunk) = ChunkRef(chunk.world.uid, chunk.x, chunk.z)
 
@@ -109,7 +132,10 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
         val text = chunk.persistentDataContainer.get(dataKey, PersistentDataType.STRING) ?: return
         val blocks = BlockCodec.decode(text)
         val before = blocks.size
-        blocks.keys.removeIf { chunk.world.getBlockAt(it.x, it.y, it.z).type != proxy }
+        blocks.entries.removeIf { (pos, data) ->
+            val definition = definitions[data.id]
+            definition != null && chunk.world.getBlockAt(pos.x, pos.y, pos.z).type != definition.proxyBlock
+        }
         val ref = refOf(chunk)
         if (blocks.isNotEmpty()) chunks[ref] = blocks
         if (blocks.size != before) save(chunk, ref)
@@ -121,38 +147,5 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
     @EventHandler
     fun onChunkUnload(event: ChunkUnloadEvent) {
         chunks.remove(refOf(event.chunk))
-    }
-
-    @EventHandler(ignoreCancelled = true)
-    fun onInteract(event: PlayerInteractEvent) {
-        if (event.action != Action.RIGHT_CLICK_BLOCK && event.action != Action.LEFT_CLICK_BLOCK) return
-        val block = event.clickedBlock ?: return
-        val id = idAt(block) ?: return
-        val custom = CustomBlockInteractEvent(event.player, block, id, event.action, event.hand)
-        plugin.server.pluginManager.callEvent(custom)
-        if (custom.isCancelled) event.isCancelled = true
-    }
-
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    fun onBreak(event: BlockBreakEvent) = forget(event.block)
-
-    @EventHandler(ignoreCancelled = true)
-    fun onEntityExplode(event: EntityExplodeEvent) {
-        event.blockList().removeIf { idAt(it) != null }
-    }
-
-    @EventHandler(ignoreCancelled = true)
-    fun onBlockExplode(event: BlockExplodeEvent) {
-        event.blockList().removeIf { idAt(it) != null }
-    }
-
-    @EventHandler(ignoreCancelled = true)
-    fun onPistonExtend(event: BlockPistonExtendEvent) {
-        if (event.blocks.any { idAt(it) != null }) event.isCancelled = true
-    }
-
-    @EventHandler(ignoreCancelled = true)
-    fun onPistonRetract(event: BlockPistonRetractEvent) {
-        if (event.blocks.any { idAt(it) != null }) event.isCancelled = true
     }
 }

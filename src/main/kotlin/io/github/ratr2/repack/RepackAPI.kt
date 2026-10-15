@@ -2,6 +2,7 @@ package io.github.ratr2.repack
 
 import org.bukkit.Location
 import org.bukkit.block.Block
+import org.bukkit.inventory.ItemStack
 
 /**
  * Static entry points for other plugins, callable directly or via reflection, on the main thread:
@@ -19,7 +20,11 @@ object RepackAPI {
 
     /** Places the custom block [id] at [location]. False if the id is unknown, the spot is taken or the plugin is disabled. */
     @JvmStatic
-    fun place(location: Location, id: String): Boolean = plugin?.blocks?.place(location, id) ?: false
+    fun place(location: Location, id: String): Boolean = place(location, id, 0f)
+
+    /** As above, facing [yaw] degrees for blocks set to rotate to the placer. */
+    @JvmStatic
+    fun place(location: Location, id: String, yaw: Float): Boolean = plugin?.blocks?.place(location, id, yaw) ?: false
 
     /** Removes the custom block at [location]; false if there was none. */
     @JvmStatic
@@ -36,45 +41,11 @@ object RepackAPI {
         return id == null || found == id
     }
 
+    /** The item that places the custom block [id], or null for an unknown id. */
     @JvmStatic
-    fun ripple(location: Location, rgb: Int, radius: Double, ticks: Int): Boolean = io.github.ratr2.repack.distortion.DistortionAPI.spawn(location, rgb, radius, ticks)
-
-    @JvmStatic
-    fun activeRipples(): Int = io.github.ratr2.repack.distortion.DistortionAPI.activeRipples()
-
-    @JvmStatic
-    fun maxRipples(): Int = io.github.ratr2.repack.distortion.DistortionAPI.maxRipples()
-
-    @JvmStatic
-    fun item(id: String, amount: Int): ItemStack? = onMain(null) { api -> api.stackFor(id, amount) }
-
-    /**
-     * Adds a block type with the default settings that shows model, a file in the models folder without its extension.
-     * Lasts until the next reload. Returns an error message, or null when it worked.
-     */
-    @JvmStatic
-    fun register(id: String, model: String): String? = onMain("Repack is not running.") { it.registerBlock(id, model) }
-
-    /** Removes a block type until the next reload. Blocks already placed stay in the world but show nothing. */
-    @JvmStatic
-    fun unregister(id: String): Boolean = onMain(false) { it.unregisterBlock(id) }
-
-    /** Reads the block files again. Returns the errors found. */
-    @JvmStatic
-    fun reload(): List<String> = onMain(emptyList()) { it.reloadDefinitions() }
-
-    @JvmStatic
-    fun edit(id: String): BlockBuilder = onMain(BlockBuilder(null, "Repack is not running.")) { api ->
-        val draft = api.gui.editor.open(id)
-        BlockBuilder(draft, if (draft == null) "There is no block with the id '$id'." else null)
-    }
-
-    @JvmStatic
-    fun create(id: String, model: String): BlockBuilder = onMain(BlockBuilder(null, "Repack is not running.")) { api ->
-        api.gui.editor.create(id, model).fold(
-            onSuccess = { BlockBuilder(it, null) },
-            onFailure = { BlockBuilder(null, it.message ?: "Could not make the block.") },
-        )
+    fun item(id: String, amount: Int): ItemStack? {
+        val api = plugin ?: return null
+        return api.blocks.definitionOf(id)?.let { api.items.create(it, amount) }
     }
 
     @JvmStatic

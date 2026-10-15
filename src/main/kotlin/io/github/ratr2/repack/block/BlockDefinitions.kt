@@ -74,7 +74,6 @@ object BlockDefinitions {
             tier = breaking?.getString("tier")?.let { enumOf(it, ToolTier::class.java, "breaking.tier") },
             dropsNeedTool = breaking?.getBoolean("drops-need-tool", false) ?: false,
             xp = (breaking?.getInt("xp", 0) ?: 0).coerceAtLeast(0),
-            creativeInstant = breaking?.getBoolean("creative-instant", true) ?: true,
         )
 
         val explosion = section.getConfigurationSection("explosion")
@@ -94,6 +93,7 @@ object BlockDefinitions {
             model = section.getString("model")?.lowercase() ?: id,
             proxyBlockName = proxyBlock,
             proxyMode = mode,
+            vanillaInteraction = proxy?.getBoolean("vanilla-interaction", false) ?: false,
             breaking = breakingOptions,
             drops = if (section.contains("drops")) drops(section.getMapList("drops"), materials) else listOf(SelfDrop(AmountRange(1, 1), 1.0)),
             explosionResistant = explosion?.getBoolean("resistant", false) ?: false,
