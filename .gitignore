@@ -1,0 +1,43 @@
+# Gradle build outputs
+.gradle/
+build/
+bin/
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# VSC
+.vscode/
+
+# Eclipse
+.settings/
+.project
+.classpath
+
+# Kotlin incremental compilation caches
+*.class
+.kotlin/
+
+# Java / JVM compiled classes
+*.log
+hs_err_pid*
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+~*
+.Trash-*
+
+/.dev/
