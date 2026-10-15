@@ -1,12 +1,11 @@
 # Logs what happens when players click and mine custom blocks, to find out why something does not work.
 debug: false
 
+# Install the table that comes with Repack (models/table.bbmodel and blocks/table.yml) the first time it runs.
+install-defaults: true
+
 # Write a settings file in blocks/ (every option, at its default) for each model that does not have one yet.
 create-block-files: true
-
-# The invisible block that sits under every custom block. Players click it and collide with it.
-# BARRIER is solid and invisible; use LIGHT or STRUCTURE_VOID for a block you can walk through.
-proxy-block: BARRIER
 
 # Sent in chat when a protection plugin such as WorldGuard says no. Leave empty for no message.
 messages:

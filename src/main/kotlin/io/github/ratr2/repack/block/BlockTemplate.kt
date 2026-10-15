@@ -46,5 +46,14 @@ object BlockTemplate {
           base: PAPER                   # what the item that places this block is made from
           # name: "&bTable"
           lore: []
+          glint: false                  # true: the item shines like an enchanted one
+
+        # A shaped crafting recipe for the item. Up to three rows of up to three characters, a space is empty.
+        # recipe:
+        #   shape: ["aba", "bcb", "aba"]
+        #   ingredients: {a: AMETHYST_SHARD, b: DIAMOND, c: SMITHING_TABLE}
+        #   amount: 1
+        #   group: mytables             # optional
+        #   category: building          # optional: building, redstone, equipment or misc
     """.trimIndent() + "\n"
 }

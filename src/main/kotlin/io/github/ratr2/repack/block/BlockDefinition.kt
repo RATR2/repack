@@ -98,9 +98,20 @@ class DisplayOptions(
     val context: DisplayContext,
 )
 
-class ItemOptions(val baseName: String, val name: String?, val lore: List<String>) {
+class ItemOptions(val baseName: String, val name: String?, val lore: List<String>, val glint: Boolean) {
     val base: Material by lazy { Material.matchMaterial(baseName)!! }
 }
+
+/** A shaped crafting recipe for the block's item. [shape] has up to three rows of up to three characters, a space is empty. */
+class RecipeOptions(
+    val shape: List<String>,
+    /** Material name for each character used in [shape]. */
+    val ingredients: Map<Char, String>,
+    val amount: Int,
+    val group: String?,
+    /** building, redstone, equipment or misc. */
+    val category: String?,
+)
 
 /** Everything one custom block type can be configured with. See the example file the plugin writes to `blocks/_example.yml`. */
 class BlockDefinition(
@@ -118,6 +129,7 @@ class BlockDefinition(
     val piston: PistonBehavior,
     val display: DisplayOptions,
     val item: ItemOptions,
+    val recipe: RecipeOptions?,
 ) {
     val proxyBlock: Material by lazy { Material.matchMaterial(proxyBlockName)!! }
 }

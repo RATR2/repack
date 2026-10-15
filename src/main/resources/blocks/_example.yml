@@ -67,3 +67,17 @@ item:
   base: PAPER
   # name: "&bExample"
   lore: []
+  # true: the item shines like an enchanted one.
+  glint: false
+
+# A shaped crafting recipe for the item. Leave it out for no recipe. shape is up to three rows of up to three characters, a space
+# is empty, and every other character needs an entry in ingredients.
+# recipe:
+#   shape: ["aba", "bcb", "aba"]
+#   ingredients:
+#     a: AMETHYST_SHARD
+#     b: DIAMOND
+#     c: SMITHING_TABLE
+#   amount: 1
+#   group: mytables
+#   category: building

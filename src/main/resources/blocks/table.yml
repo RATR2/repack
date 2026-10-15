@@ -1,0 +1,58 @@
+# The Infusion Table, as the Ethereal server's Skript built it (features/4table.sk), without the custom menus and the particles.
+# Every old rule is here:
+#   - a real smithing table under the model, with the model scaled to 1.01 x 1.15 x 1.01 so it covers the smithing table
+#   - lit at full brightness
+#   - right-clicking does not open the smithing table menu (the Skript cancelled it; sneaking with an empty hand too)
+#   - breaking it drops the table item
+#   - the item is a glowing smithing table named "Infusion Table", crafted shaped as amethyst shard, diamond, smithing table
+# The old menus (infuse and craft) hook in through Skript: on custom block interact of "table":
+
+model: table
+
+proxy:
+  block: SMITHING_TABLE
+  mode: vanilla                 # broken at the smithing table's own speed
+  vanilla-interaction: false    # right click does not open the smithing table menu
+
+breaking:
+  tool: any
+  drops-need-tool: false
+  xp: 0
+
+drops:
+  - block: self
+
+explosion:
+  resistant: false
+  drops: false
+
+piston: block
+
+display:
+  offset: [0, 0, 0]
+  scale: [1.01, 1.15, 1.01]
+  view-range: 1.0
+  brightness: 15
+  rotate-to-placer: false
+  context: none
+
+item:
+  base: SMITHING_TABLE
+  glint: true
+  name: "&aInfusion Table"
+  lore:
+    - ""
+    - "&dInfuse or Craft powerful spells with this mythical table.."
+
+recipe:
+  shape:
+    - "aba"
+    - "bcb"
+    - "aba"
+  ingredients:
+    a: AMETHYST_SHARD
+    b: DIAMOND
+    c: SMITHING_TABLE
+  amount: 1
+  group: etherealtable
+  category: building
