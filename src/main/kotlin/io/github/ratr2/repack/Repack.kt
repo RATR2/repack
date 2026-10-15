@@ -1,14 +1,16 @@
 package io.github.ratr2.repack
 
+import com.github.retrooper.packetevents.PacketEvents
+import io.github.ratr2.repack.model.ModelLibrary
 import io.github.ratr2.repack.pack.PackBuilder
 import io.github.ratr2.repack.pack.PackEntry
 import io.github.ratr2.repack.pack.PackHost
 import io.github.ratr2.repack.pack.PackSender
 import io.github.ratr2.repack.pack.PackStore
-import com.github.retrooper.packetevents.PacketEvents
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
 import org.bukkit.plugin.java.JavaPlugin
+import java.io.File
 
 class Repack : JavaPlugin() {
 
@@ -42,10 +44,18 @@ class Repack : JavaPlugin() {
         PacketEvents.getAPI().terminate()
     }
 
-    /** Regenerates the pack from the registered models. Does not change the published pack. */
-    fun rebuild(): PackEntry {
-        val files = HashMap<String, ByteArray>()
+    val modelsFolder: File
+        get() = File(dataFolder, "models").apply { mkdirs() }
+
+    /** Regenerates the pack from the .bbmodel files in the models folder. Does not change the published pack. */
+    fun rebuild(): BuildReport {
+        val library = ModelLibrary.build(modelsFolder)
+        val files = HashMap(library.files)
         files["pack.mcmeta"] = PackBuilder.meta("Repack custom blocks")
-        return store.add(PackBuilder.zip(files))
+        library.warnings.forEach { logger.warning(it) }
+        library.errors.forEach { logger.severe(it) }
+        return BuildReport(store.add(PackBuilder.zip(files)), library.models, library.warnings, library.errors)
     }
 }
+
+class BuildReport(val entry: PackEntry, val models: List<String>, val warnings: List<String>, val errors: List<String>)
