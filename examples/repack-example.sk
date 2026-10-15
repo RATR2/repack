@@ -1,0 +1,51 @@
+# Example Skript for Repack. Copy it to plugins/Skript/scripts/ and run /sk reload repack-example.
+# It uses the bundled "table" block (plugins/Repack/blocks/table.yml). Needs Skript 2.13 or newer.
+
+# Right clicking the table. The table's block file already stops the smithing table menu from opening.
+on custom block interact of "table":
+    if action is not right click:
+        stop
+    cancel event
+    if player is sneaking:
+        send "&7You peek under the table." to player
+    else:
+        send "&aThe infusion table hums." to player
+        play sound "block.amethyst_block.chime" with volume 1 pitch 1.2 at event-block
+
+# Starting to dig a block: keep players without the right permission from breaking it.
+on custom block break start of "table":
+    if player does not have permission "example.table.break":
+        cancel event
+        send "&cOnly staff can take this table apart." to player
+
+# Everything else that can happen to a block: here, tnt may destroy the table although the block file says it resists.
+on custom block explode of "table":
+    uncancel event
+
+# The vanilla click event works as well, for blocks you do not want a dedicated event for.
+on right click:
+    if event-block is a custom block with id "table":
+        if player's tool is a stick:
+            send "Custom block id: %custom block id of event-block%" to player
+
+# Handing out and placing blocks.
+command /tablegive [<number=1>]:
+    permission: example.table.give
+    trigger:
+        give player custom block item "table" x arg-1
+        send "&aGave %arg-1% table(s)." to player
+
+command /tableplace:
+    permission: example.table.place
+    trigger:
+        place custom block "table" at location 2 meters in front of player facing player's yaw
+
+command /tableremove:
+    permission: example.table.place
+    trigger:
+        remove custom block at location 2 meters in front of player
+        
+command /customblocks:
+    permission: example.table.give
+    trigger:
+        send "Custom blocks: %all custom block ids%" to player

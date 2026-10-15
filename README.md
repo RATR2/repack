@@ -80,6 +80,8 @@ command /table:
         place custom block "table" at player's location facing player's yaw
 ```
 
+A fuller example with permissions, sounds and commands is in [examples/repack-example.sk](examples/repack-example.sk).
+
 | Syntax | |
 |---|---|
 | `%blocks% is a custom block [with id %string%]` | Condition |
