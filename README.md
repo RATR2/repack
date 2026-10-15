@@ -30,9 +30,9 @@ Drop a `.bbmodel` file into the plugin folder and you have a custom block. Repac
 
 ## Install
 
-Needs Paper 26.3. Clients from 1.21.4 to 26.3 are supported through [ViaVersion](https://github.com/ViaVersion/ViaVersion) (optional), and Repack sends each player the pack that fits their version.
+Needs Paper 26.3 and the [PacketEvents](https://github.com/retrooper/packetevents) plugin (the Spigot jar, 2.14.0 or newer). Clients from 1.21.4 to 26.3 are supported through [ViaVersion](https://github.com/ViaVersion/ViaVersion) (optional), and Repack sends each player the pack that fits their version.
 
-1. Put `repack.jar` in `plugins/`.
+1. Put `repack.jar` and `packetevents-spigot-2.14.0.jar` in `plugins/`.
 2. Put your models in `plugins/Repack/models/`. The file name is the block id: `table.bbmodel` makes the block `table`. Textures must be embedded in the model.
 3. Run `/repack build`, then `/repack push`.
 4. `/repack give table` and place it.

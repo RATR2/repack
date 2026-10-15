@@ -1,6 +1,5 @@
 package io.github.ratr2.repack
 
-import com.github.retrooper.packetevents.PacketEvents
 import io.github.ratr2.repack.block.BlockDefinition
 import io.github.ratr2.repack.block.BlockDefinitions
 import io.github.ratr2.repack.block.BlockEvents
@@ -16,7 +15,6 @@ import io.github.ratr2.repack.pack.SharedHost
 import io.github.ratr2.repack.pack.PackStore
 import io.github.ratr2.repack.protect.Protections
 import io.github.ratr2.repack.skript.SkriptHook
-import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
 import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
@@ -36,13 +34,7 @@ class Repack : JavaPlugin() {
         private set
     private lateinit var display: DisplayManager
 
-    override fun onLoad() {
-        PacketEvents.setAPI(SpigotPacketEventsBuilder.build(this))
-        PacketEvents.getAPI().load()
-    }
-
     override fun onEnable() {
-        PacketEvents.getAPI().init()
         saveDefaultConfig()
         saveResource("blocks/_example.yml", true)
         store = PackStore(dataFolder)
@@ -80,7 +72,6 @@ class Repack : JavaPlugin() {
     override fun onDisable() {
         RepackAPI.plugin = null
         if (::host.isInitialized) host.stop()
-        PacketEvents.getAPI().terminate()
     }
 
     val modelsFolder: File
