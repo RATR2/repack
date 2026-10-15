@@ -82,17 +82,15 @@ class DisplayManager(private val blocks: PlacedBlocks) : Listener, PlacementList
         shown.remove(event.player.uniqueId)
     }
 
-    /** Sends the models again to everyone, for after the definitions or the pack changed. */
-    fun refreshAll() {
-        for ((playerId, ids) in shown.toMap()) {
-            val player = Bukkit.getPlayer(playerId) ?: continue
-            ids.keys.toList().forEach { hide(player, it) }
-        }
+    /** Sends the models again to everyone, for after the definitions or the pack changed. With [only], just blocks with those ids. */
+    fun refreshAll(only: Set<String>? = null) {
         for (world in Bukkit.getWorlds()) {
             for (player in world.players) {
                 for (chunk in world.loadedChunks) {
                     if (!player.isChunkSent(Chunk.getChunkKey(chunk.x, chunk.z))) continue
                     for ((pos, block) in blocks.inChunk(chunk)) {
+                        if (only != null && block.id !in only) continue
+                        hide(player, Key(world.uid, pos))
                         val definition = blocks.definitionOf(block.id) ?: continue
                         show(player, world, pos, block, definition)
                     }

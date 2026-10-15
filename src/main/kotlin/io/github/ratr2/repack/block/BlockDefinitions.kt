@@ -29,13 +29,15 @@ object BukkitMaterials : MaterialRules {
  */
 object BlockDefinitions {
 
-    fun load(blocksFolder: File, modelIds: Set<String>): LoadedDefinitions {
+    /** Reads every block file, or just the ids in [only]. */
+    fun load(blocksFolder: File, modelIds: Set<String>, only: Set<String>? = null): LoadedDefinitions {
         val definitions = LinkedHashMap<String, BlockDefinition>()
         val errors = ArrayList<String>()
 
         val files = blocksFolder.listFiles { f -> f.isFile && f.extension == "yml" && !f.name.startsWith("_") }.orEmpty().sortedBy { it.name }
         for (file in files) {
             val id = file.nameWithoutExtension.lowercase()
+            if (only != null && id !in only) continue
             try {
                 val yaml = YamlConfiguration().apply { load(file) }
                 val definition = parse(id, yaml)
@@ -56,6 +58,7 @@ object BlockDefinitions {
             }
         }
         for (model in modelIds.sorted()) {
+            if (only != null && model !in only) continue
             if (model !in definitions && files.none { it.nameWithoutExtension.lowercase() == model }) {
                 definitions[model] = parse(model, YamlConfiguration())
             }

@@ -90,7 +90,7 @@ class Repack : JavaPlugin() {
 
     override fun onDisable() {
         RepackAPI.plugin = null
-        recipeKeys.forEach { server.removeRecipe(it) }
+        recipeKeys.values.forEach { server.removeRecipe(it) }
         if (::host.isInitialized) host.stop()
     }
 
@@ -101,14 +101,32 @@ class Repack : JavaPlugin() {
         get() = File(dataFolder, "blocks").apply { mkdirs() }
 
     /** What the models and blocks folders looked like when the types were last read. */
-    private var lastStamp = ""
+    private var lastStamp = emptyMap<String, String>()
 
-    /** The file names, sizes and times in the models and blocks folders, so a change shows up as a different string. */
-    private fun stamp(): String =
-        listOf(modelsFolder, blocksFolder).joinToString("|") { folder ->
-            folder.listFiles { f -> f.isFile && !f.name.startsWith("_") }.orEmpty().sortedBy { it.name }
-                .joinToString(",") { "${it.name}:${it.length()}:${it.lastModified()}" }
+    /** Size and time of each file in the models and blocks folders, so a change shows up as a different entry. */
+    private fun stamp(): Map<String, String> {
+        val stamps = HashMap<String, String>()
+        for (folder in listOf(modelsFolder, blocksFolder)) {
+            for (file in folder.listFiles { f -> f.isFile && !f.name.startsWith("_") }.orEmpty()) {
+                stamps["${folder.name}/${file.name}"] = "${file.length()}:${file.lastModified()}"
+            }
         }
+        return stamps
+    }
+
+    /** The block ids a changed, added or removed file affects: a block file is one id, a model is every block that shows it. */
+    private fun affectedIds(before: Map<String, String>, after: Map<String, String>): Set<String> {
+        val ids = HashSet<String>()
+        for (key in (before.keys + after.keys).filter { before[it] != after[it] }) {
+            val folder = key.substringBefore('/')
+            val name = key.substringAfter('/').substringBeforeLast('.').lowercase()
+            ids += name
+            if (folder == modelsFolder.name) {
+                ids += blocks.definitions.values.filter { it.model == name || it.item.model == name }.map { it.id }
+            }
+        }
+        return ids
+    }
 
     /**
      * Reads the block types again when files in the models or blocks folders were added, changed or removed. This only changes
@@ -117,9 +135,10 @@ class Repack : JavaPlugin() {
     fun refreshIfChanged(): Boolean {
         val now = stamp()
         if (now == lastStamp) return false
-        reloadDefinitions()
+        val ids = affectedIds(lastStamp, now)
+        reloadDefinitions(ids)
         lastStamp = stamp()
-        logger.info("Model or block files changed: ${blocks.types.size} block type(s) loaded.")
+        logger.info("Model or block files changed: reloaded ${ids.sorted().joinToString()} (${blocks.types.size} block type(s) in all).")
         return true
     }
 
@@ -143,35 +162,45 @@ class Repack : JavaPlugin() {
         }
     }
 
-    /** Reads the block files again, which also undoes [registerBlock] and [unregisterBlock]. */
-    fun reloadDefinitions(): List<String> {
+    /**
+     * Reads the block files again, which also undoes [registerBlock] and [unregisterBlock]. With [only], just those block ids are
+     * read and refreshed, and every other block is left exactly as it is.
+     */
+    fun reloadDefinitions(only: Set<String>? = null): List<String> {
         createMissingBlockFiles()
-        val loaded = BlockDefinitions.load(blocksFolder, ModelLibrary.ids(modelsFolder))
+        val loaded = BlockDefinitions.load(blocksFolder, ModelLibrary.ids(modelsFolder), only)
         loaded.errors.forEach { logger.severe(it) }
-        fileDefinitions = loaded.definitions
-        registered.clear()
-        unregistered.clear()
-        applyDefinitions()
+        if (only == null) {
+            fileDefinitions = loaded.definitions
+            registered.clear()
+            unregistered.clear()
+        } else {
+            fileDefinitions = fileDefinitions.filterKeys { it !in only } + loaded.definitions
+            registered.keys.removeAll(only)
+            unregistered.removeAll(only)
+        }
+        applyDefinitions(only)
         return loaded.errors
     }
 
     /** Placed blocks keep working; types that are gone stay in the world but show nothing. */
-    private fun applyDefinitions() {
+    private fun applyDefinitions(only: Set<String>? = null) {
         blocks.definitions = (fileDefinitions + registered).filterKeys { it !in unregistered }
-        registerRecipes()
+        registerRecipes(only)
         if (::display.isInitialized && server.pluginManager.isPluginEnabled(this)) {
-            display.refreshAll()
+            display.refreshAll(only)
             server.onlinePlayers.forEach { it.updateCommands() }
         }
     }
 
-    private val recipeKeys = ArrayList<NamespacedKey>()
+    private val recipeKeys = HashMap<String, NamespacedKey>()
 
-    /** Registers the crafting recipe of every block that has one, replacing the ones from before a reload. */
-    private fun registerRecipes() {
-        recipeKeys.forEach { server.removeRecipe(it) }
-        recipeKeys.clear()
+    /** Registers the crafting recipe of every block that has one (or of [only] those ids), replacing the ones from before. */
+    private fun registerRecipes(only: Set<String>? = null) {
+        val stale = recipeKeys.keys.filter { only == null || it in only }
+        stale.forEach { server.removeRecipe(recipeKeys.remove(it)!!) }
         for (definition in blocks.definitions.values) {
+            if (only != null && definition.id !in only) continue
             val options = definition.recipe ?: continue
             val key = NamespacedKey(this, "block_${definition.id}")
             val recipe = ShapedRecipe(key, items.create(definition, options.amount))
@@ -181,9 +210,9 @@ class Repack : JavaPlugin() {
             options.group?.let { recipe.group = it }
             options.category?.let { recipe.category = CraftingBookCategory.valueOf(it.uppercase()) }
             server.addRecipe(recipe)
-            recipeKeys += key
+            recipeKeys[definition.id] = key
         }
-        if (recipeKeys.isNotEmpty()) server.updateRecipes()
+        if (recipeKeys.isNotEmpty() || stale.isNotEmpty()) server.updateRecipes()
     }
 
     /** The first time Repack runs it adds the table that comes with it. Deleting those files afterwards keeps them deleted. */
