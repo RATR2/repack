@@ -1,0 +1,12 @@
+name: repack
+version: '${version}'
+
+main: io.github.ratr2.repack.Repack
+api-version: '26.3'
+load: POSTWORLD
+
+# /repack itself is registered with Brigadier in Repack.onEnable.
+permissions:
+  repack.admin:
+    description: Allows /repack build, push and status.
+    default: op

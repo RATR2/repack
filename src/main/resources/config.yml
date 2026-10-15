@@ -1,0 +1,11 @@
+resource-pack:
+  # Address players' clients download the pack from: your server's public IP or domain.
+  # Empty uses server-ip from server.properties, or localhost if that is empty too.
+  public-host: ""
+  # Port of the pack's built-in HTTP server; it must be reachable by players.
+  # Distortion uses 8085, so this one defaults to 8086.
+  port: 8086
+  bind: 0.0.0.0
+  # Kick players who decline the pack.
+  required: false
+  prompt: "This server uses a resource pack for custom blocks."
