@@ -1,6 +1,7 @@
 package io.github.ratr2.repack
 
 import com.github.retrooper.packetevents.PacketEvents
+import io.github.ratr2.repack.block.BlockDefinition
 import io.github.ratr2.repack.block.BlockDefinitions
 import io.github.ratr2.repack.block.BlockEvents
 import io.github.ratr2.repack.block.BlockItems
@@ -14,8 +15,10 @@ import io.github.ratr2.repack.pack.PackHost
 import io.github.ratr2.repack.pack.PackSender
 import io.github.ratr2.repack.pack.PackStore
 import io.github.ratr2.repack.protect.Protections
+import io.github.ratr2.repack.skript.SkriptHook
 import io.github.retrooper.packetevents.factory.spigot.SpigotPacketEventsBuilder
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
+import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.plugin.java.JavaPlugin
 import java.io.File
 
@@ -59,6 +62,13 @@ class Repack : JavaPlugin() {
         }
         blocks.start()
         RepackAPI.plugin = this
+        if (server.pluginManager.isPluginEnabled("Skript")) {
+            try {
+                SkriptHook.register(this)
+            } catch (e: Throwable) {
+                logger.severe("Could not add Skript syntax, the rest of Repack still works: $e")
+            }
+        }
 
         val command = RepackCommand(this)
         lifecycleManager.registerEventHandler(LifecycleEvents.COMMANDS) { event ->
@@ -78,13 +88,53 @@ class Repack : JavaPlugin() {
     val blocksFolder: File
         get() = File(dataFolder, "blocks").apply { mkdirs() }
 
-    /** Reads the block files again. Placed blocks keep working; types that are gone stay in the world but show nothing. */
+    /** Types read from the block files, before runtime changes. */
+    private var fileDefinitions: Map<String, BlockDefinition> = emptyMap()
+
+    /** Types added through the API since the last reload. */
+    private val registered = LinkedHashMap<String, BlockDefinition>()
+
+    /** File types taken away through the API, until the next reload. */
+    private val unregistered = HashSet<String>()
+
+    /** Reads the block files again, which also undoes [registerBlock] and [unregisterBlock]. */
     fun reloadDefinitions(): List<String> {
         val loaded = BlockDefinitions.load(blocksFolder, ModelLibrary.ids(modelsFolder))
         loaded.errors.forEach { logger.severe(it) }
-        blocks.definitions = loaded.definitions
-        if (::display.isInitialized && server.pluginManager.isPluginEnabled(this)) display.refreshAll()
+        fileDefinitions = loaded.definitions
+        registered.clear()
+        unregistered.clear()
+        applyDefinitions()
         return loaded.errors
+    }
+
+    /** Placed blocks keep working; types that are gone stay in the world but show nothing. */
+    private fun applyDefinitions() {
+        blocks.definitions = (fileDefinitions + registered).filterKeys { it !in unregistered }
+        if (::display.isInitialized && server.pluginManager.isPluginEnabled(this)) display.refreshAll()
+    }
+
+    /**
+     * Adds a block type with the default settings that shows [model] (a file in the models folder, without extension). It lasts
+     * until the next reload. Returns an error message, or null when it worked.
+     */
+    fun registerBlock(id: String, model: String): String? {
+        if (!ID.matches(id)) return "Block ids use only a-z, 0-9, _ and -."
+        if (model !in ModelLibrary.ids(modelsFolder)) return "There is no model file '$model.bbmodel'."
+        if (id in blocks.definitions) return "A block with the id '$id' already exists."
+        registered[id] = BlockDefinitions.parse(id, YamlConfiguration().apply { set("model", model) })
+        unregistered.remove(id)
+        applyDefinitions()
+        return null
+    }
+
+    /** Takes a block type away until the next reload. Placed blocks stay in the world but show nothing. False if there was none. */
+    fun unregisterBlock(id: String): Boolean {
+        if (id !in blocks.definitions) return false
+        registered.remove(id)
+        if (id in fileDefinitions) unregistered += id
+        applyDefinitions()
+        return true
     }
 
     /** Regenerates the pack from the .bbmodel files in the models folder. Does not change the published pack. */
@@ -98,5 +148,7 @@ class Repack : JavaPlugin() {
         return BuildReport(store.add(PackBuilder.zip(files)), library.models, library.warnings, library.errors + definitionErrors)
     }
 }
+
+private val ID = Regex("[a-z0-9_-]+")
 
 class BuildReport(val entry: PackEntry, val models: List<String>, val warnings: List<String>, val errors: List<String>)

@@ -54,6 +54,8 @@ import java.util.UUID
  * same moment other plugins decide. At monitor priority, when the outcome is final, the custom block is removed if its proxy
  * really is going away. Removing it earlier would lose the block whenever a protection plugin stepped in afterwards.
  */
+private const val DENY_COOLDOWN_MILLIS = 3000L
+
 class BlockEvents(
     private val plugin: Repack,
     private val blocks: PlacedBlocks,
@@ -67,6 +69,7 @@ class BlockEvents(
     private class Hit(val block: Block, val id: String, val definition: BlockDefinition)
 
     private val mining = HashMap<UUID, Mining>()
+    private val lastDenied = HashMap<UUID, Long>()
 
     /** Players whose break we are finishing ourselves, so [onBreak] can tell it from a vanilla one. */
     private val completing = HashSet<UUID>()
@@ -88,9 +91,14 @@ class BlockEvents(
         return event
     }
 
+    /** Tells the player in chat, at most every few seconds. The action bar is left alone: servers use it for their own icons. */
     private fun deny(player: Player) {
         val text = plugin.config.getString("messages.no-permission", "You can't do that here.").orEmpty()
-        if (text.isNotBlank()) player.sendActionBar(Component.text(text, NamedTextColor.RED))
+        if (text.isBlank()) return
+        val now = System.currentTimeMillis()
+        if (now - (lastDenied[player.uniqueId] ?: 0L) < DENY_COOLDOWN_MILLIS) return
+        lastDenied[player.uniqueId] = now
+        player.sendMessage(Component.text(text, NamedTextColor.RED))
     }
 
     private fun dropLoot(hit: Hit) {
@@ -201,6 +209,7 @@ class BlockEvents(
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
         mining.remove(event.player.uniqueId)
+        lastDenied.remove(event.player.uniqueId)
     }
 
     private fun tickMining() {
