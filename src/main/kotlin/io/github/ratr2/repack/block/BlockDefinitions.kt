@@ -43,6 +43,11 @@ object BlockDefinitions {
                     errors += "$id: model '${definition.model}' has no .bbmodel file in the models folder."
                     continue
                 }
+                val itemModel = definition.item.model
+                if (itemModel != null && itemModel !in modelIds) {
+                    errors += "$id: item.model '$itemModel' has no .bbmodel file in the models folder."
+                    continue
+                }
                 definitions[id] = definition
             } catch (e: DefinitionException) {
                 errors += "$id: ${e.message}"
@@ -117,6 +122,7 @@ object BlockDefinitions {
                 name = item?.getString("name"),
                 lore = item?.getStringList("lore").orEmpty(),
                 glint = item?.getBoolean("glint", false) ?: false,
+                model = item?.getString("model")?.lowercase(),
             ),
             recipe = recipeOf(section.getConfigurationSection("recipe"), materials),
         )

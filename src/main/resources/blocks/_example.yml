@@ -65,6 +65,8 @@ display:
 # The item players hold to place this block.
 item:
   base: PAPER
+  # A different .bbmodel (file name without extension) for the item in the hand, inventory and GUI. Leave it out to use the block's model.
+  # model: example_item
   # name: "&bExample"
   lore: []
   # true: the item shines like an enchanted one.

@@ -94,7 +94,13 @@ class DisplayOptions(
     val context: DisplayContext,
 )
 
-class ItemOptions(val baseName: String, val name: String?, val lore: List<String>, val glint: Boolean) {
+class ItemOptions(
+    val baseName: String,
+    val name: String?,
+    val lore: List<String>,
+    val glint: Boolean,
+    val model: String? = null,
+) {
     val base: Material by lazy { Material.matchMaterial(baseName)!! }
 }
 
