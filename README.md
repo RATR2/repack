@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="src/main/resources/pack.png" alt="Repack logo" width="128" height="128">
+
 # Repack
 
 [![Issues](https://img.shields.io/github/issues/RATR2/repack?style=for-the-badge&logo=github)](https://github.com/RATR2/repack/issues)
