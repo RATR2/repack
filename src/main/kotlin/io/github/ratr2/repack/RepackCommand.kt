@@ -28,7 +28,7 @@ import java.util.concurrent.CompletableFuture
  * /repack remove [pos]        removes the custom block there
  * /repack list                lists the ids that can be placed
  * /repack give <id> [amount] [players]   gives the item that places a custom block
- * /repack reload              reads the block files again
+ * /repack reload [blocks|config|host|all]   reads the block files (default), the config, or restarts the pack server on the new port
  * ```
  */
 class RepackCommand(private val plugin: Repack) {
@@ -86,7 +86,14 @@ class RepackCommand(private val plugin: Repack) {
                     )
             )
         )
-        .then(Commands.literal("reload").executes(::reload))
+        .then(
+            Commands.literal("reload")
+                .executes { reload(it, blocks = true, config = false, host = false) }
+                .then(Commands.literal("blocks").executes { reload(it, blocks = true, config = false, host = false) })
+                .then(Commands.literal("config").executes { reload(it, blocks = false, config = true, host = false) })
+                .then(Commands.literal("host").executes { reload(it, blocks = false, config = false, host = true) })
+                .then(Commands.literal("all").executes { reload(it, blocks = true, config = true, host = true) })
+        )
         .build()
 
     private fun positionOf(context: CommandContext<CommandSourceStack>): Location =
@@ -129,6 +136,7 @@ class RepackCommand(private val plugin: Repack) {
         val built = plugin.store.built
         val published = plugin.store.published
         reply(context, "Built: ${built?.let(::short) ?: "none"}. Published: ${published?.let(::short) ?: "none"}.", NamedTextColor.YELLOW)
+        reply(context, "Pack server: ${plugin.host.description}.", NamedTextColor.YELLOW)
         if (built != null && built != published) {
             reply(context, "The built pack has not been pushed yet.", NamedTextColor.YELLOW)
         }
@@ -181,10 +189,18 @@ class RepackCommand(private val plugin: Repack) {
         return Command.SINGLE_SUCCESS
     }
 
-    private fun reload(context: CommandContext<CommandSourceStack>): Int {
-        val errors = plugin.reloadDefinitions()
-        errors.take(MAX_LINES).forEach { reply(context, it, NamedTextColor.RED) }
-        reply(context, "Loaded ${plugin.blocks.types.size} block type(s)${if (errors.isEmpty()) "" else ", ${errors.size} with errors"}.", NamedTextColor.GREEN)
+    private fun reload(context: CommandContext<CommandSourceStack>, blocks: Boolean, config: Boolean, host: Boolean): Int {
+        if (config) plugin.reloadConfig()
+        if (blocks) {
+            val errors = plugin.reloadDefinitions()
+            errors.take(MAX_LINES).forEach { reply(context, it, NamedTextColor.RED) }
+            reply(context, "Loaded ${plugin.blocks.types.size} block type(s)${if (errors.isEmpty()) "" else ", ${errors.size} with errors"}.", NamedTextColor.GREEN)
+        }
+        if (host) {
+            val error = plugin.host.restart()
+            if (error != null) reply(context, error, NamedTextColor.RED) else reply(context, "Pack server ${plugin.host.description}.", NamedTextColor.GREEN)
+        }
+        if (config && !host) reply(context, "Config reloaded. Run /repack reload host to apply a changed port.", NamedTextColor.GREEN)
         return Command.SINGLE_SUCCESS
     }
 
