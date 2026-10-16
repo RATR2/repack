@@ -249,6 +249,7 @@ class SharedHost(
             Mode.HOST -> {
                 http?.stop(0)
                 http = null
+                boundTo = null
                 service?.let { Bukkit.getServicesManager().unregister(it) }
                 service = null
                 sources.clear()
@@ -268,14 +269,15 @@ class SharedHost(
 
     /** Opens a server on the configured port. The old one, if any, keeps running when the new one cannot start. */
     private fun bind(): HttpServer? {
-        val config = plugin.config
-        val port = config.getInt("resource-pack.port", defaultPort)
-        val host = config.getString("resource-pack.public-host").orEmpty().ifBlank { plugin.server.ip }.ifBlank { "localhost" }
+        val (address, port) = bindTarget()
         return try {
-            HttpServer.create(InetSocketAddress(config.getString("resource-pack.bind", "0.0.0.0"), port), 0).apply {
+            HttpServer.create(InetSocketAddress(address, port), 0).apply {
                 createContext("/", ::handle)
                 start()
-            }.also { ownBase = "http://$host:$port" }
+            }.also {
+                ownBase = publicBase(port)
+                boundTo = address to port
+            }
         } catch (e: IOException) {
             plugin.logger.severe(
                 "Could not open the pack server on port $port (${e.message}). Another program may be using it: set " +
@@ -285,7 +287,27 @@ class SharedHost(
         }
     }
 
+    /** The address and port the settings ask for. */
+    private fun bindTarget(): Pair<String, Int> =
+        plugin.config.getString("resource-pack.bind", "0.0.0.0")!! to plugin.config.getInt("resource-pack.port", defaultPort)
+
+    /** The address players are told to download from. */
+    private fun publicBase(port: Int): String {
+        val host = plugin.config.getString("resource-pack.public-host").orEmpty().ifBlank { plugin.server.ip }.ifBlank { "localhost" }
+        return "http://$host:$port"
+    }
+
+    /** What the running server is bound to, so a reload that keeps it does not try to bind the same port a second time. */
+    private var boundTo: Pair<String, Int>? = null
+
     private fun rebind(): String? {
+        val target = bindTarget()
+        if (boundTo == target) {
+            // Same address and port: only the advertised address can have changed, which needs no new server.
+            ownBase = publicBase(target.second)
+            plugin.logger.info("Pack server address is now $ownBase")
+            return null
+        }
         val old = http
         val server = bind() ?: return "Could not use the new port, still serving at $ownBase."
         http = server
