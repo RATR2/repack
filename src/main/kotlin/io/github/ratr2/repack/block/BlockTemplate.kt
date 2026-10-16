@@ -1,9 +1,17 @@
 package io.github.ratr2.repack.block
 
+import io.github.ratr2.repack.config.ConfigMigrator
+import io.github.ratr2.repack.config.ConfigVersions
+
 /** The settings file the plugin writes for a block the first time it sees its model: every option, set to its default. */
 object BlockTemplate {
 
-    fun render(id: String): String = """
+    /** The version of the files this template writes: a hash of its text, so changing the template changes it. */
+    val version: String = ConfigVersions.of(body("ID"))
+
+    fun render(id: String): String = "# ${ConfigMigrator.note(version)}\n${ConfigMigrator.KEY}: $version\n\n" + body(id)
+
+    private fun body(id: String): String = """
         # Settings for the block "$id". Every option is here with its default, so change what you need.
         # _example.yml explains each one. To make a second block from the same model, copy this file
         # (table2.yml next to table.yml) and keep `model` pointing at the same .bbmodel file.

@@ -29,3 +29,6 @@ resource-pack:
   # Kick players who decline the pack.
   required: false
   prompt: "This server uses a resource pack for custom blocks."
+
+# Tell players when their client version is too old for the blocks.
+client-notices: true

@@ -10,6 +10,8 @@ import io.github.ratr2.repack.block.PickBlock
 import io.github.ratr2.repack.block.BlockTemplate
 import io.github.ratr2.repack.block.Loot
 import io.github.ratr2.repack.block.PlacedBlocks
+import io.github.ratr2.repack.config.ConfigMigrator
+import io.github.ratr2.repack.config.ConfigVersions
 import io.github.ratr2.repack.display.DisplayManager
 import io.github.ratr2.repack.model.ModelLibrary
 import io.github.ratr2.repack.pack.PackBuilder
@@ -47,6 +49,7 @@ class Repack : JavaPlugin() {
 
     override fun onEnable() {
         saveDefaultConfig()
+        migrateConfig()
         saveResource("blocks/_example.yml", true)
         installDefaults()
         store = PackStore(dataFolder)
@@ -164,11 +167,26 @@ class Repack : JavaPlugin() {
         }
     }
 
+    /** Brings `config.yml` up to date, then reads it again. */
+    private fun migrateConfig() {
+        val shippedConfig = getResource("config.yml")?.reader()?.use { it.readText() } ?: return
+        val defaults = YamlConfiguration().apply { loadFromString(shippedConfig) }
+        ConfigMigrator.migrate(File(dataFolder, "config.yml"), ConfigVersions.of(shippedConfig), emptyList(), defaults)?.let(logger::info)
+        reloadConfig()
+    }
+
+    /** Brings every settings file in `blocks/` up to date, so the parser only ever sees the current layout. */
+    private fun migrateBlockFiles() {
+        val files = blocksFolder.listFiles { f -> f.isFile && f.extension == "yml" && !f.name.startsWith("_") }.orEmpty()
+        for (file in files.sortedBy { it.name }) ConfigMigrator.migrate(file, BlockTemplate.version)?.let(logger::info)
+    }
+
     /**
      * Reads the block files again, which also undoes registerBlock and unregisterBlock. With only, just those block ids are
      * read and refreshed, and every other block is left exactly as it is.
      */
     fun reloadDefinitions(only: Set<String>? = null): List<String> {
+        migrateBlockFiles()
         createMissingBlockFiles()
         val loaded = BlockDefinitions.load(blocksFolder, ModelLibrary.ids(modelsFolder), only)
         loaded.errors.forEach { logger.severe(it) }
