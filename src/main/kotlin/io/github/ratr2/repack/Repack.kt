@@ -254,7 +254,11 @@ class Repack : JavaPlugin() {
 
     /** Placed blocks keep working; types that are gone stay in the world but show nothing. */
     private fun applyDefinitions(only: Set<String>? = null) {
+        val previous = blocks.definitions
         blocks.definitions = (fileDefinitions + registered).filterKeys { it !in unregistered }
+        blocks.proxyChanged(previous, blocks.definitions).takeIf { it.isNotEmpty() }?.let {
+            logger.info("The proxy block of ${it.sorted().joinToString()} changed: placed blocks of those types follow it.")
+        }
         registerRecipes(only)
         if (::display.isInitialized && server.pluginManager.isPluginEnabled(this)) {
             display.refreshAll(only)
@@ -277,7 +281,12 @@ class Repack : JavaPlugin() {
             for ((char, name) in options.ingredients) if (char in used) recipe.setIngredient(char, Material.matchMaterial(name)!!)
             options.group?.let { recipe.group = it }
             options.category?.let { recipe.category = CraftingBookCategory.valueOf(it.uppercase()) }
-            server.addRecipe(recipe)
+            try {
+                server.addRecipe(recipe)
+            } catch (e: IllegalArgumentException) {
+                logger.severe("${definition.id}: the recipe could not be registered: ${e.message}")
+                continue
+            }
             recipeKeys[definition.id] = key
         }
         if (recipeKeys.isNotEmpty() || stale.isNotEmpty()) server.updateRecipes()
@@ -313,11 +322,15 @@ class Repack : JavaPlugin() {
     }
 
     /** Regenerates every version of the pack from the .bbmodel files in the models folder. Does not change what is published. */
-    fun rebuild(): BuildReport {
+    fun rebuild(force: Boolean = false): BuildReport {
         val library = ModelLibrary.build(modelsFolder)
         library.warnings.forEach { logger.warning(it) }
         library.errors.forEach { logger.severe(it) }
         val definitionErrors = reloadDefinitions()
+        // A model that failed to convert is missing from the pack, so a pack built around it could replace a working one.
+        if (library.errors.isNotEmpty() && !force) {
+            return BuildReport(emptyMap(), library.models, library.warnings, library.errors + definitionErrors, rejected = true)
+        }
         val entries = LinkedHashMap<PackVariant, PackEntry>()
         for (variant in PackVariant.entries) {
             val files = HashMap(library.files.getValue(variant))
@@ -334,4 +347,10 @@ private val ID = Regex("[a-z0-9_-]+")
 /** How often the models and blocks folders are checked for changes: every 5 seconds. */
 private const val WATCH_TICKS = 100L
 
-class BuildReport(val entries: Map<PackVariant, PackEntry>, val models: List<String>, val warnings: List<String>, val errors: List<String>)
+class BuildReport(
+    val entries: Map<PackVariant, PackEntry>,
+    val models: List<String>,
+    val warnings: List<String>,
+    val errors: List<String>,
+    val rejected: Boolean = false,
+)
