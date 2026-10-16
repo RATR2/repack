@@ -6,6 +6,7 @@ import io.github.ratr2.repack.block.BlockEvents
 import io.github.ratr2.repack.block.BlockItems
 import io.github.ratr2.repack.block.BlockMenu
 import io.github.ratr2.repack.block.GiveCommand
+import io.github.ratr2.repack.block.PickBlock
 import io.github.ratr2.repack.block.BlockTemplate
 import io.github.ratr2.repack.block.Loot
 import io.github.ratr2.repack.block.PlacedBlocks
@@ -65,6 +66,7 @@ class Repack : JavaPlugin() {
         menu = BlockMenu(this)
         server.pluginManager.registerEvents(menu, this)
         server.pluginManager.registerEvents(GiveCommand(this), this)
+        server.pluginManager.registerEvents(PickBlock(this), this)
         BlockEvents(this, blocks, items, Loot(items), Protections.detect(this)).also {
             server.pluginManager.registerEvents(it, this)
             it.start()
