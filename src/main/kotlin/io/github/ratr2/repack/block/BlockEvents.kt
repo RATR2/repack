@@ -55,7 +55,11 @@ import java.util.UUID
  * only removed at monitor priority, once the outcome is final, so a protection plugin stepping in later can't lose the block.
  */
 private const val DENY_COOLDOWN_MILLIS = 3000L
-private const val MINING_REACH = 6
+/** Vanilla block interaction range is 4.5 (5 in creative); the attribute follows anything that raises it, and one block of slack covers lag. */
+internal fun reachOf(player: org.bukkit.entity.Player): Int {
+    val range = player.getAttribute(org.bukkit.attribute.Attribute.BLOCK_INTERACTION_RANGE)?.value ?: 4.5
+    return kotlin.math.ceil(range).toInt() + 1
+}
 private const val SWING_TIMEOUT_MILLIS = 700L
 
 class BlockEvents(
@@ -255,7 +259,7 @@ class BlockEvents(
                 continue
             }
             // Stopped digging: looked away, or no swing for a moment (the abort packet does not always arrive for every proxy).
-            if (player.getTargetBlockExact(MINING_REACH) != session.block || now - session.lastActive > SWING_TIMEOUT_MILLIS) {
+            if (player.getTargetBlockExact(reachOf(player)) != session.block || now - session.lastActive > SWING_TIMEOUT_MILLIS) {
                 mining.remove(playerId)
                 player.sendBlockDamage(session.block.location, 0f)
                 debug("${player.name} stopped mining ${session.definition.id}")
