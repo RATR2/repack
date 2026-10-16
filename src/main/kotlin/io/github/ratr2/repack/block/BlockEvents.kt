@@ -297,7 +297,7 @@ class BlockEvents(
         val player = event.player
 
         // The proxy's own mining must not finish a block that is on our timer.
-        if (hit.definition.proxyMode == ProxyMode.CUSTOM && player.gameMode == GameMode.SURVIVAL && player.uniqueId !in completing) {
+        if (hit.definition.proxyMode == ProxyMode.CUSTOM && (player.gameMode == GameMode.SURVIVAL || player.gameMode == GameMode.ADVENTURE) && player.uniqueId !in completing) {
             event.isCancelled = true
             return
         }

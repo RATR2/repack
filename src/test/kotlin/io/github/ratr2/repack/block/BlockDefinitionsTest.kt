@@ -62,6 +62,8 @@ class BlockDefinitionsTest {
             "display: {scale: [1, .inf, 1]}",
             "display: {scale: .nan}",
             "display: {view-range: .inf}",
+            "display: {view-range: 1e100}",
+            "recipe: {shape: [\"A\"], ingredients: {\" \": STICK, A: STICK}}",
         )) {
             assertFailsWith<DefinitionException>(yaml) { parse(yaml) }
         }

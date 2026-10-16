@@ -29,6 +29,9 @@ object BukkitMaterials : MaterialRules {
  */
 object BlockDefinitions {
 
+    /** 100 times the usual display range: far past anything a client draws, and small enough to stay a finite float. */
+    private const val MAX_VIEW_RANGE = 100.0
+
     /** Reads every block file, or just the ids in only. */
     fun load(blocksFolder: File, modelIds: Set<String>, only: Set<String>? = null): LoadedDefinitions {
         val definitions = LinkedHashMap<String, BlockDefinition>()
@@ -90,7 +93,7 @@ object BlockDefinitions {
         if (offset.isNotEmpty() && offset.size != 3) throw DefinitionException("display.offset needs three numbers: x, y, z.")
         if (offset.any { !it.isFinite() }) throw DefinitionException("display.offset needs real numbers.")
         val viewRange = display?.getDouble("view-range", 1.0) ?: 1.0
-        if (!viewRange.isFinite() || viewRange <= 0) throw DefinitionException("display.view-range must be a number above 0.")
+        if (!viewRange.isFinite() || viewRange <= 0 || viewRange > MAX_VIEW_RANGE) throw DefinitionException("display.view-range must be above 0 and at most $MAX_VIEW_RANGE.")
         val scale = scaleOf(display)
         val brightness = display?.takeIf { it.contains("brightness") }?.getInt("brightness")
         if (brightness != null && brightness !in 0..15) throw DefinitionException("display.brightness must be 0 to 15.")
@@ -148,7 +151,7 @@ object BlockDefinitions {
         val ingredients = LinkedHashMap<Char, String>()
         val given = section.getConfigurationSection("ingredients")
         for (key in given?.getKeys(false).orEmpty()) {
-            if (key.length != 1) throw DefinitionException("recipe.ingredients key '$key' must be a single character.")
+            if (key.length != 1 || key == " ") throw DefinitionException("recipe.ingredients key '$key' must be a single character that is not a space.")
             val name = material(given!!.getString(key).orEmpty(), "recipe.ingredients.$key", materials)
             if (!materials.isItem(name)) throw DefinitionException("recipe.ingredients.$key $name is not an item.")
             ingredients[key[0]] = name

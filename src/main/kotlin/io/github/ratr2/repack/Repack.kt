@@ -275,15 +275,15 @@ class Repack : JavaPlugin() {
             if (only != null && definition.id !in only) continue
             val options = definition.recipe ?: continue
             val key = NamespacedKey(this, "block_${definition.id}")
-            val recipe = ShapedRecipe(key, items.create(definition, options.amount))
-            recipe.shape(*options.shape.toTypedArray())
-            val used = options.shape.joinToString("").toSet()
-            for ((char, name) in options.ingredients) if (char in used) recipe.setIngredient(char, Material.matchMaterial(name)!!)
-            options.group?.let { recipe.group = it }
-            options.category?.let { recipe.category = CraftingBookCategory.valueOf(it.uppercase()) }
             try {
+                val recipe = ShapedRecipe(key, items.create(definition, options.amount))
+                recipe.shape(*options.shape.toTypedArray())
+                val used = options.shape.joinToString("").toSet() - ' '
+                for ((char, name) in options.ingredients) if (char in used) recipe.setIngredient(char, Material.matchMaterial(name)!!)
+                options.group?.let { recipe.group = it }
+                options.category?.let { recipe.category = CraftingBookCategory.valueOf(it.uppercase()) }
                 server.addRecipe(recipe)
-            } catch (e: IllegalArgumentException) {
+            } catch (e: RuntimeException) {
                 logger.severe("${definition.id}: the recipe could not be registered: ${e.message}")
                 continue
             }

@@ -9,9 +9,11 @@ import org.bukkit.World
 import org.bukkit.block.Block
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
+import org.bukkit.configuration.file.YamlConfiguration
 import org.bukkit.event.world.ChunkLoadEvent
 import org.bukkit.event.world.ChunkUnloadEvent
 import org.bukkit.persistence.PersistentDataType
+import java.io.File
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -33,13 +35,28 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
 
     val types: Set<String> get() = definitions.keys
 
-    /** Proxy blocks a type used before its definition changed, until the server restarts, so blocks already placed can follow. */
-    private val legacyProxies = HashMap<String, MutableSet<Material>>()
-
     /**
-     * Call after [definitions] was replaced. A type whose proxy block changed keeps its placed blocks: the old proxy is turned into
-     * the new one in loaded chunks now and in other chunks as they load, until the next restart. Returns the ids that changed.
+     * Proxy blocks a type used before its definition changed, so blocks already placed can follow. Saved in
+     * `legacy-proxies.yml`, because chunks that were not loaded at the time are only migrated when they load, maybe after a restart.
      */
+    private val legacyProxies = HashMap<String, MutableSet<Material>>()
+    private val legacyFile = File(plugin.dataFolder, "legacy-proxies.yml")
+
+    init {
+        if (legacyFile.isFile) {
+            val yaml = YamlConfiguration.loadConfiguration(legacyFile)
+            for (id in yaml.getKeys(false)) {
+                legacyProxies[id] = yaml.getStringList(id).mapNotNull { Material.matchMaterial(it) }.toMutableSet()
+            }
+        }
+    }
+
+    private fun saveLegacy() {
+        val yaml = YamlConfiguration()
+        for ((id, materials) in legacyProxies) yaml.set(id, materials.map { it.name }.sorted())
+        yaml.save(legacyFile)
+    }
+
     fun proxyChanged(old: Map<String, BlockDefinition>, new: Map<String, BlockDefinition>): Set<String> {
         val changed = HashSet<String>()
         for ((id, definition) in new) {
@@ -48,7 +65,10 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
             legacyProxies.getOrPut(id) { HashSet() } += before
             changed += id
         }
-        if (changed.isNotEmpty()) validate()
+        if (changed.isNotEmpty()) {
+            saveLegacy()
+            validate()
+        }
         return changed
     }
 
