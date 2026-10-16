@@ -75,7 +75,7 @@ object BlockDefinitions {
 
         val breaking = section.getConfigurationSection("breaking")
         val time = breaking?.getDouble("time", 1.0) ?: 1.0
-        if (time <= 0) throw DefinitionException("breaking.time must be above 0 seconds.")
+        if (!time.isFinite() || time <= 0) throw DefinitionException("breaking.time must be a number above 0 seconds.")
         val breakingOptions = Breaking(
             time = time,
             tool = enumOf(breaking?.getString("tool") ?: "any", ToolType::class.java, "breaking.tool"),
@@ -88,6 +88,9 @@ object BlockDefinitions {
         val display = section.getConfigurationSection("display")
         val offset = display?.getDoubleList("offset").orEmpty()
         if (offset.isNotEmpty() && offset.size != 3) throw DefinitionException("display.offset needs three numbers: x, y, z.")
+        if (offset.any { !it.isFinite() }) throw DefinitionException("display.offset needs real numbers.")
+        val viewRange = display?.getDouble("view-range", 1.0) ?: 1.0
+        if (!viewRange.isFinite() || viewRange <= 0) throw DefinitionException("display.view-range must be a number above 0.")
         val scale = scaleOf(display)
         val brightness = display?.takeIf { it.contains("brightness") }?.getInt("brightness")
         if (brightness != null && brightness !in 0..15) throw DefinitionException("display.brightness must be 0 to 15.")
@@ -115,7 +118,7 @@ object BlockDefinitions {
                 scaleX = scale[0],
                 scaleY = scale[1],
                 scaleZ = scale[2],
-                viewRange = display?.getDouble("view-range", 1.0)?.toFloat() ?: 1f,
+                viewRange = viewRange.toFloat(),
                 brightness = brightness,
                 rotateToPlacer = display?.getBoolean("rotate-to-placer", false) ?: false,
                 context = enumOf(display?.getString("context") ?: "none", DisplayContext::class.java, "display.context"),
@@ -138,7 +141,10 @@ object BlockDefinitions {
         val shape = section.getStringList("shape")
         if (shape.isEmpty() || shape.size > 3) throw DefinitionException("recipe.shape needs one to three rows.")
         if (shape.any { it.isEmpty() || it.length > 3 }) throw DefinitionException("recipe.shape rows need one to three characters.")
-        if (shape.all { row -> row.all { it == ' ' } }) throw DefinitionException("recipe.shape has no ingredients in it.")
+        // Bukkit wants a rectangle, so a shorter row gets empty slots at its end.
+        val width = shape.maxOf { it.length }
+        val rows = shape.map { it.padEnd(width, ' ') }
+        if (rows.all { row -> row.all { it == ' ' } }) throw DefinitionException("recipe.shape has no ingredients in it.")
         val ingredients = LinkedHashMap<Char, String>()
         val given = section.getConfigurationSection("ingredients")
         for (key in given?.getKeys(false).orEmpty()) {
@@ -147,14 +153,14 @@ object BlockDefinitions {
             if (!materials.isItem(name)) throw DefinitionException("recipe.ingredients.$key $name is not an item.")
             ingredients[key[0]] = name
         }
-        for (char in shape.joinToString("").toSet() - ' ') {
+        for (char in rows.joinToString("").toSet() - ' ') {
             if (char !in ingredients) throw DefinitionException("recipe.shape uses '$char' but recipe.ingredients has no '$char'.")
         }
         val amount = section.getInt("amount", 1)
         if (amount !in 1..64) throw DefinitionException("recipe.amount must be 1 to 64.")
         val category = section.getString("category")?.lowercase()
         if (category != null && category !in CATEGORIES) throw DefinitionException("recipe.category '$category' is not one of ${CATEGORIES.joinToString()}.")
-        return RecipeOptions(shape, ingredients, amount, section.getString("group"), category)
+        return RecipeOptions(rows, ingredients, amount, section.getString("group"), category)
     }
 
     /** `scale: 1.5` for all three axes, or `scale: [1.01, 1.15, 1.01]` for x, y and z. */
@@ -166,7 +172,7 @@ object BlockDefinitions {
             else -> throw DefinitionException("display.scale is a number, or three numbers: x, y, z.")
         }
         if (values.size != 3) throw DefinitionException("display.scale needs one number, or three: x, y, z.")
-        if (values.any { it <= 0f }) throw DefinitionException("display.scale must be above 0.")
+        if (values.any { !it.isFinite() || it <= 0f }) throw DefinitionException("display.scale must be numbers above 0.")
         return values
     }
 

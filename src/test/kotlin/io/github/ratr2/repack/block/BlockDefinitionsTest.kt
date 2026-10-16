@@ -42,6 +42,32 @@ class BlockDefinitionsTest {
     }
 
     @Test
+    fun `uneven recipe rows are padded to a rectangle`() {
+        val recipe = parse(
+            """
+            recipe:
+              shape: ["AB", "C"]
+              ingredients: {A: STICK, B: DIAMOND, C: PAPER}
+            """.trimIndent()
+        ).recipe!!
+        assertEquals(listOf("AB", "C "), recipe.shape)
+    }
+
+    @Test
+    fun `numbers that are not real are rejected`() {
+        for (yaml in listOf(
+            "breaking: {time: .nan}",
+            "breaking: {time: .inf}",
+            "display: {offset: [0, .nan, 0]}",
+            "display: {scale: [1, .inf, 1]}",
+            "display: {scale: .nan}",
+            "display: {view-range: .inf}",
+        )) {
+            assertFailsWith<DefinitionException>(yaml) { parse(yaml) }
+        }
+    }
+
+    @Test
     fun `the item can use its own model`() {
         assertNull(parse("").item.model)
         assertEquals("table_item", parse("item: {model: Table_Item}").item.model)

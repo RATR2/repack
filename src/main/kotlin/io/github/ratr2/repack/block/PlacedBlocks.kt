@@ -41,6 +41,34 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
 
     val types: Set<String> get() = definitions.keys
 
+    /** Proxy blocks a type used before its definition changed, until the server restarts, so blocks already placed can follow. */
+    private val legacyProxies = HashMap<String, MutableSet<Material>>()
+
+    /**
+     * Call after [definitions] was replaced. A type whose proxy block changed keeps its placed blocks: the old proxy is turned into
+     * the new one in loaded chunks now and in other chunks as they load, until the next restart. Returns the ids that changed.
+     */
+    fun proxyChanged(old: Map<String, BlockDefinition>, new: Map<String, BlockDefinition>): Set<String> {
+        val changed = HashSet<String>()
+        for ((id, definition) in new) {
+            val before = old[id]?.proxyBlock ?: continue
+            if (before == definition.proxyBlock) continue
+            legacyProxies.getOrPut(id) { HashSet() } += before
+            changed += id
+        }
+        if (changed.isNotEmpty()) validate()
+        return changed
+    }
+
+    /** True when the block still is the proxy of [data]'s type; a proxy from before a definition change is replaced by the new one. */
+    private fun isProxy(world: World, pos: BlockPos, data: PlacedBlock, definition: BlockDefinition): Boolean {
+        val block = world.getBlockAt(pos.x, pos.y, pos.z)
+        if (block.type == definition.proxyBlock) return true
+        if (block.type !in legacyProxies[data.id].orEmpty()) return false
+        block.setType(definition.proxyBlock, false)
+        return true
+    }
+
     fun start() {
         plugin.server.worlds.forEach { world -> world.loadedChunks.forEach(::load) }
     }
@@ -59,7 +87,7 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
         // Something else (WorldEdit, a command) replaced the proxy, so the entry is stale. A type with no definition keeps its
         // entry, so the data is still there if the definition comes back.
         val definition = definitions[data.id]
-        if (definition != null && block.type != definition.proxyBlock) {
+        if (definition != null && !isProxy(block.world, pos, data, definition)) {
             forget(block)
             return null
         }
@@ -113,7 +141,7 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
             val world = plugin.server.getWorld(ref.world) ?: continue
             for ((pos, data) in blocks.entries.toList()) {
                 val definition = definitions[data.id] ?: continue
-                if (world.getBlockAt(pos.x, pos.y, pos.z).type != definition.proxyBlock) forget(world.getBlockAt(pos.x, pos.y, pos.z))
+                if (!isProxy(world, pos, data, definition)) forget(world.getBlockAt(pos.x, pos.y, pos.z))
             }
         }
     }
@@ -139,7 +167,7 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
         val before = blocks.size
         blocks.entries.removeIf { (pos, data) ->
             val definition = definitions[data.id]
-            definition != null && chunk.world.getBlockAt(pos.x, pos.y, pos.z).type != definition.proxyBlock
+            definition != null && !isProxy(chunk.world, pos, data, definition)
         }
         val ref = refOf(chunk)
         if (blocks.isNotEmpty()) chunks[ref] = blocks

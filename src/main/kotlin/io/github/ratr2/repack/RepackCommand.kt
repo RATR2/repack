@@ -22,7 +22,7 @@ import java.util.concurrent.CompletableFuture
 
 /**
  * ```
- * /repack build               regenerates the pack zip; players keep getting the last pushed pack
+ * /repack build [force]      regenerates the pack zip (force: even when models failed to convert); players keep getting the last pushed pack
  * /repack push [players]      makes the built pack the published one and sends it (everyone online by default)
  * /repack status
  * /repack place <id> [pos]    places a custom block (at your feet by default)
@@ -37,7 +37,11 @@ class RepackCommand(private val plugin: Repack) {
 
     fun node(): LiteralCommandNode<CommandSourceStack> = Commands.literal("repack")
         .requires { it.sender.hasPermission(ADMIN) }
-        .then(Commands.literal("build").executes(::build))
+        .then(
+            Commands.literal("build")
+                .executes { build(it, force = false) }
+                .then(Commands.literal("force").executes { build(it, force = true) })
+        )
         .then(
             Commands.literal("push")
                 .executes { push(it, plugin.server.onlinePlayers.toList()) }
@@ -114,14 +118,23 @@ class RepackCommand(private val plugin: Repack) {
         return builder.buildFuture()
     }
 
-    private fun build(context: CommandContext<CommandSourceStack>): Int {
-        val report = plugin.rebuild()
-        reply(
-            context,
-            "Built ${report.entries.entries.joinToString { (variant, entry) -> "${variant.id} ${short(entry)}" }} from ${report.models.size} model(s). " +
-                "Players still get the published packs until you run /repack push.",
-            NamedTextColor.GREEN,
-        )
+    private fun build(context: CommandContext<CommandSourceStack>, force: Boolean): Int {
+        val report = plugin.rebuild(force)
+        if (report.rejected) {
+            reply(
+                context,
+                "Build rejected: ${report.errors.size} error(s) while converting models, so the pack was not updated. " +
+                    "Fix them, or run /repack build force to build without those models.",
+                NamedTextColor.RED,
+            )
+        } else {
+            reply(
+                context,
+                "Built ${report.entries.entries.joinToString { (variant, entry) -> "${variant.id} ${short(entry)}" }} from ${report.models.size} model(s). " +
+                    "Players still get the published packs until you run /repack push.",
+                NamedTextColor.GREEN,
+            )
+        }
         report.errors.take(MAX_LINES).forEach { reply(context, it, NamedTextColor.RED) }
         report.warnings.take(MAX_LINES).forEach { reply(context, it, NamedTextColor.YELLOW) }
         val hidden = report.errors.size + report.warnings.size - minOf(report.errors.size, MAX_LINES) - minOf(report.warnings.size, MAX_LINES)
