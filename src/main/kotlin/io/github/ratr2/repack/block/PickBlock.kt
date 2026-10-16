@@ -17,7 +17,7 @@ class PickBlock(private val plugin: Repack) : Listener {
         // Newer Paper versions send this for entities too; those are not ours.
         if (event.javaClass.simpleName == "PlayerPickEntityEvent") return
         val player = event.player
-        val block = player.rayTraceBlocks(REACH)?.hitBlock ?: return
+        val block = player.rayTraceBlocks(reachOf(player).toDouble())?.hitBlock ?: return
         val id = plugin.blocks.idAt(block) ?: return
         val definition = plugin.blocks.definitionOf(id) ?: return
         event.isCancelled = true
@@ -43,9 +43,5 @@ class PickBlock(private val plugin: Repack) : Listener {
         val picked = inventory.getItem(from)
         inventory.setItem(from, inventory.getItem(held))
         inventory.setItem(held, picked)
-    }
-
-    private companion object {
-        const val REACH = 6.0
     }
 }
