@@ -16,6 +16,7 @@ import io.github.ratr2.repack.display.DisplayManager
 import io.github.ratr2.repack.model.LibraryResult
 import io.github.ratr2.repack.model.ModelCache
 import io.github.ratr2.repack.model.ModelLibrary
+import io.github.ratr2.repack.pack.LoadingHold
 import io.github.ratr2.repack.pack.PackBuilder
 import io.github.ratr2.repack.pack.PackVariant
 import io.github.ratr2.repack.pack.PackEntry
@@ -39,6 +40,7 @@ class Repack : JavaPlugin() {
         private set
     lateinit var sender: PackSender
         private set
+    private lateinit var hold: LoadingHold
     lateinit var blocks: PlacedBlocks
         private set
     lateinit var items: BlockItems
@@ -57,13 +59,16 @@ class Repack : JavaPlugin() {
         store = PackStore(dataFolder)
         host = SharedHost(this, "repack", 8086) { name -> store.file(name.removeSuffix(".zip"))?.readBytes() }.also { it.start() }
         val versions = ClientVersions(this)
-        sender = PackSender(this, store, host, versions)
+        hold = LoadingHold(this)
+        sender = PackSender(this, store, host, versions, hold)
         if (versions.hasViaBackwards) logger.warning("ViaBackwards found: clients older than 1.21.4 will not be able to see Repack blocks.")
         server.pluginManager.registerEvents(sender, this)
+        server.pluginManager.registerEvents(hold, this)
 
         blocks = PlacedBlocks(this)
         items = BlockItems(this)
         display = DisplayManager(blocks)
+        display.hidden = hold::isHeld
         blocks.listeners += display
         reloadDefinitions()
         server.pluginManager.registerEvents(blocks, this)
@@ -99,9 +104,12 @@ class Repack : JavaPlugin() {
     override fun onDisable() {
         RepackAPI.plugin = null
         recipeKeys.values.forEach { server.removeRecipe(it) }
-        if (::sender.isInitialized) sender.releaseAll()
+        if (::hold.isInitialized) hold.endAll()
         if (::host.isInitialized) host.stop()
     }
+
+    /** The model display manager, or null before the plugin has started it. */
+    fun displays(): DisplayManager? = if (::display.isInitialized) display else null
 
     val modelsFolder: File
         get() = File(dataFolder, "models").apply { mkdirs() }

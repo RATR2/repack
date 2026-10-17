@@ -82,6 +82,23 @@ class DisplayManager(private val blocks: PlacedBlocks) : Listener, PlacementList
         shown.remove(event.player.uniqueId)
     }
 
+    /** Takes every model away from one player. [showAllFor] gives them back. */
+    fun hideAllFor(player: Player) {
+        shown[player.uniqueId]?.keys?.toList()?.forEach { hide(player, it) }
+    }
+
+    /** Shows one player every model in the chunks they have. */
+    fun showAllFor(player: Player) {
+        val world = player.world
+        for (chunk in world.loadedChunks) {
+            if (!player.isChunkSent(Chunk.getChunkKey(chunk.x, chunk.z))) continue
+            for ((pos, block) in blocks.inChunk(chunk)) {
+                val definition = blocks.definitionOf(block.id) ?: continue
+                show(player, world, pos, block, definition)
+            }
+        }
+    }
+
     /** Sends the models again to everyone, for after the definitions or the pack changed. With only, just blocks with those ids. */
     fun refreshAll(only: Set<String>? = null) {
         for (world in Bukkit.getWorlds()) {
@@ -99,7 +116,11 @@ class DisplayManager(private val blocks: PlacedBlocks) : Listener, PlacementList
         }
     }
 
+    /** Says whether a player must not see models for now (while their client reloads a pack). */
+    var hidden: (Player) -> Boolean = { false }
+
     private fun show(player: Player, world: World, pos: BlockPos, block: PlacedBlock, definition: BlockDefinition) {
+        if (hidden(player)) return
         val key = Key(world.uid, pos)
         // Showing again without hiding first would spawn a second copy under the same entity id.
         hide(player, key)

@@ -28,9 +28,13 @@ resource-pack:
   send-gap-ticks: 20
   # A player who joins gets the newest build, even one that was never pushed. false: only the pack that was last pushed.
   join-latest-build: true
-  # Players cannot be hurt while their client reloads a pack you sent them: from "downloaded" until "loaded", at most 20 seconds, ended by
-  # hitting something, and not again for two minutes. A client that fakes its status gains almost nothing.
+  # While a player's client reloads a pack you sent them (from "downloaded" until "loaded", at most 20 seconds) they are held: they cannot be
+  # hurt, move, attack or interact, see no other entities, and the blocks around them are shown as black concrete. It does not start
+  # again for two minutes, and a client that fakes its status gains almost nothing.
   invulnerable-while-loading: true
+  black-blocks-while-loading: true
+  # How far around the player the blocks are blacked out, up to 16.
+  loading-radius: 8
   # Kick players who decline the pack.
   required: false
   prompt: "This server uses a resource pack for custom blocks."
