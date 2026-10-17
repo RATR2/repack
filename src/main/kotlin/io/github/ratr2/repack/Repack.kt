@@ -99,6 +99,7 @@ class Repack : JavaPlugin() {
     override fun onDisable() {
         RepackAPI.plugin = null
         recipeKeys.values.forEach { server.removeRecipe(it) }
+        if (::sender.isInitialized) sender.releaseAll()
         if (::host.isInitialized) host.stop()
     }
 
@@ -322,13 +323,12 @@ class Repack : JavaPlugin() {
 
     private var building = false
 
-    /**
-     * What /repack reload and a saved file do: [rebuild], and when it worked and the pack is different from the published one, publish it and send it to
-     * everyone online. The config's `workflow.send-after-build` can turn the sending off, which leaves it to /repack push.
-     */
-    fun rebuildAndSend(force: Boolean = false, done: (BuildReport) -> Unit) {
+    var exportedTo: String? = null
+        private set
+
+    fun rebuildAndPush(force: Boolean = false, done: (BuildReport) -> Unit) {
         rebuild(force) { report ->
-            if (!report.rejected && report.entries.isNotEmpty() && config.getBoolean("workflow.send-after-build", true)) {
+            if (!report.rejected && report.entries.isNotEmpty()) {
                 if (report.entries == store.published) {
                     report.unchanged = true
                 } else {
@@ -350,12 +350,11 @@ class Repack : JavaPlugin() {
         }
         if (pendingBuild && !building && stamp() == lastStamp) {
             pendingBuild = false
-            rebuildAndSend { report ->
-                val sent = report.sent?.let { ", sent to $it player(s)" }.orEmpty()
-                when {
-                    report.rejected -> logger.warning("The pack was not rebuilt: ${report.errors.size} error(s), see above. The published pack is unchanged.")
-                    report.unchanged -> logger.info("Models changed but the pack came out the same.")
-                    else -> logger.info("Rebuilt the pack after a file change: ${report.entries.entries.joinToString { (v, e) -> "${v.id} ${e.sha1.take(8)}" }}$sent.")
+            rebuild { report ->
+                if (report.rejected) {
+                    logger.warning("The pack was not rebuilt: ${report.errors.size} error(s), see above. The previous build is kept.")
+                } else {
+                    logger.info("Rebuilt the pack after a file change: ${report.entries.entries.joinToString { (v, e) -> "${v.id} ${e.sha1.take(8)}" }}. /repack push sends it to players who are online.")
                 }
             }
         }
@@ -439,6 +438,5 @@ class BuildReport(
 ) {
     var sent: Int? = null
 
-    /** True when the build came out the same as the pack already published, so there was nothing to send. */
     var unchanged = false
 }

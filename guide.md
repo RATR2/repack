@@ -15,13 +15,13 @@ Clients from 1.21.4 to 26.3 are supported. Older clients cannot show the models 
 1. Put `repack.jar` and the PacketEvents jar in `plugins/` and start the server.
 2. The first start adds a ready-made `table` block (`models/table.bbmodel` and `blocks/table.yml`). Set `install-defaults: false` in `config.yml` before the first start to skip it.
 3. Set `resource-pack.public-host` in `plugins/Repack/config.yml` to your server's address (see [Pack hosting](#pack-hosting)).
-4. Wait a few seconds for the first pack to build and be sent, then run `/repack give table` and place it.
+4. Wait a few seconds for the first pack to build, then join (or rejoin) to get it, run `/repack give table` and place it.
 
 ## Making a block
 
 1. Make a model in Blockbench (Java Block/Item model) and **embed the textures** when you save it.
 2. Put the `.bbmodel` file in `plugins/Repack/models/`. The file name is the block id: `chair.bbmodel` makes the block `chair`. Use a-z, 0-9, `_` and `-`; other characters in a file name become `_`.
-3. Save the file. A few seconds later Repack builds the pack and sends it to everyone online. Nothing needs a restart.
+3. Save the file. A few seconds later Repack rebuilds the pack, quietly. New players get it when they join, and `/repack reload` or `/repack push` sends it to the ones online. Nothing needs a restart.
 4. `/repack give chair`, place it.
 
 Repack also writes `plugins/Repack/blocks/chair.yml` with every option at its default. Edit that file to change how the block behaves.
@@ -34,20 +34,23 @@ What Blockbench features carry over:
 
 ## The pack: build and send
 
-By default Repack does everything for you:
+Repack rebuilds the pack by itself and only sends it when you say so:
 
-- A few seconds after you save a model or block file, and when you run `/repack reload`, it rebuilds the pack.
-- If the new pack differs from the published one, it is published and sent to everyone online. Players who join later get the published pack.
-- A build with errors is never sent. The old pack stays published and the errors are in the chat and the console.
-- While it builds, operators (`repack.admin`) see a progress boss bar.
+- **Saving a model or block file** rebuilds the pack a few seconds later. It is silent: nobody online is sent anything, and only the console and the operators' progress bar show it.
+- **`/repack push`** sends the pack to everyone online, and **`/repack push <player>`** sends it to one player. It publishes the latest build first.
+- **`/repack reload`** reads the block files, rebuilds the pack and pushes it to everyone online, unless it came out the same as the pack last pushed.
+- **A player who joins** gets the newest build, even one that was never pushed. Set `resource-pack.join-latest-build: false` to give joiners only the pack that was last pushed.
+- A build with errors is never used. The previous build stays, and the errors are in the chat and the console.
+- **Invulnerability:** the screen freezes while a client reloads a pack, so a player cannot be hurt from the moment their client reports it has downloaded the pack until it has loaded it, for 20 seconds at most. It only starts for a pack Repack just sent that player (a push or a join), it ends as soon as the player hits something, and the same player cannot get it again for two minutes, so a modified client cannot use it to fight safely or stay immune. Their normal setting is put back when it ends, if they leave, or if the server stops. `resource-pack.invulnerable-while-loading: false` turns it off.
 
-Two settings under `workflow:` in `config.yml` control this:
+Two settings under `workflow:` in `config.yml` control the building:
 
 | Key | Default | |
 |---|---|---|
-| `build-on-change` | `true` | Rebuild a few seconds after a model or block file is saved. |
-| `send-after-build` | `true` | Send a newly built pack to everyone online. `false` builds only, and you send with `/repack push`. |
+| `build-on-change` | `true` | Rebuild a few seconds after a model or block file is saved. `false` leaves it to `/repack reload` and `/repack build`. |
 | `progress-bar` | `true` | Show operators the build progress. |
+
+`/repack build` only builds. It sends nothing and publishes nothing, so you can check a build and then `/repack push` it.
 
 Repack builds one pack per client version range (`legacy` for 1.21.4 to 1.21.8 and `modern` for 1.21.9 and newer, the older one without the shelf display setting) and sends each player the one that fits their client. `/repack status` shows both.
 
@@ -61,9 +64,9 @@ All of them need `repack.admin` (given to operators by default). `/give` also wo
 
 | Command | |
 |---|---|
-| `/repack reload [blocks\|config\|host\|all]` | With no argument: reads the block files, rebuilds the pack and sends it when it changed. `blocks` only reads the block files, `config` the config, `host` restarts the pack server (use it after changing the port), `all` does all of it. |
+| `/repack reload [blocks\|config\|host\|all]` | With no argument: reads the block files, rebuilds the pack and pushes it to everyone online. `blocks` only reads the block files, `config` the config, `host` restarts the pack server (use it after changing the port), `all` does all of it. |
 | `/repack build [force\|fresh]` | Only rebuilds the pack. It refuses when a model has errors; `force` builds without those models. `fresh` converts every model again instead of using the cache. |
-| `/repack push [players]` | Publishes the built pack and sends it (everyone online by default). |
+| `/repack push [players]` | Publishes the latest build and sends it to the players you name, or to everyone online. They cannot be hurt until it has loaded. |
 | `/repack status` | Built and published packs per version, and the pack server. |
 | `/repack give <id> [amount] [players]` | Gives the item that places a block. |
 | `/give @s repack:<id> [count]` | The same through vanilla `/give`, with tab completion. |
@@ -154,6 +157,8 @@ If Distortion (or another plugin that uses the same scheme) is installed, the fi
 | `resource-pack.public-host` / `port` / `bind` | empty / `8086` / `0.0.0.0` | Where the pack server listens and what players are told. |
 | `resource-pack.share-host` | `true` | Share one pack server with Distortion. |
 | `resource-pack.join-delay-ticks` | `40` | Wait after a player joins before sending the pack. |
+| `resource-pack.join-latest-build` | `true` | Joiners get the newest build. `false`: only the pack last pushed. |
+| `resource-pack.invulnerable-while-loading` | `true` | Players cannot be hurt while a pack loads. |
 | `resource-pack.send-gap-ticks` | `20` | Minimum time between packs from different plugins to one player. |
 | `resource-pack.required` / `prompt` | `false` / text | Kick players who decline, and the text of the prompt. |
 | `client-notices` | `true` | Tell players their client is too old. |
