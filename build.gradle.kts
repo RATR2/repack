@@ -36,6 +36,8 @@ dependencies {
 }
 
 kotlin {
+    // Tests live in the git-ignored .dev folder and only run on the developer's machine.
+    sourceSets.named("test") { kotlin.srcDir(".dev/test/kotlin") }
     // Built with JDK 25, but the classes are Java 21 ones so the jar also loads on the Java 21 that 1.21.x servers run.
     jvmToolchain(25)
     compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
