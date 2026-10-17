@@ -23,14 +23,16 @@ object ModelLibrary {
     fun ids(folder: File): Set<String> =
         folder.listFiles { f -> f.isFile && f.extension.equals("bbmodel", ignoreCase = true) }.orEmpty().mapTo(HashSet(), ::idOf)
 
-    fun build(folder: File): LibraryResult {
+    /** [onProgress] is called with how many files are done and how many there are, after each one. */
+    fun build(folder: File, onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }): LibraryResult {
         val files = PackVariant.entries.associateWith { HashMap<String, ByteArray>() }
         val models = ArrayList<String>()
         val warnings = ArrayList<String>()
         val errors = ArrayList<String>()
 
         val sources = folder.listFiles { f -> f.isFile && f.extension.equals("bbmodel", ignoreCase = true) }.orEmpty().sortedBy { it.name }
-        for (source in sources) {
+        for ((index, source) in sources.withIndex()) {
+            onProgress(index, sources.size)
             val id = idOf(source)
             if (id in models) {
                 errors += "${source.name}: another file already uses the id '$id'."
