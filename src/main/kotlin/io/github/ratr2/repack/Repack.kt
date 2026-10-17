@@ -13,6 +13,7 @@ import io.github.ratr2.repack.block.PlacedBlocks
 import io.github.ratr2.repack.config.ConfigMigrator
 import io.github.ratr2.repack.config.ConfigVersions
 import io.github.ratr2.repack.display.DisplayManager
+import io.github.ratr2.repack.model.LibraryResult
 import io.github.ratr2.repack.model.ModelLibrary
 import io.github.ratr2.repack.pack.PackBuilder
 import io.github.ratr2.repack.pack.PackVariant
@@ -134,8 +135,7 @@ class Repack : JavaPlugin() {
     }
 
     /**
-     * Reads the block types again when files in the models or blocks folders were added, changed or removed. This only changes
-     * which blocks exist; the pack still needs /repack build and /repack push. Returns true when it reloaded.
+     * Reads the block types again when files in the models or blocks folders were added, changed or removed.
      */
     fun refreshIfChanged(): Boolean {
         val now = stamp()
@@ -278,31 +278,59 @@ class Repack : JavaPlugin() {
         return true
     }
 
-    /** Regenerates every version of the pack from the .bbmodel files in the models folder. Does not change what is published. */
-    fun rebuild(force: Boolean = false): BuildReport {
-        val library = ModelLibrary.build(modelsFolder)
-        library.warnings.forEach { logger.warning(it) }
-        library.errors.forEach { logger.severe(it) }
-        val definitionErrors = reloadDefinitions()
-        // A model that failed to convert is missing from the pack, so a pack built around it could replace a working one.
-        if (library.errors.isNotEmpty() && !force) {
-            return BuildReport(emptyMap(), library.models, library.warnings, library.errors + definitionErrors, rejected = true)
+    private var building = false
+
+    fun rebuild(force: Boolean = false, done: (BuildReport) -> Unit) {
+        if (building) {
+            done(BuildReport(emptyMap(), emptyList(), emptyList(), listOf("A build is already running."), rejected = true))
+            return
         }
-        val entries = LinkedHashMap<PackVariant, PackEntry>()
-        for (variant in PackVariant.entries) {
-            val files = HashMap(library.files.getValue(variant))
-            files["pack.mcmeta"] = PackBuilder.meta(variant)
-            files["pack.png"] = PackBuilder.icon()
-            entries[variant] = store.add(variant, PackBuilder.zip(files))
-        }
-        return BuildReport(entries, library.models, library.warnings, library.errors + definitionErrors)
+        building = true
+        val folder = modelsFolder
+        server.scheduler.runTaskAsynchronously(this, Runnable {
+            var library: LibraryResult? = null
+            var zips: Map<PackVariant, ByteArray>? = null
+            var failure: String? = null
+            try {
+                library = ModelLibrary.build(folder)
+                // A model that failed to convert is missing from the pack, so a pack built around it could replace a working one.
+                if (library.errors.isEmpty() || force) {
+                    zips = PackVariant.entries.associateWith { variant ->
+                        val files = HashMap(library.files.getValue(variant))
+                        files["pack.mcmeta"] = PackBuilder.meta(variant)
+                        files["pack.png"] = PackBuilder.icon()
+                        PackBuilder.zip(files)
+                    }
+                }
+            } catch (e: Throwable) {
+                failure = "The build failed: ${e.javaClass.simpleName}: ${e.message}"
+            }
+            server.scheduler.runTask(this, Runnable {
+                building = false
+                if (failure != null || library == null) {
+                    logger.severe(failure ?: "The build failed.")
+                    done(BuildReport(emptyMap(), emptyList(), emptyList(), listOf(failure ?: "The build failed."), rejected = true))
+                    return@Runnable
+                }
+                library.warnings.forEach { logger.warning(it) }
+                library.errors.forEach { logger.severe(it) }
+                val definitionErrors = reloadDefinitions()
+                if (zips == null) {
+                    done(BuildReport(emptyMap(), library.models, library.warnings, library.errors + definitionErrors, rejected = true))
+                    return@Runnable
+                }
+                val entries = LinkedHashMap<PackVariant, PackEntry>()
+                for ((variant, zip) in zips) entries[variant] = store.add(variant, zip)
+                done(BuildReport(entries, library.models, library.warnings, library.errors + definitionErrors))
+            })
+        })
     }
 }
 
 private val ID = Regex("[a-z0-9_-]+")
 
-/** How often the models and blocks folders are checked for changes: every 5 seconds. */
-private const val WATCH_TICKS = 100L
+/** How often the models and blocks folders are checked for changes: */
+private const val WATCH_TICKS = 100L /** every 5 seconds. */
 
 /** [rejected]: model errors stopped the build, so the previous built pack is still the one in the store. */
 class BuildReport(

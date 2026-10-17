@@ -49,8 +49,10 @@ class PackSender(
      */
     fun send(players: Collection<Player>): Int {
         if (!store.hasPublished) return 0
-        players.forEach { player -> host.enqueue(player.uniqueId) { if (player.isOnline) sendNow(player) } }
-        return players.size
+        val online = players.filter { it.isOnline }
+        online.forEach { player -> host.enqueue(player.uniqueId) { if (player.isOnline) sendNow(player) } }
+        // Only players whose client version has a published pack count as sent.
+        return online.count { player -> variantOf(player)?.let(store.published::get) != null }
     }
 
     /** The version of the pack for the client this player connected with, or null for a client too old for any of them. */

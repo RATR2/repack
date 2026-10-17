@@ -10,6 +10,8 @@ import java.net.InetSocketAddress
 import java.net.URI
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import net.kyori.adventure.resource.ResourcePackInfo
 import net.kyori.adventure.resource.ResourcePackRequest
 import net.kyori.adventure.text.Component
@@ -247,7 +249,7 @@ class SharedHost(
     private fun leave() {
         when (mode) {
             Mode.HOST -> {
-                http?.stop(0)
+                http?.let(::close)
                 http = null
                 boundTo = null
                 service?.let { Bukkit.getServicesManager().unregister(it) }
@@ -272,6 +274,8 @@ class SharedHost(
         val (address, port) = bindTarget()
         return try {
             HttpServer.create(InetSocketAddress(address, port), 0).apply {
+                // Downloads run in a small pool, so one slow client cannot hold up everyone else's.
+                executor = Executors.newFixedThreadPool(DOWNLOAD_THREADS) { task -> Thread(task, "pack-download").apply { isDaemon = true } }
                 createContext("/", ::handle)
                 start()
             }.also {
@@ -287,14 +291,26 @@ class SharedHost(
         }
     }
 
+    /** Stops a server and its download threads. */
+    private fun close(server: HttpServer) {
+        server.stop(0)
+        (server.executor as? ExecutorService)?.shutdownNow()
+    }
+
     /** The address and port the settings ask for. */
     private fun bindTarget(): Pair<String, Int> =
         plugin.config.getString("resource-pack.bind", "0.0.0.0")!! to plugin.config.getInt("resource-pack.port", defaultPort)
 
     /** The address players are told to download from. */
     private fun publicBase(port: Int): String {
-        val host = plugin.config.getString("resource-pack.public-host").orEmpty().ifBlank { plugin.server.ip }.ifBlank { "localhost" }
-        return "http://$host:$port"
+        val configured = plugin.config.getString("resource-pack.public-host").orEmpty().ifBlank { plugin.server.ip }
+        if (configured.isBlank()) {
+            plugin.logger.warning(
+                "resource-pack.public-host and server-ip are both empty, so players are told to download the pack from localhost, " +
+                    "which only works on this machine. Set resource-pack.public-host to your server's address."
+            )
+        }
+        return "http://${configured.ifBlank { "localhost" }}:$port"
     }
 
     /** What the running server is bound to, so a reload that keeps it does not try to bind the same port a second time. */
@@ -311,7 +327,7 @@ class SharedHost(
         val old = http
         val server = bind() ?: return "Could not use the new port, still serving at $ownBase."
         http = server
-        old?.stop(0)
+        old?.let(::close)
         plugin.logger.info("Pack server moved to $ownBase")
         return null
     }
@@ -334,6 +350,7 @@ class SharedHost(
         const val SHARE = "resource-pack.share-host"
         const val GAP_KEY = "resource-pack.send-gap-ticks"
         private const val VERSION = 2
+        private const val DOWNLOAD_THREADS = 4
     }
 }
 

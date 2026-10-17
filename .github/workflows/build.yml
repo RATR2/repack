@@ -70,7 +70,8 @@ jobs:
           scripts/ci/set-version.sh "$snapshot"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "bump version to $snapshot [skip ci]"
+          git add gradle.properties
+          git commit -m "bump version to $snapshot [skip ci]"
           git pull --rebase origin "$GITHUB_REF_NAME"
           git push origin "HEAD:$GITHUB_REF_NAME"
 
@@ -84,6 +85,7 @@ jobs:
           git diff --quiet && exit 0
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -am "set version to $VERSION [skip ci]"
+          git add gradle.properties
+          git commit -m "set version to $VERSION [skip ci]"
           git pull --rebase origin "$GITHUB_REF_NAME"
           git push origin "HEAD:$GITHUB_REF_NAME"

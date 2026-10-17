@@ -54,7 +54,7 @@ object ConfigMigrator {
         migrations.forEach { it.apply(yaml) }
         if (defaults != null) addMissing(yaml, defaults)
         val changed = snapshot(yaml) != before
-        val backup = File(file.parentFile, "${file.name}.bak-${found ?: "unversioned"}")
+        val backup = File(file.parentFile, "${file.name}.bak-${(found ?: "unversioned").replace(Regex("[^A-Za-z0-9._-]"), "_").take(40)}")
         if (changed && !backup.exists()) file.copyTo(backup)
         withVersion(yaml, current).save(file)
         return if (changed) "${file.name}: updated to version $current (the old file is kept as ${backup.name})." else null

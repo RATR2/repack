@@ -16,7 +16,10 @@ object ModelLibrary {
 
     private val INVALID = Regex("[^a-z0-9_-]")
 
-    fun idOf(file: File): String = file.nameWithoutExtension.lowercase().replace(INVALID, "_")
+    /** A name as an id: lower case, anything outside a-z, 0-9, `_` and `-` turned into `_`. */
+    fun cleanId(name: String): String = name.lowercase().replace(INVALID, "_")
+
+    fun idOf(file: File): String = cleanId(file.nameWithoutExtension)
 
     /** The ids the files in folder would get, without parsing them. */
     fun ids(folder: File): Set<String> =
@@ -37,15 +40,22 @@ object ModelLibrary {
             }
             try {
                 val model = BbParser.parse(id, source.readText())
-                for ((variant, variantFiles) in files) {
-                    val generated = ItemModelGenerator.generate(id, model, variant.shelf)
-                    variantFiles += generated.files
-                    // The warnings are the same in every version, so they are only listed once.
-                    if (variant == PackVariant.entries.first()) generated.warnings.mapTo(warnings) { "$id: $it" }
+                val generated = PackVariant.entries.associateWith { ItemModelGenerator.generate(id, model, it.shelf) }
+                val first = generated.getValue(PackVariant.entries.first())
+                // The warnings and errors are the same in every version, so they are only listed once.
+                first.warnings.mapTo(warnings) { "$id: $it" }
+                if (first.errors.isNotEmpty()) {
+                    first.errors.mapTo(errors) { "${source.name}: $it" }
+                    continue
                 }
+                for ((variant, result) in generated) files.getValue(variant) += result.files
                 models += id
             } catch (e: BbParseException) {
                 errors += "${source.name}: ${e.message}"
+            } catch (e: RuntimeException) {
+                errors += "${source.name}: the file does not have the structure of a .bbmodel (${e.javaClass.simpleName}: ${e.message})."
+            } catch (e: StackOverflowError) {
+                errors += "${source.name}: the file is nested too deeply to read."
             }
         }
         return LibraryResult(files, models, warnings, errors)

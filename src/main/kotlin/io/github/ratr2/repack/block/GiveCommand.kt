@@ -59,8 +59,9 @@ class GiveCommand(private val plugin: Repack) : Listener {
             sender.sendMessage(Component.text("No player was found.", NamedTextColor.RED))
             return true
         }
+        val given = amount.coerceAtMost(MAX_TOTAL)
         for (player in targets) {
-            var left = amount.coerceAtMost(MAX_TOTAL)
+            var left = given
             while (left > 0) {
                 val stack = minOf(left, 64)
                 player.inventory.addItem(plugin.items.create(definition, stack)).values.forEach { player.world.dropItemNaturally(player.location, it) }
@@ -68,7 +69,7 @@ class GiveCommand(private val plugin: Repack) : Listener {
             }
         }
         val who = if (targets.size == 1) targets.first().name else "${targets.size} players"
-        sender.sendMessage(Component.text("Gave $amount [${definition.id}] to $who", NamedTextColor.WHITE))
+        sender.sendMessage(Component.text("Gave $given [${definition.id}] to $who" + if (given < amount) " (the most it gives at once)" else "", NamedTextColor.WHITE))
         return true
     }
 
