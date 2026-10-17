@@ -327,16 +327,21 @@ class Repack : JavaPlugin() {
             return
         }
         building = true
+        val progress = BuildProgress(this)
+        progress.start()
         val folder = modelsFolder
         server.scheduler.runTaskAsynchronously(this, Runnable {
             var library: LibraryResult? = null
             var zips: Map<PackVariant, ByteArray>? = null
             var failure: String? = null
             try {
-                library = ModelLibrary.build(folder)
+                library = ModelLibrary.build(folder) { done, total ->
+                    progress.update(PARSE_SHARE * done / maxOf(total, 1), "converting models $done/$total")
+                }
                 // A model that failed to convert is missing from the pack, so a pack built around it could replace a working one.
                 if (library.errors.isEmpty() || force) {
                     zips = PackVariant.entries.associateWith { variant ->
+                        progress.update(PARSE_SHARE + (ZIP_SHARE - PARSE_SHARE) * variant.ordinal / PackVariant.entries.size, "zipping the ${variant.id} pack")
                         val files = HashMap(library.files.getValue(variant))
                         files["pack.mcmeta"] = PackBuilder.meta(variant)
                         files["pack.png"] = PackBuilder.icon()
@@ -349,19 +354,23 @@ class Repack : JavaPlugin() {
             server.scheduler.runTask(this, Runnable {
                 building = false
                 if (failure != null || library == null) {
+                    progress.finish(false, "build failed")
                     logger.severe(failure ?: "The build failed.")
                     done(BuildReport(emptyMap(), emptyList(), emptyList(), listOf(failure ?: "The build failed."), rejected = true))
                     return@Runnable
                 }
+                progress.update(ZIP_SHARE, "loading the block files")
                 library.warnings.forEach { logger.warning(it) }
                 library.errors.forEach { logger.severe(it) }
                 val definitionErrors = reloadDefinitions()
                 if (zips == null) {
+                    progress.finish(false, "build rejected, ${library.errors.size} error(s)")
                     done(BuildReport(emptyMap(), library.models, library.warnings, library.errors + definitionErrors, rejected = true))
                     return@Runnable
                 }
                 val entries = LinkedHashMap<PackVariant, PackEntry>()
                 for ((variant, zip) in zips) entries[variant] = store.add(variant, zip)
+                progress.finish(true, "pack built")
                 done(BuildReport(entries, library.models, library.warnings, library.errors + definitionErrors))
             })
         })
@@ -372,6 +381,10 @@ private val ID = Regex("[a-z0-9_-]+")
 
 /** How often the models and blocks folders are checked for changes: */
 private const val WATCH_TICKS = 100L /** every 5 seconds. */
+
+/** How much of the build bar the model conversion and the zipping take; the rest is loading the block files and saving. */
+private const val PARSE_SHARE = 0.7f
+private const val ZIP_SHARE = 0.95f
 
 /** [rejected]: model errors stopped the build, so the previous built pack is still the one in the store. */
 class BuildReport(

@@ -38,3 +38,5 @@ workflow:
   build-on-change: true
   # Send a newly built pack to everyone online right away. Packs with errors are never sent. false: build only, and send it with /repack push.
   send-after-build: true
+  # Show operators (repack.admin) a boss bar with the progress while the pack builds.
+  progress-bar: true

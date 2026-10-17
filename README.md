@@ -30,6 +30,8 @@ Drop a `.bbmodel` file into the plugin folder and you have a custom block. Repac
 - **Saves rebuild the pack.** A few seconds after you save a model or block file, or when you run `/repack reload`, Repack rebuilds the pack and sends it to everyone online if it changed. A pack that fails to build is never sent. Set `workflow.send-after-build: false` to only build, and send it yourself with `/repack push`.
 - **Everything configurable.** Mining time, tool and tier, drops, experience, explosion and piston behaviour, model offset and scale, and the item that places the block.
 
+Guides: [guide.md](guide.md) for running Repack, [dev.md](dev.md) for Skript and the Java API.
+
 ## Install
 
 Needs Paper 1.21.4 or newer (built with Java 25, but runs on Java 21 and up) and the [PacketEvents](https://github.com/retrooper/packetevents) plugin (the Spigot jar, 2.14.0 or newer). Clients from 1.21.4 to 26.3 are supported, older or newer ones than the server through [ViaVersion](https://github.com/ViaVersion/ViaVersion) (optional), and Repack sends each player the pack that fits their version.
