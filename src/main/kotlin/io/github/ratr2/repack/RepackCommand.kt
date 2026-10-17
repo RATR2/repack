@@ -22,7 +22,7 @@ import java.util.concurrent.CompletableFuture
 
 /**
  * ```
- * /repack build [force]      regenerates the pack zip (force: even when models failed to convert); players keep getting the last pushed pack
+ * /repack build [force|fresh]   regenerates the pack zip (force: even when models failed to convert; fresh: convert every model again instead of using the cache); players keep getting the last pushed pack
  * /repack push [players]      makes the built pack the published one and sends it (everyone online by default)
  * /repack status
  * /repack place <id> [pos]    places a custom block (at your feet by default)
@@ -41,6 +41,7 @@ class RepackCommand(private val plugin: Repack) {
             Commands.literal("build")
                 .executes { build(it, force = false) }
                 .then(Commands.literal("force").executes { build(it, force = true) })
+                .then(Commands.literal("fresh").executes { build(it, force = false, fresh = true) })
         )
         .then(
             Commands.literal("push")
@@ -118,9 +119,9 @@ class RepackCommand(private val plugin: Repack) {
         return builder.buildFuture()
     }
 
-    private fun build(context: CommandContext<CommandSourceStack>, force: Boolean): Int {
+    private fun build(context: CommandContext<CommandSourceStack>, force: Boolean, fresh: Boolean = false): Int {
         reply(context, "Building the pack...", NamedTextColor.GRAY)
-        plugin.rebuild(force) { report -> showBuild(context, report) }
+        plugin.rebuild(force, fresh) { report -> showBuild(context, report) }
         return Command.SINGLE_SUCCESS
     }
 

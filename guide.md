@@ -51,6 +51,8 @@ Two settings under `workflow:` in `config.yml` control this:
 
 Repack builds one pack per client version range (`legacy` for 1.21.4 to 1.21.8 and `modern` for 1.21.9 and newer, the older one without the shelf display setting) and sends each player the one that fits their client. `/repack status` shows both.
 
+Converted models are cached in `plugins/Repack/cache/models/`, one file per model, named by the model's id and a hash of its file. A build only converts the models that changed, and the first build after a restart reuses the cache too. The cache is thrown away when Repack's version changes. If a model looks stale anyway, for example on a development build with an unchanged version number, run `/repack build fresh`, or delete that folder.
+
 If Distortion is installed too, both plugins send their packs in one request when a player joins, so there is a single "accept the resource pack" prompt.
 
 ## Commands
@@ -60,7 +62,7 @@ All of them need `repack.admin` (given to operators by default). `/give` also wo
 | Command | |
 |---|---|
 | `/repack reload [blocks\|config\|host\|all]` | With no argument: reads the block files, rebuilds the pack and sends it when it changed. `blocks` only reads the block files, `config` the config, `host` restarts the pack server (use it after changing the port), `all` does all of it. |
-| `/repack build [force]` | Only rebuilds the pack. It refuses when a model has errors; `force` builds without those models. |
+| `/repack build [force\|fresh]` | Only rebuilds the pack. It refuses when a model has errors; `force` builds without those models. `fresh` converts every model again instead of using the cache. |
 | `/repack push [players]` | Publishes the built pack and sends it (everyone online by default). |
 | `/repack status` | Built and published packs per version, and the pack server. |
 | `/repack give <id> [amount] [players]` | Gives the item that places a block. |
