@@ -79,7 +79,8 @@ class Repack : JavaPlugin() {
         RepackAPI.plugin = this
         if (!store.hasPublished) logger.info("No pack published yet: run /repack build, then /repack push, to send players the pack.")
         lastStamp = stamp()
-        server.scheduler.runTaskTimer(this, Runnable { refreshIfChanged() }, WATCH_TICKS, WATCH_TICKS)
+        pendingBuild = config.getBoolean("workflow.build-on-change", true)
+        server.scheduler.runTaskTimer(this, Runnable { watch() }, WATCH_TICKS, WATCH_TICKS)
         if (server.pluginManager.isPluginEnabled("Skript")) {
             try {
                 SkriptHook.register(this)
@@ -280,6 +281,46 @@ class Repack : JavaPlugin() {
 
     private var building = false
 
+    /**
+     * What /repack reload and a saved file do: [rebuild], and when it worked and the pack is different from the published one, publish it and send it to
+     * everyone online. The config's `workflow.send-after-build` can turn the sending off, which leaves it to /repack push.
+     */
+    fun rebuildAndSend(force: Boolean = false, done: (BuildReport) -> Unit) {
+        rebuild(force) { report ->
+            if (!report.rejected && report.entries.isNotEmpty() && config.getBoolean("workflow.send-after-build", true)) {
+                if (report.entries == store.published) {
+                    report.unchanged = true
+                } else {
+                    store.publish()
+                    report.sent = sender.send(server.onlinePlayers.toList())
+                }
+            }
+            done(report)
+        }
+    }
+
+    /** A file changed and the pack is rebuilt once no more changes come in, so saving a model several times builds it once. */
+    private var pendingBuild = false
+
+    private fun watch() {
+        if (refreshIfChanged() && config.getBoolean("workflow.build-on-change", true)) {
+            // Wait for the next check: if the file changes again in the meantime the build waits once more.
+            pendingBuild = true
+            return
+        }
+        if (pendingBuild && !building && stamp() == lastStamp) {
+            pendingBuild = false
+            rebuildAndSend { report ->
+                val sent = report.sent?.let { ", sent to $it player(s)" }.orEmpty()
+                when {
+                    report.rejected -> logger.warning("The pack was not rebuilt: ${report.errors.size} error(s), see above. The published pack is unchanged.")
+                    report.unchanged -> logger.info("Models changed but the pack came out the same.")
+                    else -> logger.info("Rebuilt the pack after a file change: ${report.entries.entries.joinToString { (v, e) -> "${v.id} ${e.sha1.take(8)}" }}$sent.")
+                }
+            }
+        }
+    }
+
     fun rebuild(force: Boolean = false, done: (BuildReport) -> Unit) {
         if (building) {
             done(BuildReport(emptyMap(), emptyList(), emptyList(), listOf("A build is already running."), rejected = true))
@@ -339,4 +380,10 @@ class BuildReport(
     val warnings: List<String>,
     val errors: List<String>,
     val rejected: Boolean = false,
-)
+) {
+    /** How many players were sent the new pack, or null when it was not sent. */
+    var sent: Int? = null
+
+    /** True when the build came out the same as the pack already published, so there was nothing to send. */
+    var unchanged = false
+}

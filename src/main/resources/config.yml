@@ -32,3 +32,9 @@ resource-pack:
 
 # Tell players when their client version is too old for the blocks.
 client-notices: true
+
+workflow:
+  # Rebuild the pack when a model or block file changes, a few seconds after the last save, and when /repack reload runs.
+  build-on-change: true
+  # Send a newly built pack to everyone online right away. Packs with errors are never sent. false: build only, and send it with /repack push.
+  send-after-build: true

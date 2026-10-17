@@ -30,7 +30,7 @@ import java.util.concurrent.CompletableFuture
  * /repack list                lists the ids that can be placed
  * /repack menu              opens a screen with every block item to take
  * /repack give <id> [amount] [players]   gives the item that places a custom block
- * /repack reload [blocks|config|host|all]   reads the block files (default), the config, or restarts the pack server on the new port
+ * /repack reload [blocks|config|host|all]   reads the block files, builds the pack and sends it when it changed (default); blocks, config and host only do that part, all also reloads the config and the pack server
  * ```
  */
 class RepackCommand(private val plugin: Repack) {
@@ -101,11 +101,11 @@ class RepackCommand(private val plugin: Repack) {
         )
         .then(
             Commands.literal("reload")
-                .executes { reload(it, blocks = true, config = false, host = false) }
+                .executes { reloadPack(it, config = false, host = false) }
                 .then(Commands.literal("blocks").executes { reload(it, blocks = true, config = false, host = false) })
                 .then(Commands.literal("config").executes { reload(it, blocks = false, config = true, host = false) })
                 .then(Commands.literal("host").executes { reload(it, blocks = false, config = false, host = true) })
-                .then(Commands.literal("all").executes { reload(it, blocks = true, config = true, host = true) })
+                .then(Commands.literal("all").executes { reloadPack(it, config = true, host = true) })
         )
         .build()
 
@@ -133,12 +133,13 @@ class RepackCommand(private val plugin: Repack) {
                 NamedTextColor.RED,
             )
         } else {
-            reply(
-                context,
-                "Built ${report.entries.entries.joinToString { (variant, entry) -> "${variant.id} ${short(entry)}" }} from ${report.models.size} model(s). " +
-                    "Players still get the published packs until you run /repack push.",
-                NamedTextColor.GREEN,
-            )
+            val built = "Built ${report.entries.entries.joinToString { (variant, entry) -> "${variant.id} ${short(entry)}" }} from ${report.models.size} model(s). "
+            val next = when {
+                report.sent != null -> "Sent it to ${report.sent} player(s)."
+                report.unchanged -> "It is the same as the published pack, so nothing was sent."
+                else -> "Players still get the published packs until you run /repack push."
+            }
+            reply(context, built + next, NamedTextColor.GREEN)
         }
         report.errors.take(MAX_LINES).forEach { reply(context, it, NamedTextColor.RED) }
         report.warnings.take(MAX_LINES).forEach { reply(context, it, NamedTextColor.YELLOW) }
@@ -219,6 +220,18 @@ class RepackCommand(private val plugin: Repack) {
             left.values.forEach { player.world.dropItemNaturally(player.location, it) }
         }
         reply(context, "Gave $amount x $id to ${targets.size} player(s).", NamedTextColor.GREEN)
+        return Command.SINGLE_SUCCESS
+    }
+
+    /** /repack reload and /repack reload all: reads the block files, then builds the pack and sends it when it changed. */
+    private fun reloadPack(context: CommandContext<CommandSourceStack>, config: Boolean, host: Boolean): Int {
+        if (config) plugin.reloadConfig()
+        if (host) {
+            val error = plugin.host.restart()
+            if (error != null) reply(context, error, NamedTextColor.RED) else reply(context, "Pack server ${plugin.host.description}.", NamedTextColor.GREEN)
+        }
+        reply(context, "Reloading and building the pack...", NamedTextColor.GRAY)
+        plugin.rebuildAndSend { report -> showBuild(context, report) }
         return Command.SINGLE_SUCCESS
     }
 
