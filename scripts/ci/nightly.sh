@@ -78,12 +78,33 @@ if [ "$EXCESS" -gt 0 ]; then
     tail -n "$KEEP" "$MAIN_DIR/.builds" > "$MAIN_DIR/.builds.new"
     mv "$MAIN_DIR/.builds.new" "$MAIN_DIR/.builds"
 fi
+
+# The commits since the last release, newest first, without the version bumps the release workflow makes.
+LAST_RELEASE=$(git describe --tags --abbrev=0 --match '[0-9]*' 2>/dev/null || true)
+if [ -n "$LAST_RELEASE" ]; then RANGE="${LAST_RELEASE}..HEAD"; else RANGE="HEAD"; fi
+CHANGES=$(git log --no-merges --max-count=50 --format='%H%x09%s' "$RANGE" | grep -v '\[skip ci\]' | while IFS=$'\t' read -r full subject; do
+    subject=${subject//</&lt;}
+    echo "- [\`${full:0:7}\`](${SOURCE_WEB}/commit/${full}) ${subject//>/&gt;}"
+done || true)
+if [ -z "$CHANGES" ]; then CHANGES="Nothing yet."; fi
+if [ -n "$LAST_RELEASE" ]; then
+    SINCE="Since [\`${LAST_RELEASE}\`](${SOURCE_WEB}/releases/tag/${LAST_RELEASE}):"
+else
+    SINCE="There is no release yet."
+fi
+
 cat > "$MAIN_DIR/README.md" <<README
 # Repack nightly
 
 Nightly builds of [Repack](${SOURCE_WEB}). Every build is a branch named after the commit it was built from.
 
 latest publish: [\`${SHA}\`](${SOURCE_WEB}/commit/${SHA_FULL}) ([branch](${NIGHTLY_WEB}/tree/${SHA}))
+
+## Changes since last release
+
+${SINCE}
+
+${CHANGES}
 README
 "${GIT[@]}" -C "$MAIN_DIR" add README.md .builds
 "${GIT[@]}" -C "$MAIN_DIR" commit -q -m "$SUBJECT"
