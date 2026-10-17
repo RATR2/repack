@@ -32,6 +32,8 @@ Drop a `.bbmodel` file into the plugin folder and you have a custom block. Repac
 
 Guides: [guide.md](guide.md) for running Repack, [dev.md](dev.md) for Skript and the Java API.
 
+Every commit on `main` is built and published to [RATR2/repack-nightly](https://github.com/RATR2/repack-nightly).
+
 ## Install
 
 Needs Paper 1.21.4 or newer (built with Java 25, but runs on Java 21 and up) and the [PacketEvents](https://github.com/retrooper/packetevents) plugin (the Spigot jar, 2.14.0 or newer). Clients from 1.21.4 to 26.3 are supported, older or newer ones than the server through [ViaVersion](https://github.com/ViaVersion/ViaVersion) (optional), and Repack sends each player the pack that fits their version.
