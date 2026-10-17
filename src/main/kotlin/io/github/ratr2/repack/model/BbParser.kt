@@ -18,6 +18,9 @@ object BbParser {
         "on_shelf",
     )
 
+    /** Blockbench groups nest a few levels; a file far beyond that is broken, and recursing through it could overflow the stack. */
+    private const val MAX_OUTLINER_DEPTH = 100
+
     fun parse(name: String, json: String): BbModel {
         val root = try {
             JsonParser.parseString(json).asJsonObject
@@ -95,7 +98,10 @@ object BbParser {
             if (obj.int("frame_time", 0) > 0 && obj.int("height", 0) > obj.int("width", 0)) {
                 warnings += "Texture '$name' looks animated; animation is not generated yet."
             }
-            result += BbTexture(name, png, obj.int("uv_width", width), obj.int("uv_height", height))
+            val uvWidth = obj.int("uv_width", width)
+            val uvHeight = obj.int("uv_height", height)
+            if (uvWidth <= 0 || uvHeight <= 0) throw BbParseException("Texture '$name' has a UV size of $uvWidth x $uvHeight, which must be above 0.")
+            result += BbTexture(name, png, uvWidth, uvHeight)
         }
         return result
     }
@@ -212,7 +218,8 @@ object BbParser {
     private fun rotatedGroupsOf(root: JsonObject, rotations: Map<String, Vec3>): Map<String, String> {
         val result = HashMap<String, String>()
 
-        fun visit(node: JsonElement, rotatedAncestor: String?) {
+        fun visit(node: JsonElement, rotatedAncestor: String?, depth: Int = 0) {
+            if (depth > MAX_OUTLINER_DEPTH) throw BbParseException("The outliner is nested more than $MAX_OUTLINER_DEPTH groups deep.")
             if (node.isJsonPrimitive) {
                 if (rotatedAncestor != null) result[node.asString] = rotatedAncestor
                 return
@@ -223,7 +230,7 @@ object BbParser {
             val rotation = if (obj.has("rotation")) obj.vec3("rotation") else uuid?.let(rotations::get) ?: Vec3.ZERO
             val rotated = rotation != Vec3.ZERO
             val here = if (rotated) "${obj.string("name") ?: uuid} ${rotation.x}, ${rotation.y}, ${rotation.z}" else rotatedAncestor
-            for (child in obj.array("children") ?: JsonArray()) visit(child, here)
+            for (child in obj.array("children") ?: JsonArray()) visit(child, here, depth + 1)
         }
 
         for (node in root.array("outliner") ?: JsonArray()) visit(node, null)

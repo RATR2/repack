@@ -1,5 +1,6 @@
 package io.github.ratr2.repack.block
 
+import io.github.ratr2.repack.model.ModelLibrary
 import org.bukkit.Material
 import org.bukkit.configuration.ConfigurationSection
 import org.bukkit.configuration.InvalidConfigurationException
@@ -32,6 +33,8 @@ object BlockDefinitions {
     /** 100 times the usual display range: far past anything a client draws, and small enough to stay a finite float. */
     private const val MAX_VIEW_RANGE = 100.0
 
+    private val ID = Regex("[a-z0-9_-]+")
+
     /** Reads every block file, or just the ids in only. */
     fun load(blocksFolder: File, modelIds: Set<String>, only: Set<String>? = null): LoadedDefinitions {
         val definitions = LinkedHashMap<String, BlockDefinition>()
@@ -41,6 +44,10 @@ object BlockDefinitions {
         for (file in files) {
             val id = file.nameWithoutExtension.lowercase()
             if (only != null && id !in only) continue
+            if (!ID.matches(id)) {
+                errors += "${file.name}: block file names may only use a-z, 0-9, _ and -."
+                continue
+            }
             try {
                 val yaml = YamlConfiguration().apply { load(file) }
                 val definition = parse(id, yaml)
@@ -105,7 +112,7 @@ object BlockDefinitions {
 
         return BlockDefinition(
             id = id,
-            model = section.getString("model")?.lowercase() ?: id,
+            model = section.getString("model")?.let(ModelLibrary::cleanId) ?: id,
             proxyBlockName = proxyBlock,
             proxyMode = mode,
             vanillaInteraction = proxy?.getBoolean("vanilla-interaction", false) ?: false,
@@ -131,7 +138,7 @@ object BlockDefinitions {
                 name = item?.getString("name"),
                 lore = item?.getStringList("lore").orEmpty(),
                 glint = item?.getBoolean("glint", false) ?: false,
-                model = item?.getString("model")?.lowercase(),
+                model = item?.getString("model")?.let(ModelLibrary::cleanId),
             ),
             recipe = recipeOf(section.getConfigurationSection("recipe"), materials),
         )

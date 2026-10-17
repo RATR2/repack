@@ -119,7 +119,12 @@ class RepackCommand(private val plugin: Repack) {
     }
 
     private fun build(context: CommandContext<CommandSourceStack>, force: Boolean): Int {
-        val report = plugin.rebuild(force)
+        reply(context, "Building the pack...", NamedTextColor.GRAY)
+        plugin.rebuild(force) { report -> showBuild(context, report) }
+        return Command.SINGLE_SUCCESS
+    }
+
+    private fun showBuild(context: CommandContext<CommandSourceStack>, report: BuildReport) {
         if (report.rejected) {
             reply(
                 context,
@@ -139,7 +144,6 @@ class RepackCommand(private val plugin: Repack) {
         report.warnings.take(MAX_LINES).forEach { reply(context, it, NamedTextColor.YELLOW) }
         val hidden = report.errors.size + report.warnings.size - minOf(report.errors.size, MAX_LINES) - minOf(report.warnings.size, MAX_LINES)
         if (hidden > 0) reply(context, "$hidden more in the server log.", NamedTextColor.GRAY)
-        return Command.SINGLE_SUCCESS
     }
 
     private fun push(context: CommandContext<CommandSourceStack>, targets: List<Player>): Int {

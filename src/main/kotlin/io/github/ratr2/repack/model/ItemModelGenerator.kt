@@ -4,8 +4,8 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import kotlin.math.abs
 
-/** Pack files for one model, plus anything that could not be represented. */
-class GeneratedModel(val files: Map<String, ByteArray>, val warnings: List<String>)
+/** errors are problems that make the model unusable in the game, so it is left out of the pack. */
+class GeneratedModel(val files: Map<String, ByteArray>, val warnings: List<String>, val errors: List<String> = emptyList())
 
 object ItemModelGenerator {
 
@@ -21,6 +21,7 @@ object ItemModelGenerator {
     fun generate(id: String, model: BbModel, shelf: Boolean = true): GeneratedModel {
         val files = HashMap<String, ByteArray>()
         val warnings = ArrayList<String>(model.warnings)
+        val errors = ArrayList<String>()
 
         val textures = JsonObject()
         for ((index, texture) in model.textures.withIndex()) {
@@ -32,7 +33,7 @@ object ItemModelGenerator {
 
         val elements = JsonArray()
         for (cube in model.cubes) {
-            elementOf(cube, model.textures, textures, warnings)?.let(elements::add)
+            elementOf(cube, model.textures, textures, warnings, errors)?.let(elements::add)
         }
 
         val block = JsonObject().apply {
@@ -49,7 +50,7 @@ object ItemModelGenerator {
             })
         }
         files["assets/$NAMESPACE/items/$id.json"] = item.toString().toByteArray(Charsets.UTF_8)
-        return GeneratedModel(files, warnings)
+        return GeneratedModel(files, warnings, errors)
     }
 
     /** Vanilla accepts translation between -80 and 80 and scale between -4 and 4 in a display transform. */
@@ -77,7 +78,7 @@ object ItemModelGenerator {
 
     private fun List<Double>.toJsonArray() = JsonArray().also { array -> forEach { array.add(it) } }
 
-    private fun elementOf(cube: BbCube, textures: List<BbTexture>, usable: JsonObject, warnings: MutableList<String>): JsonObject? {
+    private fun elementOf(cube: BbCube, textures: List<BbTexture>, usable: JsonObject, warnings: MutableList<String>, errors: MutableList<String>): JsonObject? {
         val faces = JsonObject()
         for ((direction, face) in cube.faces) {
             val texture = textures[face.texture]
@@ -98,7 +99,7 @@ object ItemModelGenerator {
         val to = cube.to + Vec3(cube.inflate, cube.inflate, cube.inflate)
         for (value in listOf(from.x, from.y, from.z, to.x, to.y, to.z)) {
             if (value < MIN_COORDINATE || value > MAX_COORDINATE) {
-                warnings += "Cube '${cube.name}' reaches outside the -16 to 32 range vanilla models allow and will not load."
+                errors += "Cube '${cube.name}' reaches outside the -16 to 32 range vanilla models allow, so the game would not load the model."
                 break
             }
         }

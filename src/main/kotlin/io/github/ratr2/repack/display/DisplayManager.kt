@@ -113,8 +113,10 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
 
     private fun show(player: Player, world: World, pos: BlockPos, block: PlacedBlock, definition: BlockDefinition) {
         val key = Key(world.uid, pos)
+        // Showing again without hiding first would spawn a second copy under the same entity id.
+        hide(player, key)
         val ids = shown.getOrPut(player.uniqueId) { HashMap() }
-        val entityId = ids.getOrPut(key) { SpigotReflectionUtil.generateEntityId() }
+        val entityId = SpigotReflectionUtil.generateEntityId().also { ids[key] = it }
 
         val options = definition.display
         val location = PacketLocation(

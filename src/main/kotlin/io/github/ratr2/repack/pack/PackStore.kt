@@ -2,6 +2,8 @@ package io.github.ratr2.repack.pack
 
 import org.bukkit.configuration.file.YamlConfiguration
 import java.io.File
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 
 data class PackEntry(val sha1: String, val size: Int)
@@ -33,10 +35,12 @@ class PackStore(private val dataFolder: File) {
     fun add(variant: PackVariant, zip: ByteArray): PackEntry {
         val sha1 = MessageDigest.getInstance("SHA-1").digest(zip).joinToString("") { "%02x".format(it) }
         val file = File(dir, "$sha1.zip")
-        if (!file.exists()) file.writeBytes(zip)
+        // A file of the wrong size is what a crash or a full disk leaves behind, and it would fail the client's hash check.
+        if (!file.exists() || file.length() != zip.size.toLong()) writeAtomically(file, zip)
         return PackEntry(sha1, zip.size).also {
             builtEntries[variant] = it
             save()
+            prune()
         }
     }
 
@@ -44,6 +48,7 @@ class PackStore(private val dataFolder: File) {
         if (builtEntries.isEmpty()) return emptyMap()
         publishedEntries.putAll(builtEntries)
         save()
+        prune()
         return published
     }
 
@@ -60,10 +65,30 @@ class PackStore(private val dataFolder: File) {
         val state = YamlConfiguration()
         for ((variant, entry) in builtEntries) state.set("built.${variant.id}", entry.sha1)
         for ((variant, entry) in publishedEntries) state.set("published.${variant.id}", entry.sha1)
-        state.save(stateFile)
+        writeAtomically(stateFile, state.saveToString().toByteArray(Charsets.UTF_8))
+    }
+
+    private fun writeAtomically(target: File, bytes: ByteArray) {
+        val temp = File(target.parentFile, "${target.name}.tmp")
+        temp.writeBytes(bytes)
+        Files.move(temp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+    }
+
+    /**
+     * Deletes packs that neither state refers to, once they are a day old: a client may still be downloading the pack that was
+     * published a moment ago.
+     */
+    private fun prune() {
+        val keep = (builtEntries.values + publishedEntries.values).mapTo(HashSet()) { "${it.sha1}.zip" }
+        val cutoff = System.currentTimeMillis() - PRUNE_AFTER_MILLIS
+        for (file in dir.listFiles().orEmpty()) {
+            if (file.name in keep || !file.isFile) continue
+            if ((file.name.endsWith(".zip") || file.name.endsWith(".tmp")) && file.lastModified() < cutoff) file.delete()
+        }
     }
 
     private companion object {
         val HASH = Regex("[0-9a-f]{40}")
+        const val PRUNE_AFTER_MILLIS = 24L * 60 * 60 * 1000
     }
 }

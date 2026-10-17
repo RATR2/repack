@@ -88,6 +88,15 @@ class ConfigMigratorTest {
     }
 
     @Test
+    fun `a version that looks like a path cannot escape through the backup name`() {
+        val file = tempFile("config-version: ../../evil\ndebug: true\n")
+        ConfigMigrator.migrate(file, current, emptyList(), defaults)
+        assertTrue(backups(file).single().name.startsWith("config.yml.bak-"))
+        assertTrue(backups(file).single().parentFile == file.parentFile)
+        assertTrue(file.parentFile.parentFile.listFiles().orEmpty().none { it.name == "evil" })
+    }
+
+    @Test
     fun `a file that is not yaml is reported and left alone`() {
         val file = tempFile("debug: [unclosed\n")
         val before = file.readText()

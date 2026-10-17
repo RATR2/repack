@@ -48,8 +48,9 @@ class PackSender(
 
     fun send(players: Collection<Player>): Int {
         if (!store.hasPublished) return 0
-        players.forEach { player -> host.enqueue(player.uniqueId) { if (player.isOnline) sendNow(player) } }
-        return players.size
+        val online = players.filter { it.isOnline }
+        online.forEach { player -> host.enqueue(player.uniqueId) { if (player.isOnline) sendNow(player) } }
+        return online.count { player -> variantOf(player)?.let(store.published::get) != null }
     }
 
     private fun variantOf(player: Player) = PackEra.forProtocol(versions.protocolOf(player))
