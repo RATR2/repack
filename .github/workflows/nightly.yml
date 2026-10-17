@@ -25,6 +25,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          # All the history and tags, to list the changes since the last release.
+          fetch-depth: 0
 
       - name: Set up JDK 25
         uses: actions/setup-java@v5
