@@ -14,6 +14,7 @@ import io.github.ratr2.repack.config.ConfigMigrator
 import io.github.ratr2.repack.config.ConfigVersions
 import io.github.ratr2.repack.display.DisplayManager
 import io.github.ratr2.repack.model.LibraryResult
+import io.github.ratr2.repack.model.ModelCache
 import io.github.ratr2.repack.model.ModelLibrary
 import io.github.ratr2.repack.pack.PackBuilder
 import io.github.ratr2.repack.pack.PackVariant
@@ -360,7 +361,7 @@ class Repack : JavaPlugin() {
         }
     }
 
-    fun rebuild(force: Boolean = false, done: (BuildReport) -> Unit) {
+    fun rebuild(force: Boolean = false, fresh: Boolean = false, done: (BuildReport) -> Unit) {
         if (building) {
             done(BuildReport(emptyMap(), emptyList(), emptyList(), listOf("A build is already running."), rejected = true))
             return
@@ -369,12 +370,13 @@ class Repack : JavaPlugin() {
         val progress = BuildProgress(this)
         progress.start()
         val folder = modelsFolder
+        val cache = ModelCache(File(dataFolder, "cache/models"), description.version)
         server.scheduler.runTaskAsynchronously(this, Runnable {
             var library: LibraryResult? = null
             var zips: Map<PackVariant, ByteArray>? = null
             var failure: String? = null
             try {
-                library = ModelLibrary.build(folder) { done, total ->
+                library = ModelLibrary.build(folder, cache, fresh) { done, total ->
                     progress.update(PARSE_SHARE * done / maxOf(total, 1), "converting models $done/$total")
                 }
                 // A model that failed to convert is missing from the pack, so a pack built around it could replace a working one.
