@@ -27,7 +27,7 @@ Drop a `.bbmodel` file into the plugin folder and you have a custom block. Repac
 - **No entities on the server.** The models are packet-based item displays, sent to each player only while they have the block's chunk loaded.
 - **Saved with the world.** Placements live in the chunk's own data, so they survive restarts and travel with world copies and backups.
 - **Its own pack.** Clients can hold several server resource packs at once, so Repack's pack sits next to your other packs and never has to be merged with them.
-- **Build, then push.** Uploading a model rebuilds the pack but sends nothing. Players get the new pack when you run `/repack push`.
+- **Saves rebuild the pack.** A few seconds after you save a model or block file, or when you run `/repack reload`, Repack rebuilds the pack and sends it to everyone online if it changed. A pack that fails to build is never sent. Set `workflow.send-after-build: false` to only build, and send it yourself with `/repack push`.
 - **Everything configurable.** Mining time, tool and tier, drops, experience, explosion and piston behaviour, model offset and scale, and the item that places the block.
 
 ## Install
@@ -37,7 +37,7 @@ Needs Paper 1.21.4 or newer (built with Java 25, but runs on Java 21 and up) and
 1. Put `repack.jar` and `packetevents-spigot-2.14.0.jar` in `plugins/`.
 2. Start the server. The first time, Repack adds a ready-made `table` block (`models/table.bbmodel` and `blocks/table.yml`). Set `install-defaults: false` before the first start to skip it.
 3. Put your own models in `plugins/Repack/models/`. The file name is the block id: `chair.bbmodel` makes the block `chair`. Textures must be embedded in the model.
-4. Run `/repack build`, then `/repack push`.
+4. Save the files. The pack is built and sent by itself (or run `/repack reload`).
 5. `/repack give table` and place it.
 
 Repack writes `plugins/Repack/blocks/table.yml` for every model, with every option listed at its default. Edit it to change the block (the bundled `table.yml` shows a real one, with a crafting recipe, a glowing item and a scaled model), or copy it (`table2.yml`, same `model:`) for a second block that shares the model. `_example.yml` in the same folder explains each option and is rewritten on every start.
@@ -46,7 +46,7 @@ Repack writes `plugins/Repack/blocks/table.yml` for every model, with every opti
 
 | Command | What it does |
 |---|---|
-| `/repack build` | Rebuilds the pack from the models. Players keep the last pushed pack |
+| `/repack build [force]` | Only rebuilds the pack from the models. Players keep the last published pack |
 | `/repack push [players]` | Publishes the built pack and sends it (everyone by default) |
 | `/repack status` | Shows the built and published pack |
 | `/repack place <id> [pos]` | Places a custom block (at your feet by default) |
@@ -56,7 +56,7 @@ Repack writes `plugins/Repack/blocks/table.yml` for every model, with every opti
 
 Vanilla `/give @s repack:<id> [count]` works too, with tab completion. An item can show a different model than its block with `item.model` in the block file.
 | `/repack list` | Lists the block ids |
-| `/repack reload` | Reads the block files again |
+| `/repack reload` | Reads the block files, rebuilds the pack and sends it when it changed. `blocks` only reads the block files, `config` and `host` only that part, `all` does everything |
 
 All need the `repack.admin` permission.
 
