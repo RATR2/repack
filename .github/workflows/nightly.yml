@@ -1,0 +1,43 @@
+name: Nightly
+
+on:
+  # Every commit on main. The version bump the release workflow pushes has [skip ci] in it, and GitHub skips it.
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Publish even when the latest commit was already published"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Builds publish one after the other, so two quick pushes never race for the nightly repo.
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5.0.2
+
+      # Needs the REPACK_NIGHTLY_TOKEN secret: a token that can push to RATR2/repack-nightly.
+      - name: Publish the nightly build
+        env:
+          NIGHTLY_TOKEN: ${{ secrets.REPACK_NIGHTLY_TOKEN }}
+          FORCE: ${{ inputs.force }}
+        run: scripts/ci/nightly.sh
