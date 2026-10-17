@@ -26,6 +26,11 @@ resource-pack:
   join-delay-ticks: 40
   # Minimum time between two packs reaching the same player from plugins that share the server.
   send-gap-ticks: 20
+  # A player who joins gets the newest build, even one that was never pushed. false: only the pack that was last pushed.
+  join-latest-build: true
+  # Players cannot be hurt while their client reloads a pack you sent them: from "downloaded" until "loaded", at most 20 seconds, ended by
+  # hitting something, and not again for two minutes. A client that fakes its status gains almost nothing.
+  invulnerable-while-loading: true
   # Kick players who decline the pack.
   required: false
   prompt: "This server uses a resource pack for custom blocks."
@@ -34,9 +39,8 @@ resource-pack:
 client-notices: true
 
 workflow:
-  # Rebuild the pack when a model or block file changes, a few seconds after the last save, and when /repack reload runs.
+  # Rebuild the pack when a model or block file changes, a few seconds after the last save. This is silent: nobody online is sent anything.
+  # /repack reload builds and pushes the pack to everyone online, and /repack push [player] pushes the pack that was built.
   build-on-change: true
-  # Send a newly built pack to everyone online right away. Packs with errors are never sent. false: build only, and send it with /repack push.
-  send-after-build: true
   # Show operators (repack.admin) a boss bar with the progress while the pack builds.
   progress-bar: true

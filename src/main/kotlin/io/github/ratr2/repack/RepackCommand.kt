@@ -30,7 +30,7 @@ import java.util.concurrent.CompletableFuture
  * /repack list                lists the ids that can be placed
  * /repack menu              opens a screen with every block item to take
  * /repack give <id> [amount] [players]   gives the item that places a custom block
- * /repack reload [blocks|config|host|all]   reads the block files, builds the pack and sends it when it changed (default); blocks, config and host only do that part, all also reloads the config and the pack server
+ * /repack reload [blocks|config|host|all]   reads the block files, builds the pack and pushes it to everyone online (default); blocks, config and host only do that part, all also reloads the config and the pack server; blocks, config and host only do that part, all also reloads the config and the pack server
  * ```
  */
 class RepackCommand(private val plugin: Repack) {
@@ -137,8 +137,8 @@ class RepackCommand(private val plugin: Repack) {
             val built = "Built ${report.entries.entries.joinToString { (variant, entry) -> "${variant.id} ${short(entry)}" }} from ${report.models.size} model(s). "
             val next = when {
                 report.sent != null -> "Sent it to ${report.sent} player(s)."
-                report.unchanged -> "It is the same as the published pack, so nothing was sent."
-                else -> "Players still get the published packs until you run /repack push."
+                report.unchanged -> "It is the same as the pack last pushed, so nothing was sent. /repack push sends it anyway."
+                else -> "Nobody was sent it. Run /repack push to send it to everyone online, or /repack push <player> to one."
             }
             reply(context, built + next, NamedTextColor.GREEN)
         }
@@ -155,7 +155,7 @@ class RepackCommand(private val plugin: Repack) {
             return 0
         }
         val sent = plugin.sender.send(targets)
-        reply(context, "Published ${published.entries.joinToString { (variant, entry) -> "${variant.id} ${short(entry)}" }} and sent it to $sent player(s).", NamedTextColor.GREEN)
+        reply(context, "Published ${published.entries.joinToString { (variant, entry) -> "${variant.id} ${short(entry)}" }} and sent it to $sent player(s)." + if (plugin.config.getBoolean("resource-pack.invulnerable-while-loading", true)) " They cannot be hurt while their client reloads it." else "", NamedTextColor.GREEN)
         return Command.SINGLE_SUCCESS
     }
 
@@ -224,7 +224,7 @@ class RepackCommand(private val plugin: Repack) {
         return Command.SINGLE_SUCCESS
     }
 
-    /** /repack reload and /repack reload all: reads the block files, then builds the pack and sends it when it changed. */
+    /** /repack reload and /repack reload all: reads the block files, then builds the pack and pushes it to everyone online when it changed. */
     private fun reloadPack(context: CommandContext<CommandSourceStack>, config: Boolean, host: Boolean): Int {
         if (config) plugin.reloadConfig()
         if (host) {
@@ -232,7 +232,7 @@ class RepackCommand(private val plugin: Repack) {
             if (error != null) reply(context, error, NamedTextColor.RED) else reply(context, "Pack server ${plugin.host.description}.", NamedTextColor.GREEN)
         }
         reply(context, "Reloading and building the pack...", NamedTextColor.GRAY)
-        plugin.rebuildAndSend { report -> showBuild(context, report) }
+        plugin.rebuildAndPush { report -> showBuild(context, report) }
         return Command.SINGLE_SUCCESS
     }
 
