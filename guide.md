@@ -41,7 +41,7 @@ Repack rebuilds the pack by itself and only sends it when you say so:
 - **`/repack reload`** reads the block files, rebuilds the pack and pushes it to everyone online, unless it came out the same as the pack last pushed.
 - **A player who joins** gets the newest build, even one that was never pushed. Set `resource-pack.join-latest-build: false` to give joiners only the pack that was last pushed.
 - A build with errors is never used. The previous build stays, and the errors are in the chat and the console.
-- **Invulnerability:** the screen freezes while a client reloads a pack, so a player cannot be hurt from the moment their client reports it has downloaded the pack until it has loaded it, for 20 seconds at most. It only starts for a pack Repack just sent that player (a push or a join), it ends as soon as the player hits something, and the same player cannot get it again for two minutes, so a modified client cannot use it to fight safely or stay immune. Their normal setting is put back when it ends, if they leave, or if the server stops. `resource-pack.invulnerable-while-loading: false` turns it off.
+- **While a pack loads:** the screen freezes while a client reloads a pack. From the moment the client reports it has downloaded a pack Repack just sent it (a push or a join) until it has loaded it, for 20 seconds at most, the player is held. They cannot be hurt and cannot move (the server puts their position back, they are held in the air without falling, and they are allowed to hover so the server does not kick them for flying). They cannot attack, use items, break, place, drop or interact with anything. They see no other entities at all, and the blocks around them look like black concrete. All of it is sent to that player only, and the real blocks and entities come back when it is done. The same player cannot be held again for two minutes, so a modified client that fakes its status gains only a few seconds of standing still. Their normal settings are put back when it ends, if they leave, or if the server stops. Turn it off with `resource-pack.invulnerable-while-loading`, the black blocks with `resource-pack.black-blocks-while-loading`, and change the size with `resource-pack.loading-radius`.
 
 Two settings under `workflow:` in `config.yml` control the building:
 
@@ -158,7 +158,9 @@ If Distortion (or another plugin that uses the same scheme) is installed, the fi
 | `resource-pack.share-host` | `true` | Share one pack server with Distortion. |
 | `resource-pack.join-delay-ticks` | `40` | Wait after a player joins before sending the pack. |
 | `resource-pack.join-latest-build` | `true` | Joiners get the newest build. `false`: only the pack last pushed. |
-| `resource-pack.invulnerable-while-loading` | `true` | Players cannot be hurt while a pack loads. |
+| `resource-pack.invulnerable-while-loading` | `true` | Players are held (safe, still, no entities visible) while a pack loads. |
+| `resource-pack.black-blocks-while-loading` | `true` | The blocks around them look black while it loads. |
+| `resource-pack.loading-radius` | `8` | How far around the player, up to 16. |
 | `resource-pack.send-gap-ticks` | `20` | Minimum time between packs from different plugins to one player. |
 | `resource-pack.required` / `prompt` | `false` / text | Kick players who decline, and the text of the prompt. |
 | `client-notices` | `true` | Tell players their client is too old. |

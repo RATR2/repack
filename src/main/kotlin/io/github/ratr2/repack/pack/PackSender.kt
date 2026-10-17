@@ -9,13 +9,10 @@ import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.entity.Player
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
-import org.bukkit.entity.Projectile
-import org.bukkit.event.entity.EntityDamageByEntityEvent
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.bukkit.event.player.PlayerResourcePackStatusEvent
 import org.bukkit.event.player.PlayerResourcePackStatusEvent.Status
-import org.bukkit.scheduler.BukkitTask
 import java.util.UUID
 
 class PackSender(
@@ -23,6 +20,7 @@ class PackSender(
     private val store: PackStore,
     private val host: SharedHost,
     private val versions: ClientVersions,
+    private val hold: LoadingHold,
 ) : Listener {
 
     private val id: UUID = UUID.nameUUIDFromBytes("repack-pack".toByteArray())
@@ -74,42 +72,13 @@ class PackSender(
         player.sendResourcePacks(request)
     }
 
-    // The screen freezes while the client reloads a pack, so a player cannot be hurt between the moment the client says it has the file
-    // and the moment it has loaded it (or failed). A modified client could try to stretch that, so:
-    //  - it only starts when the client reports the pack we sent it a moment ago, once per send,
-    //  - it ends after 20 seconds whatever the client says, and on any hit the player deals,
-    //  - and the same player cannot get it again for two minutes.
-    // The player's own invulnerable setting is put back when it ends, when they leave and when the plugin stops.
+    // Between the moment Repack sends a player the pack and the moment their client has loaded it, LoadingHold keeps them still and safe.
+    // It only starts when the client reports the download of a pack we sent it in the last five minutes, once per send.
 
     private val sentAt = HashMap<UUID, Long>()
-    private val lastProtected = HashMap<UUID, Long>()
-    private val protectedPlayers = HashMap<UUID, Boolean>()
-    private val protectTimers = HashMap<UUID, BukkitTask>()
 
     private fun markSent(player: Player) {
         sentAt[player.uniqueId] = System.currentTimeMillis()
-    }
-
-    private fun protect(player: Player) {
-        if (!plugin.config.getBoolean("resource-pack.invulnerable-while-loading", true)) return
-        val playerId = player.uniqueId
-        val now = System.currentTimeMillis()
-        if (playerId in protectedPlayers) return
-        if (now - (lastProtected[playerId] ?: 0L) < PROTECT_COOLDOWN_MILLIS) return
-        lastProtected[playerId] = now
-        protectedPlayers[playerId] = player.isInvulnerable
-        player.isInvulnerable = true
-        protectTimers[playerId] = plugin.server.scheduler.runTaskLater(plugin, Runnable { release(playerId) }, PROTECT_TIMEOUT_TICKS)
-    }
-
-    private fun release(playerId: UUID) {
-        protectTimers.remove(playerId)?.cancel()
-        val wasInvulnerable = protectedPlayers.remove(playerId) ?: return
-        if (!wasInvulnerable) plugin.server.getPlayer(playerId)?.isInvulnerable = false
-    }
-
-    fun releaseAll() {
-        protectedPlayers.keys.toList().forEach(::release)
     }
 
     @EventHandler
@@ -119,30 +88,19 @@ class PackSender(
         when (event.status) {
             Status.DOWNLOADED -> {
                 val sent = sentAt.remove(playerId)
-                if (sent != null && System.currentTimeMillis() - sent < SENT_VALID_MILLIS) protect(event.player)
+                if (sent != null && System.currentTimeMillis() - sent < SENT_VALID_MILLIS) hold.start(event.player)
             }
             Status.SUCCESSFULLY_LOADED, Status.DECLINED, Status.FAILED_DOWNLOAD, Status.FAILED_RELOAD, Status.INVALID_URL, Status.DISCARDED -> {
                 sentAt.remove(playerId)
-                release(playerId)
+                hold.end(playerId)
             }
             else -> {}
         }
     }
 
-    /** A protected player who hits something loses the protection, so it cannot be used to fight without risk. */
-    @EventHandler
-    fun onDamage(event: EntityDamageByEntityEvent) {
-        val damager = event.damager
-        val attacker = if (damager is Projectile) damager.shooter as? Player else damager as? Player
-        if (attacker != null) release(attacker.uniqueId)
-    }
-
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
-        val playerId = event.player.uniqueId
-        release(playerId)
-        sentAt.remove(playerId)
-        lastProtected.remove(playerId)
+        sentAt.remove(event.player.uniqueId)
     }
 
     private fun notice(player: Player, message: String) {
@@ -161,8 +119,5 @@ class PackSender(
 
     private companion object {
         const val SENT_VALID_MILLIS = 5L * 60 * 1000
-
-        /** The least time between two protections of the same player. */
-        const val PROTECT_COOLDOWN_MILLIS = 2L * 60 * 1000
     }
 }

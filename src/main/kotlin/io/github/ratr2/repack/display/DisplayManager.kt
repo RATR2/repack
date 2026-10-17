@@ -78,12 +78,10 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
         shown.remove(event.player.uniqueId)
     }
 
-    /** Takes every model away from one player. [showAllFor] gives them back. */
     fun hideAllFor(player: Player) {
         shown[player.uniqueId]?.keys?.toList()?.forEach { hide(player, it) }
     }
 
-    /** Shows one player every model in the chunks they have. */
     fun showAllFor(player: Player) {
         val world = player.world
         for (chunk in world.loadedChunks) {
@@ -111,7 +109,10 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
         }
     }
 
+    var hidden: (Player) -> Boolean = { false }
+
     private fun show(player: Player, world: World, pos: BlockPos, block: PlacedBlock, definition: BlockDefinition) {
+        if (hidden(player)) return
         val key = Key(world.uid, pos)
         // Showing again without hiding first would spawn a second copy under the same entity id.
         hide(player, key)
