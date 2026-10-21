@@ -36,6 +36,7 @@ jobs:
       # Tags are lines of their own in the last commit message:
       #   version="0.1.0"   the version to release, or to switch to without release
       #   release           publish a GitHub release for it
+      #   modrinth          publish it to Modrinth, with or without a release
       #   next="0.2.0"      what to continue with afterwards (default: the next patch number, as -SNAPSHOT)
       - name: Read the commit tags
         id: tags
@@ -83,15 +84,20 @@ jobs:
           git pull --rebase origin "$GITHUB_REF_NAME"
           git push origin "HEAD:$GITHUB_REF_NAME"
 
-      # Needs the MODRINTH_TOKEN secret and the MODRINTH_PROJECT_ID secret; without them this step does nothing.
+      # The modrinth tag. Needs the MODRINTH_TOKEN and MODRINTH_PROJECT_ID secrets; without them this step does nothing.
       - name: Publish to Modrinth
-        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && steps.tags.outputs.VERSION != '' && steps.tags.outputs.RELEASE == 'true'
+        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && steps.tags.outputs.MODRINTH == 'true'
         env:
           MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
           MODRINTH_PROJECT_ID: ${{ secrets.MODRINTH_PROJECT_ID }}
           VERSION: ${{ steps.tags.outputs.VERSION }}
         run: |
-          JAR="build/libs/repack-$VERSION.jar" NOTES="$RUNNER_TEMP/notes-modrinth.md" scripts/ci/modrinth.sh
+          # Without a version tag, the version in gradle.properties is published (a -SNAPSHOT one is a beta on Modrinth).
+          [ -n "$VERSION" ] || VERSION=$(grep -E '^version=' gradle.properties | head -1 | cut -d= -f2)
+          # With release, the release step already saved the description (without the commit list).
+          notes="$RUNNER_TEMP/notes-modrinth.md"
+          if [ ! -f "$notes" ]; then cp "$RUNNER_TEMP/notes.md" "$notes"; [ -s "$notes" ] || echo "Repack $VERSION" > "$notes"; fi
+          JAR="build/libs/repack-$VERSION.jar" NOTES="$notes" scripts/ci/modrinth.sh
 
       # version="X" without release: only moves the version in gradle.properties.
       - name: Set the version
