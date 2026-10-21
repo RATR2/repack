@@ -41,7 +41,7 @@ resource-pack:
   # A player who joins gets the newest build, even one that was never pushed. false: only the pack that was last pushed.
   join-latest-build: true
   # While a player's client reloads a pack you sent them (from "downloaded" until "loaded", at most 20 seconds) they are held: they cannot be
-  # hurt, move, attack or interact, see no other entities, and every block around them, air included, is shown as black concrete (except the two they stand in). It does not start
+  # hurt, move, attack or interact, see no other entities, and every block around them, air included, is shown as black concrete (except the blocks their body is in and the ones under their feet). It does not start
   # again for two minutes, and a client that fakes its status gains almost nothing.
   invulnerable-while-loading: true
   black-blocks-while-loading: true

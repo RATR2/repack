@@ -13,9 +13,10 @@ import org.bukkit.entity.Player
 import java.util.UUID
 
 /**
- * While a client reloads a resource pack, the blocks around the player look black to that player: every block in a cube around them,
- * air included, is shown as black concrete (packets only, the world is not touched) and put back to what it really is afterwards.
- * The two blocks the player stands in are left alone, so they are not inside a solid block.
+ * While a client reloads a resource pack, the blocks around the player look black to them: every block in a cube around them,
+ * air included, is shown as black concrete (packets only) and put back afterwards. The blocks the player's body is in, and
+ * those directly under it, are left alone (two or four columns on a block edge), since the client moves a player out of a solid
+ * block it only thinks is there, the server refuses, and they would be pulled back over and over.
  */
 class LoadingScreen(private val plugin: Repack) {
 
@@ -27,6 +28,7 @@ class LoadingScreen(private val plugin: Repack) {
         val radius = plugin.config.getInt("resource-pack.loading-radius", 8).coerceIn(1, MAX_RADIUS)
         val world = player.world
         val center = player.location
+        val clear = clearArea(player.boundingBox.minX, player.boundingBox.maxX, player.boundingBox.minY, player.boundingBox.maxY, player.boundingBox.minZ, player.boundingBox.maxZ)
         val found = ArrayList<IntArray>()
         // Chests, signs and the like lose their contents on the client when they are replaced, so they are sent again afterwards.
         val tiles = ArrayList<IntArray>()
@@ -34,7 +36,7 @@ class LoadingScreen(private val plugin: Repack) {
             for (z in center.blockZ - radius..center.blockZ + radius) {
                 if (!world.isChunkLoaded(x shr 4, z shr 4)) continue
                 for (y in maxOf(world.minHeight, center.blockY - radius)..minOf(world.maxHeight - 1, center.blockY + radius)) {
-                    if (x == center.blockX && z == center.blockZ && (y == center.blockY || y == center.blockY + 1)) continue
+                    if (x in clear.x && z in clear.z && y in clear.y) continue
                     val block = world.getBlockAt(x, y, z)
                     found += intArrayOf(x, y, z)
                     if (!block.type.isAir && block.getState(false) is TileState) tiles += intArrayOf(x, y, z)
@@ -80,14 +82,12 @@ class LoadingScreen(private val plugin: Repack) {
         }
     }
 
-    /** The columns and the heights that stay as they are: everything the body touches, with a little room round it, and the layer of blocks it stands on. */
     class ClearArea(val x: IntRange, val y: IntRange, val z: IntRange)
 
     companion object {
         /** How far past the body a block still counts: a player at the very edge of a block can be nudged by the next one. */
         private const val MARGIN = 0.12
 
-        /** The area to leave alone for a body in the box from ([minX], [minY], [minZ]) to ([maxX], [maxY], [maxZ]). */
         fun clearArea(minX: Double, maxX: Double, minY: Double, maxY: Double, minZ: Double, maxZ: Double) = ClearArea(
             Math.floor(minX - MARGIN).toInt()..Math.floor(maxX + MARGIN).toInt(),
             Math.floor(minY).toInt() - 1..Math.floor(maxY + MARGIN).toInt(),
