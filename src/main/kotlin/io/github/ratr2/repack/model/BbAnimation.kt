@@ -34,15 +34,18 @@ object AnimationSampler {
             else -> {
                 val left = 1 - (seconds - animation.length) / TWEEN_BACK
                 sample(animation, animation.length).mapValues { (_, t) ->
+                    // A turn of 360 degrees or more is the same pose as the one it ends at, so only what is left over is settled: otherwise the model spins back.
                     BoneTransform(
                         Vec3(t.position.x * left, t.position.y * left, t.position.z * left),
-                        Vec3(t.rotation.x * left, t.rotation.y * left, t.rotation.z * left),
+                        Vec3(wrap(t.rotation.x) * left, wrap(t.rotation.y) * left, wrap(t.rotation.z) * left),
                         Vec3(1 + (t.scale.x - 1) * left, 1 + (t.scale.y - 1) * left, 1 + (t.scale.z - 1) * left),
                     )
                 }
             }
         }
     }
+
+    private fun wrap(degrees: Double): Double = ((degrees + 180) % 360 + 360) % 360 - 180
 
     fun sample(animation: BbAnimation, time: Double): Map<String, BoneTransform> {
         val result = HashMap<String, BoneTransform>()

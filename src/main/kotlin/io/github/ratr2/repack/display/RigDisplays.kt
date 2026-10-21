@@ -24,6 +24,7 @@ import io.github.ratr2.repack.model.Vec3
 import io.github.ratr2.repack.text.Colors
 import io.github.retrooper.packetevents.util.SpigotReflectionUtil
 import org.bukkit.entity.Player
+import org.joml.Quaternionf
 import java.util.UUID
 
 /** How a rigged model is shown as a whole: moved and scaled as a block's or an entity's options say. offset is in blocks, in the model's own frame. */
@@ -106,7 +107,9 @@ object RigDisplays {
             (look.offset.z + look.scale.z * display.translation.z).toFloat(),
         )
         val scale = Vector3f((look.scale.x * display.scale.x).toFloat(), (look.scale.y * display.scale.y).toFloat(), (look.scale.z * display.scale.z).toFloat())
-        val r = display.rotation
+        // The game turns an item display's model half a turn before drawing it, so each bone's model is turned back; otherwise
+        // it would face south instead of north and animations would run toward the wrong side.
+        val r = Quaternionf(display.rotation).mul(Quaternionf().rotationY(Math.PI.toFloat()))
         return listOf(
             EntityData(TRANSLATION, EntityDataTypes.VECTOR3F, translation),
             EntityData(SCALE, EntityDataTypes.VECTOR3F, scale),
