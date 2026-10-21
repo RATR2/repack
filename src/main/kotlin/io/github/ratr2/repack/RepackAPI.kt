@@ -47,6 +47,15 @@ object RepackAPI {
         return id == null || found == id
     }
 
+    @JvmStatic
+    fun ripple(location: Location, rgb: Int, radius: Double, ticks: Int): Boolean = io.github.ratr2.repack.distortion.DistortionAPI.spawn(location, rgb, radius, ticks)
+
+    @JvmStatic
+    fun activeRipples(): Int = io.github.ratr2.repack.distortion.DistortionAPI.activeRipples()
+
+    @JvmStatic
+    fun maxRipples(): Int = io.github.ratr2.repack.distortion.DistortionAPI.maxRipples()
+
     /** The item that places the custom block id, or null for an unknown id. */
     @JvmStatic
     fun item(id: String, amount: Int): ItemStack? = onMain(null) { api -> api.blocks.definitionOf(id)?.let { api.items.create(it, amount) } }

@@ -37,10 +37,18 @@ resource-pack:
   loading-radius: 8
   # Kick players who decline the pack.
   required: false
-  prompt: "This server uses a resource pack for custom blocks."
+  prompt: "This server uses a resource pack for custom blocks and effects."
 
 # Tell players when their client version is too old for the blocks.
 client-notices: true
+
+# The console says so when the server runs a version older than 26.3, where the ripple effects need Fabulous! graphics. false: say nothing.
+recommend-latest: true
+
+# Distortion, now part of Repack: ripple effects anchored in the world, made by the pack's shaders. false: no shaders in the pack and no ripples.
+# Change it and restart the server; the pack changes at the next /repack build.
+distortion:
+  enabled: true
 
 workflow:
   # Rebuild the pack when a model or block file changes, a few seconds after the last save. This is silent: nobody online is sent anything.

@@ -8,37 +8,9 @@ import java.util.zip.ZipOutputStream
 
 object PackBuilder {
 
-    /** 1.21.4. */
-    private const val FIRST_FORMAT = 46
-
-    /** 1.21.7 and 1.21.8: the last formats that read `supported_formats` instead of `min_format` and `max_format`. */
-    private const val LAST_RANGE_FORMAT = 64
-
-    /** 1.21.9: the first format that reads `min_format` and `max_format`. */
-    private const val MODERN_FORMAT = 69
-
-    /** 26.3 (97.1), the newest format with the same item model layout. */
-    private const val NEWEST_MAJOR = 97
-    private const val NEWEST_MINOR = 1
-
-    fun meta(variant: PackVariant): ByteArray {
+    fun meta(era: PackEra): ByteArray {
         val pack = JsonObject()
-        when (variant) {
-            PackVariant.LEGACY -> {
-                pack.addProperty("pack_format", FIRST_FORMAT)
-                pack.add("supported_formats", JsonObject().apply {
-                    addProperty("min_inclusive", FIRST_FORMAT)
-                    addProperty("max_inclusive", LAST_RANGE_FORMAT)
-                })
-            }
-            PackVariant.MODERN -> {
-                pack.addProperty("min_format", MODERN_FORMAT)
-                pack.add("max_format", JsonArray().apply {
-                    add(NEWEST_MAJOR)
-                    add(NEWEST_MINOR)
-                })
-            }
-        }
+        era.putFormat(pack)
         pack.add("description", description())
         return JsonObject().apply { add("pack", pack) }.toString().toByteArray(Charsets.UTF_8)
     }
@@ -115,7 +87,7 @@ object PackBuilder {
             addProperty("color", "gold")
         })
         add(JsonObject().apply {
-            addProperty("text", "\nCustom blocks from Blockbench models")
+            addProperty("text", "\nCustom blocks and effects")
             addProperty("color", "gray")
         })
     }

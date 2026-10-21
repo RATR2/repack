@@ -9,7 +9,7 @@ import java.security.MessageDigest
 data class PackEntry(val sha1: String, val size: Int)
 
 /**
- * Keeps built packs under `packs/<sha1>.zip` and remembers, for each PackVariant, which one is built (the latest output of
+ * Keeps built packs under `packs/<sha1>.zip` and remembers, for each client era, which one is built (the latest output of
  * /repack build) and which is published (the one players are sent). Building never changes what players get; only publish does.
  */
 class PackStore(private val dataFolder: File) {
@@ -17,22 +17,22 @@ class PackStore(private val dataFolder: File) {
     private val dir = File(dataFolder, "packs").apply { mkdirs() }
     private val stateFile = File(dataFolder, "state.yml")
 
-    private val builtEntries = LinkedHashMap<PackVariant, PackEntry>()
-    private val publishedEntries = LinkedHashMap<PackVariant, PackEntry>()
+    private val builtEntries = LinkedHashMap<PackEra, PackEntry>()
+    private val publishedEntries = LinkedHashMap<PackEra, PackEntry>()
 
-    val built: Map<PackVariant, PackEntry> get() = builtEntries
-    val published: Map<PackVariant, PackEntry> get() = publishedEntries
+    val built: Map<PackEra, PackEntry> get() = builtEntries
+    val published: Map<PackEra, PackEntry> get() = publishedEntries
     val hasPublished: Boolean get() = publishedEntries.isNotEmpty()
 
     init {
         val state = YamlConfiguration.loadConfiguration(stateFile)
-        for (variant in PackVariant.entries) {
-            entryOf(state.getString("built.${variant.id}"))?.let { builtEntries[variant] = it }
-            entryOf(state.getString("published.${variant.id}"))?.let { publishedEntries[variant] = it }
+        for (era in PackEra.entries) {
+            entryOf(state.getString("built.${era.id}"))?.let { builtEntries[era] = it }
+            entryOf(state.getString("published.${era.id}"))?.let { publishedEntries[era] = it }
         }
     }
 
-    fun add(variant: PackVariant, zip: ByteArray): PackEntry {
+    fun add(variant: PackEra, zip: ByteArray): PackEntry {
         val sha1 = MessageDigest.getInstance("SHA-1").digest(zip).joinToString("") { "%02x".format(it) }
         val file = File(dir, "$sha1.zip")
         // A file of the wrong size is what a crash or a full disk leaves behind, and it would fail the client's hash check.

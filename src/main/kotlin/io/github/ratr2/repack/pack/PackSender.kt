@@ -25,6 +25,22 @@ class PackSender(
 
     private val id: UUID = UUID.nameUUIDFromBytes("repack-pack".toByteArray())
 
+    private val loaded = HashMap<UUID, PackEra>()
+
+    var onLoaded: (Player) -> Unit = {}
+    var onLost: (Player, Boolean) -> Unit = { _, _ -> }
+
+    fun hasLoaded(player: Player) = player.uniqueId in loaded
+
+    /** The era of the pack this player has loaded, or null when they have none. */
+    fun loadedEra(player: Player): PackEra? = loaded[player.uniqueId]
+
+    fun usesPostEffects(player: Player) = loaded[player.uniqueId]?.usesPostEffects == true
+
+    fun supportsPostEffects(player: Player) = variantOf(player)?.usesPostEffects == true
+
+    fun loadedPlayers(): List<Player> = loaded.keys.mapNotNull(plugin.server::getPlayer)
+
     init {
         host.offer(::joinOffer)
     }
@@ -90,9 +106,21 @@ class PackSender(
                 val sent = sentAt.remove(playerId)
                 if (sent != null && System.currentTimeMillis() - sent < SENT_VALID_MILLIS) hold.start(event.player)
             }
-            Status.SUCCESSFULLY_LOADED, Status.DECLINED, Status.FAILED_DOWNLOAD, Status.FAILED_RELOAD, Status.INVALID_URL, Status.DISCARDED -> {
+            Status.SUCCESSFULLY_LOADED -> {
                 sentAt.remove(playerId)
                 hold.end(playerId)
+                val era = variantOf(event.player)
+                if (era != null && loaded.put(playerId, era) == null) {
+                    onLoaded(event.player)
+                    if (!era.usesPostEffects && plugin.config.getBoolean("distortion.enabled", true)) {
+                        notice(event.player, "On your client version, distortion effects only show with Fabulous! graphics (Video Settings > Graphics).")
+                    }
+                }
+            }
+            Status.DECLINED, Status.FAILED_DOWNLOAD, Status.FAILED_RELOAD, Status.INVALID_URL, Status.DISCARDED -> {
+                sentAt.remove(playerId)
+                hold.end(playerId)
+                loaded.remove(playerId)?.let { onLost(event.player, it.usesPostEffects) }
             }
             else -> {}
         }
@@ -101,6 +129,7 @@ class PackSender(
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
         sentAt.remove(event.player.uniqueId)
+        loaded.remove(event.player.uniqueId)
     }
 
     private fun notice(player: Player, message: String) {

@@ -17,6 +17,7 @@ final class LegacySyntax {
 
         Skript.registerCondition(CondIsCustomBlock.class, CondIsCustomBlock.PATTERNS);
 
+        Skript.registerEffect(EffSpawnRipple.class, EffSpawnRipple.PATTERNS);
         Skript.registerEffect(EffPlaceCustomBlock.class, EffPlaceCustomBlock.PATTERNS);
         Skript.registerEffect(EffRemoveCustomBlock.class, EffRemoveCustomBlock.PATTERNS);
         Skript.registerEffect(EffRegisterCustomBlock.class, EffRegisterCustomBlock.PATTERNS);

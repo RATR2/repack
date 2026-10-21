@@ -5,7 +5,7 @@ main: io.github.ratr2.repack.Repack
 api-version: '1.21'
 load: POSTWORLD
 depend: [packetevents]
-softdepend: [WorldGuard, ViaVersion, ViaBackwards, Skript]
+softdepend: [WorldGuard, ViaVersion, ViaBackwards, Skript, distortion]
 
 # /repack itself is registered with Brigadier in Repack.onEnable.
 permissions:
@@ -14,4 +14,10 @@ permissions:
     default: op
   repack.settings:
     description: Allows editing the server settings in /repack.
+    default: op
+  distortion.spawn:
+    description: Allows /repack distortion spawn.
+    default: op
+  distortion.debug:
+    description: Allows /repack distortion debug.
     default: op

@@ -1,0 +1,15 @@
+{
+    "vertex": "minecraft:post/screenquad",
+    "fragment": "distortion:post/ripple",
+    "samplers": [
+        { "name": "InSampler" },
+        { "name": "MaskSampler" }
+    ],
+    "uniforms": [
+        { "name": "ProjMat", "type": "matrix4x4", "count": 16, "values": [ 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0 ] },
+        { "name": "OutSize", "type": "float", "count": 2, "values": [ 1.0, 1.0 ] },
+        { "name": "Width", "type": "float", "count": 1, "values": [ 0.7 ] },
+        { "name": "Strength", "type": "float", "count": 1, "values": [ 0.4 ] },
+        { "name": "Debug", "type": "float", "count": 1, "values": [ 0.0 ] }
+    ]
+}

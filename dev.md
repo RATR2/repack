@@ -33,6 +33,10 @@ command /table:
             send "You are looking at a table." to player
 ```
 
+### Ripples
+
+`RepackAPI.ripple(location, 0x55CCFF, 8.0, 40)` spawns a ripple (color, radius in blocks, ticks), `activeRipples()` and `maxRipples()` count them. In Skript: `spawn a ripple at player's location with color "55CCFF" radius 8 lasting 40 ticks`.
+
 ### Events
 
 `on custom block interact [of %strings%]` (or `click`) fires when a player clicks a custom block, with right or left click. Event values: `event-block`, `event-player`, `event-location`, `event-string` (the id).
@@ -182,9 +186,9 @@ Each line saves the block at once. A problem is written to the console as a warn
 
 The screens work without art. To give them custom backgrounds and icons, put PNG files in the plugin's resources and build:
 
-- **Backgrounds:** `src/main/resources/gui/screens/<screen>.png` for `list`, `models`, `overview`, `proxy`, `breaking`, `drops`, `rules`, `display`, `item` and `recipe`. They are 176 pixels wide and 168 (3 rows) or 222 (6 rows) high, and must keep **transparent holes** where the items are, because the picture is drawn above them. Unused chest slots should be covered by the picture.
+- **Backgrounds:** `src/main/resources/gui/screens/<screen>.png` for `list`, `models`, `overview`, `proxy`, `breaking`, `drops`, `rules`, `display`, `item` and `recipe`. They reach 8 pixels beyond the screen on the left, right and top, and 4 below the chest part, so they are 192 pixels wide and 180 (3 rows) or 234 (6 rows) high, and must keep **transparent holes** where the items are, because the picture is drawn above them. Unused chest slots should be covered by the picture.
 - **Icons:** `src/main/resources/gui/icons/<icon>.png`, 16x16, named as in the table below. A missing icon is the vanilla item named there. An icon can move: make the PNG a column of frames (16 wide and a multiple of 16 high) and add `<icon>.png.mcmeta` next to it with `{"animation": {"frametime": 4}}`, the same as any item texture.
-- The files go into Repack's pack by themselves. A background is the title of the chest screen in the font `repack:gui`, positioned with an ascent of 13 and a space glyph that shifts it 8 pixels left. If a picture sits a few pixels off in the game, that offset is the place to change (`GuiPack`).
+- The files go into Repack's pack by themselves. A background is the title of the chest screen in the font `repack:gui`, positioned with an ascent of 13 + 8 (`GuiAssets.PAD`) and a space glyph that shifts it 16 pixels left. If a picture sits a few pixels off in the game, that offset is the place to change (`GuiPack`).
 - Templates with the holes already cut, and numbered guides, are made by `.dev/tools/gui-templates.py` into `.dev/gui-templates/`.
 
 ### Icons the screens use

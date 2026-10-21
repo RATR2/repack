@@ -22,6 +22,8 @@ final class ModernSyntax {
         registry.register(SyntaxRegistry.CONDITION, SyntaxInfo.builder(CondIsCustomBlock.class)
                 .supplier(CondIsCustomBlock::new).addPatterns(CondIsCustomBlock.PATTERNS).build());
 
+        registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffSpawnRipple.class)
+                .supplier(EffSpawnRipple::new).addPatterns(EffSpawnRipple.PATTERNS).build());
         registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffPlaceCustomBlock.class)
                 .supplier(EffPlaceCustomBlock::new).addPatterns(EffPlaceCustomBlock.PATTERNS).build());
         registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffRemoveCustomBlock.class)

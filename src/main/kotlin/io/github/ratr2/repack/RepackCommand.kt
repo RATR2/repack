@@ -8,7 +8,7 @@ import com.mojang.brigadier.suggestion.Suggestions
 import com.mojang.brigadier.suggestion.SuggestionsBuilder
 import com.mojang.brigadier.tree.LiteralCommandNode
 import io.github.ratr2.repack.pack.PackEntry
-import io.github.ratr2.repack.pack.PackVariant
+import io.github.ratr2.repack.pack.PackEra
 import io.papermc.paper.command.brigadier.CommandSourceStack
 import io.papermc.paper.command.brigadier.Commands
 import io.papermc.paper.command.brigadier.argument.ArgumentTypes
@@ -119,6 +119,7 @@ class RepackCommand(private val plugin: Repack) {
                 .then(Commands.literal("host").executes { reload(it, blocks = false, config = false, host = true) })
                 .then(Commands.literal("all").executes { reloadPack(it, config = true, host = true) })
         )
+        .then(io.github.ratr2.repack.distortion.DistortionCommand(plugin).tree("distortion"))
         .build()
 
     private fun admin(name: String) = Commands.literal(name).requires { it.sender.hasPermission(ADMIN) }
@@ -184,7 +185,7 @@ class RepackCommand(private val plugin: Repack) {
 
     private fun status(context: CommandContext<CommandSourceStack>): Int {
         val store = plugin.store
-        for (variant in PackVariant.entries) {
+        for (variant in PackEra.entries) {
             val built = store.built[variant]
             val published = store.published[variant]
             val note = if (built != null && built != published) " (the built one has not been pushed yet)" else ""

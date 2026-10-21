@@ -1,6 +1,6 @@
 # Repack guide
 
-Repack turns Blockbench models into custom blocks on a Paper server. Players need no mod, only the resource pack Repack builds and sends. This guide is for server owners. For Skript and Java, see [dev.md](dev.md).
+Repack turns Blockbench models into custom blocks on a Paper server, and adds ripple effects anchored in the world (the plugin that used to be called Distortion). Players need no mod, only the resource pack Repack builds and sends. This guide is for server owners. For Skript and Java, see [dev.md](dev.md).
 
 ## What you need
 
@@ -60,7 +60,7 @@ If Distortion is installed too, both plugins send their packs in one request whe
 
 ## Commands
 
-All of them need `repack.admin` (given to operators by default). `/give` also works with Repack's ids.
+`/repack` alone opens the settings screens for everyone: personal settings, and for those with `repack.settings` the server settings. Every other command needs `repack.admin` (given to operators by default); `/repack distortion` needs `distortion.spawn` or `distortion.debug`. `/give` also works with Repack's ids.
 
 | Command | |
 |---|---|
@@ -74,6 +74,8 @@ All of them need `repack.admin` (given to operators by default). `/give` also wo
 | `/repack menu` | A screen with every block item. Click to take one, shift-click for 64. |
 | `/repack place <id> [pos]` and `/repack remove [pos]` | Place or remove a block without an item. |
 | `/repack list` | The ids that can be placed. |
+| `/repack distortion spawn <hex> <radius> <ticks> [pos]` | A ripple of that color growing to that radius in blocks over that many ticks. Also `/distortion ...`. |
+| `/repack distortion debug [on\|off]` | Shows outlines and the raw data of the ripples. 26.3 and newer clients only. |
 
 ## Block files
 
@@ -168,7 +170,7 @@ If Distortion (or another plugin that uses the same scheme) is installed, the fi
 | `create-block-files` | `true` | Write `blocks/<id>.yml` for every model that has none. |
 | `messages.no-permission` | text | Sent when a protection plugin says no. Empty for no message. |
 | `resource-pack.public-host` / `port` / `bind` | empty / `8086` / `0.0.0.0` | Where the pack server listens and what players are told. |
-| `resource-pack.share-host` | `true` | Share one pack server with Distortion. |
+| `resource-pack.share-host` | `true` | Share the pack server with other plugins that use the same scheme. |
 | `resource-pack.join-delay-ticks` | `40` | Wait after a player joins before sending the pack. |
 | `resource-pack.join-latest-build` | `true` | Joiners get the newest build. `false`: only the pack last pushed. |
 | `resource-pack.invulnerable-while-loading` | `true` | Players are held (safe, still, no entities visible) while a pack loads. |
@@ -177,10 +179,16 @@ If Distortion (or another plugin that uses the same scheme) is installed, the fi
 | `resource-pack.send-gap-ticks` | `20` | Minimum time between packs from different plugins to one player. |
 | `resource-pack.required` / `prompt` | `false` / text | Kick players who decline, and the text of the prompt. |
 | `client-notices` | `true` | Tell players their client is too old. |
+| `recommend-latest` | `true` | The console recommends 26.3+ when the server runs something older. |
+| `distortion.enabled` | `true` | The ripple effects: their shaders go into the pack and the effects are available. Needs a restart. |
 | `workflow.*` | see above | Automatic rebuilding and the progress bar. |
 | `gui.textures` | `true` | Use the pictures for the builder screens when there are any. |
 
 Every settings file starts with `config-version` and a note not to edit it. When a new Repack version changes the shipped `config.yml` or the block template, the file is updated on the next start: new options are added, your values and comments are kept, and the old file is saved as `<name>.bak-<version>` if anything besides the version changed.
+
+## Ripple effects
+
+Repack includes Distortion: a ripple spawned at a spot in the world distorts the screen of players who have the pack, in the color and size you give. From 26.3 on it works with any graphics setting; on 1.21.4 to 26.2 players see it only with Fabulous! graphics. Spawn one with `/repack distortion spawn 55CCFF 8 40` (color, radius in blocks, ticks), from Skript with `spawn a ripple at ...`, or from Java with `RepackAPI.ripple`. Up to 256 ripples show at once. The pack has one build per client version, because the shaders differ in every game version. If the old Distortion plugin is still installed, Repack says so and keeps its own ripples off until you remove it.
 
 ## Troubleshooting
 

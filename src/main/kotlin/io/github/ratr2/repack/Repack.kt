@@ -20,7 +20,8 @@ import io.github.ratr2.repack.model.ModelCache
 import io.github.ratr2.repack.model.ModelLibrary
 import io.github.ratr2.repack.pack.LoadingHold
 import io.github.ratr2.repack.pack.PackBuilder
-import io.github.ratr2.repack.pack.PackVariant
+import io.github.ratr2.repack.pack.EraAssets
+import io.github.ratr2.repack.pack.PackEra
 import io.github.ratr2.repack.pack.PackEntry
 import io.github.ratr2.repack.pack.PackSender
 import io.github.ratr2.repack.pack.SharedHost
@@ -55,6 +56,8 @@ class Repack : JavaPlugin() {
         private set
     lateinit var menu: BlockMenu
         private set
+    var ripples: io.github.ratr2.repack.distortion.RippleManager? = null
+        private set
     val players: PlayerSettings by lazy { PlayerSettings(this) }
     private lateinit var display: DisplayManager
 
@@ -71,6 +74,8 @@ class Repack : JavaPlugin() {
         if (versions.hasViaBackwards) logger.warning("ViaBackwards found: clients older than 1.21.4 will not be able to see Repack blocks.")
         server.pluginManager.registerEvents(sender, this)
         server.pluginManager.registerEvents(hold, this)
+        startRipples()
+        serverVersionNotice()
         gui = Gui(this)
         server.pluginManager.registerEvents(gui, this)
 
@@ -107,11 +112,14 @@ class Repack : JavaPlugin() {
         val command = RepackCommand(this)
         lifecycleManager.registerEventHandler(LifecycleEvents.COMMANDS) { event ->
             event.registrar().register(command.node(), "Build and push the custom block resource pack")
+            event.registrar().register(io.github.ratr2.repack.distortion.DistortionCommand(this).tree("distortion").build(), "Spawn and debug distortion ripples")
         }
     }
 
     override fun onDisable() {
         RepackAPI.plugin = null
+        io.github.ratr2.repack.distortion.DistortionAPI.manager = null
+        ripples?.clear()
         recipeKeys.values.forEach { server.removeRecipe(it) }
         if (::hold.isInitialized) hold.endAll()
         if (::host.isInitialized) host.stop()
@@ -124,34 +132,11 @@ class Repack : JavaPlugin() {
             return
         }
         val manager = io.github.ratr2.repack.distortion.RippleManager(this, sender)
-        val shakes = io.github.ratr2.repack.distortion.ShakeManager(this, sender)
         sender.onLoaded = manager::onPackLoaded
-        sender.onLost = { player, usedPostEffects ->
-            manager.onPackLost(player, usedPostEffects)
-            shakes.onPackLost(player)
-        }
+        sender.onLost = manager::onPackLost
         server.pluginManager.registerEvents(manager, this)
-        server.pluginManager.registerEvents(shakes, this)
         io.github.ratr2.repack.distortion.DistortionAPI.manager = manager
-        io.github.ratr2.repack.distortion.DistortionAPI.shakes = shakes
         ripples = manager
-        this.shakes = shakes
-    }
-
-    private fun startSkyboxes() {
-        val manager = io.github.ratr2.repack.sky.SkyboxManager(this, sender)
-        val loaded = sender.onLoaded
-        val lost = sender.onLost
-        sender.onLoaded = { player ->
-            loaded(player)
-            manager.onPackLoaded(player)
-        }
-        sender.onLost = { player, usedPostEffects ->
-            lost(player, usedPostEffects)
-            manager.onPackLost(player)
-        }
-        server.pluginManager.registerEvents(manager, this)
-        skyboxes = manager
     }
 
     private fun serverVersionNotice() {
@@ -434,7 +419,7 @@ class Repack : JavaPlugin() {
         val cache = ModelCache(File(dataFolder, "cache/models"), description.version)
         server.scheduler.runTaskAsynchronously(this, Runnable {
             var library: LibraryResult? = null
-            var zips: Map<PackVariant, ByteArray>? = null
+            var zips: Map<PackEra, ByteArray>? = null
             var failure: String? = null
             try {
                 library = ModelLibrary.build(folder, cache, fresh) { done, total ->
@@ -442,11 +427,13 @@ class Repack : JavaPlugin() {
                 }
                 // A model that failed to convert is missing from the pack, so a pack built around it could replace a working one.
                 if (library.errors.isEmpty() || force) {
-                    zips = PackVariant.entries.associateWith { variant ->
-                        progress.update(PARSE_SHARE + (ZIP_SHARE - PARSE_SHARE) * variant.ordinal / PackVariant.entries.size, "zipping the ${variant.id} pack")
-                        val files = HashMap(library.files.getValue(variant))
+                    val ripples = config.getBoolean("distortion.enabled", true)
+                    zips = PackEra.entries.associateWith { era ->
+                        progress.update(PARSE_SHARE + (ZIP_SHARE - PARSE_SHARE) * era.ordinal / PackEra.entries.size, "zipping the ${era.id} pack")
+                        val files = HashMap(library.files.getValue(era.family))
                         files.putAll(GuiPack.files())
-                        files["pack.mcmeta"] = PackBuilder.meta(variant)
+                        if (ripples) files.putAll(EraAssets.files(file, era))
+                        files["pack.mcmeta"] = PackBuilder.meta(era)
                         files["pack.png"] = PackBuilder.icon()
                         PackBuilder.zip(files)
                     }
@@ -471,8 +458,8 @@ class Repack : JavaPlugin() {
                     done(BuildReport(emptyMap(), library.models, library.warnings, library.errors + definitionErrors, rejected = true))
                     return@Runnable
                 }
-                val entries = LinkedHashMap<PackVariant, PackEntry>()
-                for ((variant, zip) in zips) entries[variant] = store.add(variant, zip)
+                val entries = LinkedHashMap<PackEra, PackEntry>()
+                for ((era, zip) in zips) entries[era] = store.add(era, zip)
                 progress.finish(true, "pack built")
                 done(BuildReport(entries, library.models, library.warnings, library.errors + definitionErrors))
             })
@@ -493,7 +480,7 @@ private const val PARSE_SHARE = 0.7f
 private const val ZIP_SHARE = 0.95f
 
 class BuildReport(
-    val entries: Map<PackVariant, PackEntry>,
+    val entries: Map<PackEra, PackEntry>,
     val models: List<String>,
     val warnings: List<String>,
     val errors: List<String>,

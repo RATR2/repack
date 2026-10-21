@@ -1,0 +1,13 @@
+{
+    "providers": [
+        {
+            "type": "bitmap",
+            "file": "distortion:font/marker.png",
+            "ascent": 8,
+            "height": 16,
+            "chars": [
+                "\udbcd\uddcf"
+            ]
+        }
+    ]
+}
