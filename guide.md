@@ -1,6 +1,6 @@
 # Repack guide
 
-Repack turns Blockbench models into custom blocks on a Paper server, and adds ripple effects anchored in the world (the plugin that used to be called Distortion). Players need no mod, only the resource pack Repack builds and sends. This guide is for server owners. For Skript and Java, see [dev.md](dev.md).
+Repack adds visual effects (ripples, screen shake, skyboxes, animated text) and Blockbench-made custom blocks and items to a Paper server. Players need no mod, only the resource pack Repack builds and sends. This guide is for server owners. For Skript and Java, see [dev.md](dev.md).
 
 ## What you need
 
@@ -223,7 +223,7 @@ Nametags and other see-through text are not animated.
 
 ## Ripple effects
 
-Repack includes Distortion: a ripple spawned at a spot in the world distorts the screen of players who have the pack, in the color and size you give. From 26.3 on it works with any graphics setting; on 1.21.4 to 26.2 players see it only with Fabulous! graphics. Spawn one with `/repack distortion spawn 55CCFF 8 40` (color, radius in blocks, ticks), from Skript with `spawn a ripple at ...`, or from Java with `RepackAPI.ripple`. Up to 256 ripples show at once. The pack has one build per client version, because the shaders differ in every game version. If the old Distortion plugin is still installed, Repack says so and keeps its own ripples off until you remove it.
+A ripple spawned at a spot in the world distorts the screen of players who have the pack, in the color and size you give. From 26.3 on it works with any graphics setting; on 1.21.4 to 26.2 players see it only with Fabulous! graphics. Spawn one with `/repack distortion spawn 55CCFF 8 40` (color, radius in blocks, ticks), from Skript with `spawn a ripple at ...`, or from Java with `RepackAPI.ripple`. Up to 256 ripples show at once. The pack has one build per client version, because the shaders differ in every game version. If a separate Distortion plugin is installed, Repack says so and keeps its own ripples off until you remove it.
 
 ## Screen shake
 

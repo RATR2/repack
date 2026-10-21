@@ -234,3 +234,23 @@ The vanilla "Inventory" label is still drawn over the picture, since the game dr
 ## Pack hosting for other plugins
 
 A plugin that sends its own server resource pack can share Repack's web server and the single join prompt. Repack and Distortion do this through a Bukkit service of type `java.util.Map` made only of JDK types, because each plugin has its own copy of every class. The protocol is in `SharedHost.kt` (identical in both plugins, apart from the package line): a plugin registers a name for its files and an offer function for joining players, and the plugin that started first hosts for all of them.
+
+## Releasing
+
+Every push builds and tests the plugin, and the jar is kept as a workflow artifact. A release is made by a commit on `main` whose message has tags on lines of their own (a word inside a sentence does nothing):
+
+```
+add the shelf display setting
+
+tags:
+version="0.1.0"
+release
+```
+
+| Tag | |
+|---|---|
+| `version="0.1.0"` | The version. On its own it only sets `version` in `gradle.properties`. A suffix such as `0.2.0-beta.1` makes the release a pre-release. |
+| `release` | Builds that version, tags the commit `0.1.0` and publishes a GitHub release with `repack-0.1.0.jar`. The release description is the commit message without the tags. The same jar goes to Modrinth when the `MODRINTH_TOKEN` and `MODRINTH_PROJECT_ID` repository secrets are set (see `scripts/ci/modrinth.sh`). |
+| `next="0.2.0"` | What to continue with afterwards. Without it the next patch number is used. |
+
+After a release the workflow commits `bump version to 0.1.1-SNAPSHOT [skip ci]` (or `0.2.0-SNAPSHOT` with `next`), which does not start another run. The tagged commit itself still says `-SNAPSHOT` in `gradle.properties`; the jar is built with the released version.
