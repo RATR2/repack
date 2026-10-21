@@ -35,8 +35,7 @@ object BlockDefinitions {
 
     private val ID = Regex("[a-z0-9_-]+")
 
-    /** Reads every block file, or just the ids in only. */
-    fun load(blocksFolder: File, modelIds: Set<String>, only: Set<String>? = null): LoadedDefinitions {
+    fun load(blocksFolder: File, modelIds: Set<String>, only: Set<String>? = null, itemOnly: Set<String> = emptySet(), implicit: Boolean = true): LoadedDefinitions {
         val definitions = LinkedHashMap<String, BlockDefinition>()
         val errors = ArrayList<String>()
 
@@ -69,7 +68,7 @@ object BlockDefinitions {
         }
         for (model in modelIds.sorted()) {
             if (only != null && model !in only) continue
-            if (model !in definitions && files.none { it.nameWithoutExtension.lowercase() == model }) {
+            if (model !in itemOnly && model !in definitions && files.none { it.nameWithoutExtension.lowercase() == model }) {
                 definitions[model] = parse(model, YamlConfiguration())
             }
         }
@@ -140,6 +139,7 @@ object BlockDefinitions {
                 glint = item?.getBoolean("glint", false) ?: false,
                 model = item?.getString("model")?.let(ModelLibrary::cleanId),
                 stack = item?.getString("stack")?.let { bytesOf(it, "item.stack") },
+                registered = item?.getString("registered")?.takeIf { it.isNotBlank() },
                 overrideModel = item?.getBoolean("override-model", true) ?: true,
             ),
             recipe = recipeOf(section.getConfigurationSection("recipe"), materials),

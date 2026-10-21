@@ -6,7 +6,7 @@ import java.util.jar.JarFile
 /** The shader files of each era, embedded in the jar under `packs/<era id>/`. Their pack.mcmeta and pack.png are not used: the pack makes its own. */
 object EraAssets {
 
-    fun files(jar: File, era: PackEra): Map<String, ByteArray> {
+    fun files(jar: File, era: PackEra, effects: TextEffects.Snippet? = null): Map<String, ByteArray> {
         val prefix = "packs/${era.id}/"
         val files = HashMap<String, ByteArray>()
         JarFile(jar).use { jarFile ->
@@ -15,6 +15,12 @@ object EraAssets {
                 val path = entry.name.removePrefix(prefix)
                 if (path == "pack.mcmeta" || path == "pack.png") continue
                 files[path] = jarFile.getInputStream(entry).use { it.readBytes() }
+            }
+        }
+        if (effects != null && TextEffects.supports(era)) {
+            for (path in listOf("assets/minecraft/shaders/core/rendertype_text.vsh", "assets/minecraft/shaders/core/text.vsh")) {
+                val shader = files[path] ?: continue
+                files[path] = (TextEffects.inject(String(shader, Charsets.UTF_8), effects) ?: throw IllegalStateException("The r4tshader effects do not fit the ${era.id} text shader.")).toByteArray(Charsets.UTF_8)
             }
         }
         check(files.isNotEmpty()) { "No pack files under $prefix in the plugin jar" }

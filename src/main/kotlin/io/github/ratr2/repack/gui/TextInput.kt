@@ -1,7 +1,6 @@
 package io.github.ratr2.repack.gui
 
-import net.kyori.adventure.text.Component
-import net.kyori.adventure.text.format.TextDecoration
+import io.github.ratr2.repack.text.Colors
 import org.bukkit.Material
 import org.bukkit.entity.Player
 import org.bukkit.event.inventory.PrepareAnvilEvent
@@ -9,8 +8,9 @@ import org.bukkit.inventory.ItemStack
 import org.bukkit.inventory.view.AnvilView
 
 /**
- * Asks for a line of text with a vanilla anvil: type in the name field, then take the result. Nothing is charged and nothing is
- * given, the paper in the first slot only carries the text.
+ * Asks for a line of text with a vanilla anvil: type in the name field, then take the result. Nothing is charged; the paper in
+ * the first slot only carries the text and is emptied before the anvil closes. `&c`, `&#rrggbb` and `<#rrggbb>` codes show as
+ * typed.
  */
 class TextInput(
     private val gui: Gui,
@@ -29,7 +29,7 @@ class TextInput(
     }
 
     private fun paper(text: String) = ItemStack(Material.PAPER).also {
-        it.editMeta { meta -> meta.displayName(Component.text(text).decoration(TextDecoration.ITALIC, false)) }
+        it.editMeta { meta -> meta.displayName(Colors.plain(text)) }
     }
 
     fun prepare(event: PrepareAnvilEvent) {
@@ -44,6 +44,7 @@ class TextInput(
         val text = view?.renameText?.trim().orEmpty().ifEmpty { initial }
         done = true
         gui.finishInput(player)
+        view?.topInventory?.clear()
         player.closeInventory()
         gui.plugin.server.scheduler.runTask(gui.plugin, Runnable { accept(text) })
     }

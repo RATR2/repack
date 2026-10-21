@@ -16,7 +16,6 @@ import org.bukkit.inventory.Inventory
 import org.bukkit.inventory.InventoryHolder
 import org.bukkit.inventory.ItemStack
 
-/** `/repack menu`: every custom block item in a chest screen. Click one to take it (shift-click for a full stack). */
 class BlockMenu(private val plugin: Repack) : Listener {
 
     private class Holder(val page: Int) : InventoryHolder {
@@ -25,15 +24,14 @@ class BlockMenu(private val plugin: Repack) : Listener {
     }
 
     fun open(player: Player, page: Int = 0) {
-        val ids = plugin.blocks.types.sorted()
+        val ids = plugin.giveIds()
         val pages = maxOf(1, (ids.size + PER_PAGE - 1) / PER_PAGE)
         val current = page.coerceIn(0, pages - 1)
         val holder = Holder(current)
-        val view = Bukkit.createInventory(holder, SIZE, Component.text("Custom blocks (${current + 1}/$pages)"))
+        val view = Bukkit.createInventory(holder, SIZE, Component.text("Custom blocks and items (${current + 1}/$pages)"))
         holder.view = view
         ids.drop(current * PER_PAGE).take(PER_PAGE).forEachIndexed { slot, id ->
-            val definition = plugin.blocks.definitionOf(id) ?: return@forEachIndexed
-            val icon = plugin.items.create(definition)
+            val icon = plugin.stackFor(id) ?: return@forEachIndexed
             icon.editMeta { meta ->
                 val lore = meta.lore()?.toMutableList() ?: mutableListOf()
                 lore += Component.empty()
@@ -64,10 +62,9 @@ class BlockMenu(private val plugin: Repack) : Listener {
             NEXT -> if (event.currentItem != null) open(player, holder.page + 1)
             else -> {
                 if (slot >= PER_PAGE) return
-                val id = plugin.items.idOf(event.currentItem) ?: return
-                val definition = plugin.blocks.definitionOf(id) ?: return
+                val id = plugin.items.idOf(event.currentItem) ?: plugin.customItems.idOf(event.currentItem) ?: return
                 val amount = if (event.click == ClickType.SHIFT_LEFT || event.click == ClickType.SHIFT_RIGHT) 64 else 1
-                player.inventory.addItem(plugin.items.create(definition, amount)).values.forEach { player.world.dropItemNaturally(player.location, it) }
+                player.inventory.addItem(plugin.stackFor(id, amount) ?: return).values.forEach { player.world.dropItemNaturally(player.location, it) }
             }
         }
     }

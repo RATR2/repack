@@ -96,7 +96,7 @@ class RepackCommand(private val plugin: Repack) {
         .then(
             admin("give").then(
                 Commands.argument("id", StringArgumentType.word())
-                    .suggests(::suggestIds)
+                    .suggests(::suggestGiveIds)
                     .executes { give(it, 1, listOfNotNull(it.source.sender as? Player)) }
                     .then(
                         Commands.argument("amount", IntegerArgumentType.integer(1, 64))
@@ -140,6 +140,12 @@ class RepackCommand(private val plugin: Repack) {
     private fun suggestIds(context: CommandContext<CommandSourceStack>, builder: SuggestionsBuilder): CompletableFuture<Suggestions> {
         val typed = builder.remainingLowerCase
         plugin.blocks.types.sorted().filter { it.startsWith(typed) }.forEach(builder::suggest)
+        return builder.buildFuture()
+    }
+
+    private fun suggestGiveIds(context: CommandContext<CommandSourceStack>, builder: SuggestionsBuilder): CompletableFuture<Suggestions> {
+        val typed = builder.remainingLowerCase
+        plugin.giveIds().filter { it.startsWith(typed) }.forEach(builder::suggest)
         return builder.buildFuture()
     }
 
@@ -219,10 +225,13 @@ class RepackCommand(private val plugin: Repack) {
     private fun list(context: CommandContext<CommandSourceStack>): Int {
         plugin.refreshIfChanged()
         val ids = plugin.blocks.types.sorted()
+        val itemIds = plugin.customItems.ids.sorted()
+        if (itemIds.isNotEmpty()) reply(context, "Items: ${itemIds.joinToString(", ")}", NamedTextColor.AQUA)
         if (ids.isNotEmpty()) {
-            reply(context, ids.joinToString(", "), NamedTextColor.YELLOW)
+            reply(context, (if (itemIds.isEmpty()) "" else "Blocks: ") + ids.joinToString(", "), NamedTextColor.YELLOW)
             return Command.SINGLE_SUCCESS
         }
+        if (itemIds.isNotEmpty()) return Command.SINGLE_SUCCESS
         val others = plugin.modelsFolder.listFiles { f -> f.isFile }.orEmpty().map { it.name }
         val hint = if (others.isEmpty()) "Put .bbmodel files in plugins/Repack/models." else "Found ${others.take(3).joinToString()} there, but only .bbmodel files count, directly in that folder."
         reply(context, "No models yet. $hint", NamedTextColor.YELLOW)
@@ -231,9 +240,8 @@ class RepackCommand(private val plugin: Repack) {
 
     private fun give(context: CommandContext<CommandSourceStack>, amount: Int, targets: List<Player>): Int {
         val id = StringArgumentType.getString(context, "id")
-        val definition = plugin.blocks.definitionOf(id)
-        if (definition == null) {
-            reply(context, "There is no block with the id '$id'.", NamedTextColor.RED)
+        if (plugin.stackFor(id) == null) {
+            reply(context, "There is no block or item with the id '$id'.", NamedTextColor.RED)
             return 0
         }
         if (targets.isEmpty()) {
@@ -241,7 +249,7 @@ class RepackCommand(private val plugin: Repack) {
             return 0
         }
         targets.forEach { player ->
-            val left = player.inventory.addItem(plugin.items.create(definition, amount))
+            val left = player.inventory.addItem(plugin.stackFor(id, amount)!!)
             left.values.forEach { player.world.dropItemNaturally(player.location, it) }
         }
         reply(context, "Gave $amount x $id to ${targets.size} player(s).", NamedTextColor.GREEN)

@@ -102,6 +102,7 @@ class ItemOptions(
     val model: String? = null,
     val stack: ByteArray? = null,
     val overrideModel: Boolean = true,
+    val registered: String? = null,
 ) {
     val base: Material by lazy { Material.matchMaterial(baseName)!! }
 }

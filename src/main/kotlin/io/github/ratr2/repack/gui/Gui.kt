@@ -33,6 +33,26 @@ class Gui(val plugin: Repack) : Listener {
     /** Players in the middle of moving from one screen to the next, whose old screen closing is not them leaving. */
     private val navigating = HashSet<UUID>()
 
+    val itemEditor get() = plugin.itemEditor
+
+    private val itemDrafts = HashMap<UUID, MutableMap<String, io.github.ratr2.repack.edit.ItemDraft>>()
+
+    fun itemDraftOf(player: Player, id: String): io.github.ratr2.repack.edit.ItemDraft? {
+        val mine = itemDrafts.getOrPut(player.uniqueId) { HashMap() }
+        mine[id]?.let { return it }
+        val fresh = itemEditor.open(id) ?: return null
+        mine[id] = fresh
+        return fresh
+    }
+
+    fun adoptItem(player: Player, draft: io.github.ratr2.repack.edit.ItemDraft) {
+        itemDrafts.getOrPut(player.uniqueId) { HashMap() }[draft.id] = draft
+    }
+
+    fun discardItem(player: Player, id: String) {
+        itemDrafts[player.uniqueId]?.remove(id)
+    }
+
     private val inputs = HashMap<UUID, TextInput>()
 
     val textures: Boolean get() = plugin.config.getBoolean("gui.textures", true)
@@ -119,13 +139,17 @@ class Gui(val plugin: Repack) : Listener {
         val player = event.player as? Player ?: return
         val holder = event.inventory.holder
         if (player.uniqueId in navigating) return
-        if (event.inventory.type == InventoryType.ANVIL) inputs.remove(player.uniqueId)?.closed()
+        if (event.inventory.type == InventoryType.ANVIL) inputs.remove(player.uniqueId)?.let {
+            event.inventory.clear()
+            it.closed()
+        }
         if (holder is Screen) holder.onClose()
     }
 
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
         drafts.remove(event.player.uniqueId)
+        itemDrafts.remove(event.player.uniqueId)
         inputs.remove(event.player.uniqueId)
     }
 

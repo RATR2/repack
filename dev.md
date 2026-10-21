@@ -33,6 +33,10 @@ command /table:
             send "You are looking at a table." to player
 ```
 
+### Items
+
+`RepackAPI.item(id, amount)` gives the stack for a block or custom item id. `itemIds()`, `itemIdOf(stack)`, `registerItem(id, "EMERALD", model)` and `unregisterItem(id)` (until the next reload), and `createItem(id)` / `editItem(id)` return an `ItemBuilder`: chain `base`, `model`, `name`, `lore`, `glint`, `exact`, `components`, then `save()`, which writes `items/<id>.yml`. In Skript: `custom item "ruby"`, with `x 3` for a count.
+
 ### Ripples
 
 `RepackAPI.ripple(location, 0x55CCFF, 8.0, 40)` spawns a ripple (color, radius in blocks, ticks), `activeRipples()` and `maxRipples()` count them. In Skript: `spawn a ripple at player's location with color "55CCFF" radius 8 lasting 40 ticks`.

@@ -56,9 +56,8 @@ object RepackAPI {
     @JvmStatic
     fun maxRipples(): Int = io.github.ratr2.repack.distortion.DistortionAPI.maxRipples()
 
-    /** The item that places the custom block id, or null for an unknown id. */
     @JvmStatic
-    fun item(id: String, amount: Int): ItemStack? = onMain(null) { api -> api.blocks.definitionOf(id)?.let { api.items.create(it, amount) } }
+    fun item(id: String, amount: Int): ItemStack? = onMain(null) { api -> api.stackFor(id, amount) }
 
     @JvmStatic
     fun register(id: String, model: String): String? = onMain("Repack is not running.") { it.registerBlock(id, model) }
@@ -85,4 +84,30 @@ object RepackAPI {
 
     @JvmStatic
     fun ids(): Set<String> = onMain(emptySet()) { it.blocks.types.toSet() }
+
+    @JvmStatic
+    fun itemIds(): Set<String> = onMain(emptySet()) { it.customItems.ids.toSet() }
+
+    @JvmStatic
+    fun itemIdOf(stack: ItemStack?): String? = onMain(null) { it.customItems.idOf(stack) }
+
+    @JvmStatic
+    fun registerItem(id: String, base: String, model: String?): String? = onMain("Repack is not running.") { it.registerItem(id, base, model) }
+
+    @JvmStatic
+    fun unregisterItem(id: String): Boolean = onMain(false) { it.unregisterItem(id) }
+
+    @JvmStatic
+    fun editItem(id: String): io.github.ratr2.repack.edit.ItemBuilder = onMain(io.github.ratr2.repack.edit.ItemBuilder(null, "Repack is not running.")) { api ->
+        val draft = api.itemEditor.open(id)
+        io.github.ratr2.repack.edit.ItemBuilder(draft, if (draft == null) "There is no item '$id'." else null)
+    }
+
+    @JvmStatic
+    fun createItem(id: String): io.github.ratr2.repack.edit.ItemBuilder = onMain(io.github.ratr2.repack.edit.ItemBuilder(null, "Repack is not running.")) { api ->
+        api.itemEditor.create(id).fold(
+            onSuccess = { io.github.ratr2.repack.edit.ItemBuilder(it, null) },
+            onFailure = { io.github.ratr2.repack.edit.ItemBuilder(null, it.message ?: "Could not make the item.") },
+        )
+    }
 }

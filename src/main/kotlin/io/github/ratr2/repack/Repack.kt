@@ -21,6 +21,7 @@ import io.github.ratr2.repack.model.ModelLibrary
 import io.github.ratr2.repack.pack.LoadingHold
 import io.github.ratr2.repack.pack.PackBuilder
 import io.github.ratr2.repack.pack.EraAssets
+import io.github.ratr2.repack.pack.TextEffects
 import io.github.ratr2.repack.pack.PackEra
 import io.github.ratr2.repack.pack.PackEntry
 import io.github.ratr2.repack.pack.PackSender
@@ -52,6 +53,9 @@ class Repack : JavaPlugin() {
         private set
     lateinit var items: BlockItems
         private set
+    lateinit var customItems: io.github.ratr2.repack.item.CustomItems
+        private set
+    val itemEditor: io.github.ratr2.repack.edit.ItemEditor by lazy { io.github.ratr2.repack.edit.ItemEditor(this) }
     lateinit var host: SharedHost
         private set
     lateinit var menu: BlockMenu
@@ -76,11 +80,13 @@ class Repack : JavaPlugin() {
         server.pluginManager.registerEvents(hold, this)
         startRipples()
         serverVersionNotice()
+        io.github.ratr2.repack.text.Colors.effects = TextEffects.rules(config.getConfigurationSection("text-effects")).first.associate { it.name to it.triggerHex }
         gui = Gui(this)
         server.pluginManager.registerEvents(gui, this)
 
         blocks = PlacedBlocks(this)
         items = BlockItems(this)
+        customItems = io.github.ratr2.repack.item.CustomItems(this)
         display = DisplayManager(blocks)
         display.hidden = hold::isHeld
         blocks.listeners += display
@@ -168,7 +174,7 @@ class Repack : JavaPlugin() {
 
     private fun stamp(): Map<String, String> {
         val stamps = HashMap<String, String>()
-        for (folder in listOf(modelsFolder, blocksFolder)) {
+        for (folder in listOf(modelsFolder, blocksFolder, itemsFolder)) {
             for (file in folder.listFiles { f -> f.isFile && !f.name.startsWith("_") }.orEmpty()) {
                 stamps["${folder.name}/${file.name}"] = "${file.length()}:${file.lastModified()}"
             }
@@ -220,6 +226,7 @@ class Repack : JavaPlugin() {
         if (server.pluginManager.isPluginEnabled(this)) server.onlinePlayers.forEach { it.updateCommands() }
     }
 
+    /** Models that items use: they do not turn into blocks of their own. */
     private fun modelsInUse(): Set<String> = fileItems.values.mapNotNullTo(HashSet()) { it.model }
 
     fun registerItem(id: String, base: String, model: String?): String? {
@@ -260,9 +267,10 @@ class Repack : JavaPlugin() {
     /** Writes `blocks/<id>.yml`, with every option at its default, for each model that has no settings file yet. */
     private fun createMissingBlockFiles() {
         if (!config.getBoolean("create-block-files", true)) return
+        val itemOnly = fileItems.values.mapNotNullTo(HashSet()) { it.model }
         for (id in ModelLibrary.ids(modelsFolder).sorted()) {
             val file = File(blocksFolder, "$id.yml")
-            if (file.exists()) continue
+            if (file.exists() || id in itemOnly) continue
             file.writeText(BlockTemplate.render(id))
             logger.info("Created blocks/$id.yml: edit it to change how the block behaves.")
         }
@@ -281,9 +289,10 @@ class Repack : JavaPlugin() {
     }
 
     fun reloadDefinitions(only: Set<String>? = null): List<String> {
+        val itemErrors = reloadItems()
         migrateBlockFiles()
         createMissingBlockFiles()
-        val loaded = BlockDefinitions.load(blocksFolder, ModelLibrary.ids(modelsFolder), only)
+        val loaded = BlockDefinitions.load(blocksFolder, ModelLibrary.ids(modelsFolder), only, fileItems.values.mapNotNullTo(HashSet()) { it.model })
         loaded.errors.forEach { logger.severe(it) }
         if (only == null) {
             fileDefinitions = loaded.definitions
@@ -295,7 +304,7 @@ class Repack : JavaPlugin() {
             unregistered.removeAll(only)
         }
         applyDefinitions(only)
-        return loaded.errors
+        return loaded.errors + itemErrors
     }
 
     /** Placed blocks keep working; types that are gone stay in the world but show nothing. */
@@ -427,12 +436,15 @@ class Repack : JavaPlugin() {
                 }
                 // A model that failed to convert is missing from the pack, so a pack built around it could replace a working one.
                 if (library.errors.isEmpty() || force) {
-                    val ripples = config.getBoolean("distortion.enabled", true)
+                    val (rules, ruleErrors) = TextEffects.rules(config.getConfigurationSection("text-effects"))
+                    ruleErrors.forEach { logger.warning(it) }
+                    val effects = TextEffects.snippet(rules)
+                    val shaders = config.getBoolean("distortion.enabled", true) || effects != null
                     zips = PackEra.entries.associateWith { era ->
                         progress.update(PARSE_SHARE + (ZIP_SHARE - PARSE_SHARE) * era.ordinal / PackEra.entries.size, "zipping the ${era.id} pack")
                         val files = HashMap(library.files.getValue(era.family))
                         files.putAll(GuiPack.files())
-                        if (ripples) files.putAll(EraAssets.files(file, era))
+                        if (shaders) files.putAll(EraAssets.files(file, era, effects))
                         files["pack.mcmeta"] = PackBuilder.meta(era)
                         files["pack.png"] = PackBuilder.icon()
                         PackBuilder.zip(files)

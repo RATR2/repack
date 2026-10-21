@@ -40,7 +40,7 @@ class GiveCommand(private val plugin: Repack) : Listener {
         if (parts.size !in 3..4) return false
         if (!parts[0].equals("give", true) && !parts[0].equals("minecraft:give", true)) return false
         val id = parts[2].lowercase().removePrefix("$NAMESPACE:").takeIf { parts[2].lowercase().startsWith("$NAMESPACE:") } ?: return false
-        val definition = plugin.blocks.definitionOf(id) ?: return false
+        if (plugin.stackFor(id) == null) return false
         if (!sender.hasPermission("minecraft.command.give")) return false
 
         val amount = if (parts.size == 4) parts[3].toIntOrNull() else 1
@@ -63,12 +63,12 @@ class GiveCommand(private val plugin: Repack) : Listener {
             var left = given
             while (left > 0) {
                 val stack = minOf(left, 64)
-                player.inventory.addItem(plugin.items.create(definition, stack)).values.forEach { player.world.dropItemNaturally(player.location, it) }
+                player.inventory.addItem(plugin.stackFor(id, stack)!!).values.forEach { player.world.dropItemNaturally(player.location, it) }
                 left -= stack
             }
         }
         val who = if (targets.size == 1) targets.first().name else "${targets.size} players"
-        sender.sendMessage(Component.text("Gave $given [${definition.id}] to $who" + if (given < amount) " (the most it gives at once)" else "", NamedTextColor.WHITE))
+        sender.sendMessage(Component.text("Gave $given [$id] to $who" + if (given < amount) " (the most it gives at once)" else "", NamedTextColor.WHITE))
         return true
     }
 
@@ -80,7 +80,7 @@ class GiveCommand(private val plugin: Repack) : Listener {
 
     @Suppress("UNCHECKED_CAST")
     private fun addTo(root: RootCommandNode<*>) {
-        val ids = plugin.blocks.types.sorted()
+        val ids = plugin.giveIds()
         if (ids.isEmpty()) return
         for (name in listOf("give", "minecraft:give")) {
             val give = root.getChild(name) ?: continue

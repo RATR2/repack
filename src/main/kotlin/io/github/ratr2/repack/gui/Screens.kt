@@ -131,7 +131,8 @@ class OverviewScreen(gui: Gui, player: Player, private val id: String) : Screen(
         button(12, "drops", Material.CHEST, "Drops", "What breaking drops")
         button(13, "rules", Material.TNT, "Explosions and pistons")
         button(14, "display", Material.ITEM_FRAME, "Display", "Offset, scale, light")
-        button(15, "item", Material.NAME_TAG, "Item", "The item that places it")
+        val registered = draft.string("item.registered", "")
+        button(15, "item", Material.NAME_TAG, "Item", "The item that places it", if (registered.isEmpty()) "Right click: use a registered item" else "Uses the registered item '$registered'", "Right click to pick or remove it")
         button(16, "recipe", Material.CRAFTING_TABLE, "Recipe", "How to craft it")
         button(18, "back", Material.ARROW, "Blocks")
         button(22, "save", Material.LIME_DYE, "Save", "Writes blocks/$id.yml and loads the block")
@@ -146,7 +147,7 @@ class OverviewScreen(gui: Gui, player: Player, private val id: String) : Screen(
             12 -> DropsScreen(gui, player, id)
             13 -> RulesScreen(gui, player, id)
             14 -> DisplayScreen(gui, player, id)
-            15 -> ItemScreen(gui, player, id)
+            15 -> if (event.isRightClick) ItemPickScreen(gui, player, id) else ItemScreen(gui, player, id)
             16 -> RecipeScreen(gui, player, id)
             18 -> ListScreen(gui, player)
             26 -> {

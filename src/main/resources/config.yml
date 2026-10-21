@@ -50,6 +50,40 @@ recommend-latest: true
 distortion:
   enabled: true
 
+# Animated text (r4tshader, built into Repack). Text drawn in an effect's trigger color is painted by the pack's text shader as a moving gradient
+# instead: chat, signs, item names, anything. Use the color directly (&#ff0cff or <#ff0cff>) or the name: <fx:pink> in an item name or lore is its trigger.
+# Works for 1.21.6 and newer clients; the pack changes at the next /repack build. enabled: false removes it from the pack.
+text-effects:
+  enabled: true
+  # Used by any effect that does not set the same key itself.
+  defaults:
+    speed: 300.0          # cycles per Minecraft day (about a 4 second sweep)
+    frequency: 0.10       # how tightly the wave repeats along the text
+    bias: 0.42            # 0 splits evenly, higher is brighter, lower is darker
+    hot-exponent: 5.0     # sharpness of the bright peak
+    hot-strength: 0.12    # strength of the bright peak
+  # name:
+  #   trigger: "#ff0cff"  # the text color that starts it (quote colors: # starts a YAML comment)
+  #   from: "#ff0cff"     # gradient base, the dark end (not used by rainbow)
+  #   to: "#ff70ff"       # gradient peak, the bright end (not used by rainbow)
+  #   type: shine         # sweep (same as shine), pulse, wave, strobe or rainbow
+  #   shadow: match       # match, or legacy: guesses the drop shadow from how dark the color is
+  #   speed / frequency / bias / hot-exponent / hot-strength: as in defaults
+  #   offset: 0.0         # head start in cycles, so effects do not move together
+  effects:
+    pink:
+      trigger: "#ff0cff"
+      from: "#ff0cff"
+      to: "#ff70ff"
+      type: shine
+      speed: 325.0
+    teal:
+      trigger: "#0e5e6e"
+      from: "#0e5e6e"
+      to: "#02bbde"
+      type: shine
+      speed: 200.0
+
 workflow:
   # Rebuild the pack when a model or block file changes, a few seconds after the last save. This is silent: nobody online is sent anything.
   # /repack reload builds and pushes the pack to everyone online, and /repack push [player] pushes the pack that was built.

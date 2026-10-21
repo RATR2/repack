@@ -181,10 +181,25 @@ If Distortion (or another plugin that uses the same scheme) is installed, the fi
 | `client-notices` | `true` | Tell players their client is too old. |
 | `recommend-latest` | `true` | The console recommends 26.3+ when the server runs something older. |
 | `distortion.enabled` | `true` | The ripple effects: their shaders go into the pack and the effects are available. Needs a restart. |
+| `text-effects.*` | two effects | Animated text, see [Animated text](#animated-text). |
 | `workflow.*` | see above | Automatic rebuilding and the progress bar. |
 | `gui.textures` | `true` | Use the pictures for the builder screens when there are any. |
 
 Every settings file starts with `config-version` and a note not to edit it. When a new Repack version changes the shipped `config.yml` or the block template, the file is updated on the next start: new options are added, your values and comments are kept, and the old file is saved as `<name>.bak-<version>` if anything besides the version changed.
+
+## Custom items
+
+An item is a file in `items/` (`items/ruby.yml`), made like a block: `base` (the vanilla item), `model` (a `.bbmodel` in `models/`, optional), `name` and `lore` (with `&c` codes and `<#rrggbb>` colors), `glint`, and for developers `components` (raw item components as in `/give`, like `[minecraft:custom_data={a:1}]`). A saved exact item can also be the item: it decides everything but the model. A model that only items use does not turn into a block. Players get items the way they get blocks: `/repack give ruby`, `/give @s repack:ruby`, the `/repack menu` screen, Skript and the Java API.
+
+Edit them in the game with `/repack` > Item builder: pick an item or make a new one, then set the base item (click an item in your inventory), name, lore, shine, model, exact item and components, and press Save. In the block builder, right click the Item button of a block to make the block use a registered item (`item.registered: ruby` in the block file); the block then places itself from that item. Or leave it alone and use the block's own item settings, or an exact item.
+
+Text typed into the anvil keeps the `&` and `<#rrggbb>` color codes.
+
+## Animated text
+
+Text in certain colors can move: a shine sweeping along it, a pulse, a wave, a strobe or a rainbow. It is the shader pack r4tshader, built into Repack. Under `text-effects.effects` in `config.yml` each effect has a name, a `trigger` color and a `from` and `to` color for the gradient, a `type` (`shine`, `pulse`, `wave`, `strobe` or `rainbow`) and tuning numbers (`speed`, `frequency`, `bias`, `hot-exponent`, `hot-strength`, `offset`); `text-effects.defaults` fills in what an effect leaves out. Any text drawn in the trigger color is animated, in chat, on signs, in item names and anywhere else, and so is its drop shadow. Use the color directly (`&#ff0cff` or `<#ff0cff>`) or the effect's name, `<fx:pink>`, in an item or block name or lore. It works for 1.21.6 and newer clients and goes into the pack at the next build; `enabled: false` leaves it out. The two effects that ship are `pink` (`#ff0cff`) and `teal` (`#0e5e6e`).
+
+Nametags and other see-through text are not animated.
 
 ## Ripple effects
 
