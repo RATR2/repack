@@ -29,6 +29,9 @@ const int MARKER_GROUP_STRIDE = 6;
 // Must match text.vsh.
 const float MARKER_BLOCK_PX = 96.0;
 const vec3 MARKER_SIGNATURE = vec3(127.0, 1.0, 126.0) / 255.0;
+// A shake marker uses rows of its own below the ripple slots: slot s is row SHAKE_FIRST_ROW + s, with three pixels from column 1.
+const int SHAKE_FIRST_ROW = 40;
+const vec3 SHAKE_SIGNATURE = vec3(125.0, 2.0, 124.0) / 255.0;
 // Marker glyph edge in blocks at transformation scale 1 (16 font units * 0.025).
 const float MARKER_GLYPH_BLOCKS = 0.4;
 // The plugin sets scale = (strength, radius in blocks) * this, so the glyph stays tiny and centered on the origin.
@@ -41,7 +44,8 @@ vec2 encode16(float v) {
 }
 
 void main() {
-    int markerSlot = int(round(vMarker)) - 1;
+    bool shakeMarker = vMarker < 0.0;
+    int markerSlot = int(round(abs(vMarker))) - 1;
     if (markerSlot >= 0) {
         // Derivatives first, before any discard: they need the whole 2x2 quad.
         vec2 screenDx = dFdx(markerScreen);
@@ -51,8 +55,9 @@ void main() {
         vec2 texDx = dFdx(texCoord0);
 
         ivec2 pixel = ivec2(gl_FragCoord.xy);
-        int field = pixel.x - 1 - (markerSlot / 16) * MARKER_GROUP_STRIDE;
-        if (pixel.y != MARKER_FIRST_ROW + markerSlot % 16 || field < 0 || field > 4) {
+        int field = shakeMarker ? pixel.x - 1 : pixel.x - 1 - (markerSlot / 16) * MARKER_GROUP_STRIDE;
+        int row = (shakeMarker ? SHAKE_FIRST_ROW : MARKER_FIRST_ROW) + markerSlot % 16;
+        if (pixel.y != row || field < 0 || field > (shakeMarker ? 2 : 4)) {
             discard;
         }
 
@@ -80,7 +85,16 @@ void main() {
         vec2 cx = encode16((screenCenter.x + 1.0) / 3.0);
         vec2 cy = encode16((screenCenter.y + 1.0) / 3.0);
         vec4 data;
-        if (field == 0) {
+        if (shakeMarker) {
+            // Strength from the width of the glyph, the rest from the text color: rate, up and down against left and right, roll.
+            if (field == 0) {
+                data = vec4(SHAKE_SIGNATURE, 1.0);
+            } else if (field == 1) {
+                data = vec4(encode16(strength), vertexColor.r, 1.0);
+            } else {
+                data = vec4(vertexColor.g, vertexColor.b, 0.0, 1.0);
+            }
+        } else if (field == 0) {
             data = vec4(MARKER_SIGNATURE, 1.0);
         } else if (field == 1) {
             data = vec4(cx, cy.x, 1.0);

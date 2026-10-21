@@ -134,4 +134,18 @@ object RepackAPI {
 
     @JvmStatic
     fun animationAt(location: Location): String? = onMain(null) { it.display.playing(location) }
+
+    /**
+     * Shakes the player's screen at strength 0 to 1 for ticks, fading out. False if the client can't show it (needs the pack
+     * and 1.21.6 or newer; Fabulous! graphics before 26.3).
+     */
+    @JvmStatic
+    fun shake(player: org.bukkit.entity.Player, strength: Double, ticks: Int): Boolean = io.github.ratr2.repack.distortion.DistortionAPI.shake(player, strength, ticks)
+
+    @JvmStatic
+    fun shake(player: org.bukkit.entity.Player, strength: Double, ticks: Int, rate: Double, balance: Double, roll: Double): Boolean =
+        io.github.ratr2.repack.distortion.DistortionAPI.shake(player, strength, ticks, rate, balance, roll)
+
+    @JvmStatic
+    fun stopShake(player: org.bukkit.entity.Player) = io.github.ratr2.repack.distortion.DistortionAPI.stopShake(player)
 }

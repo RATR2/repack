@@ -21,3 +21,6 @@ permissions:
   distortion.debug:
     description: Allows /repack distortion debug.
     default: op
+  distortion.shake:
+    description: Allows /repack shake.
+    default: op

@@ -24,4 +24,17 @@ object DistortionAPI {
 
     @JvmStatic
     fun maxRipples(): Int = RippleManager.SLOTS
+
+    @Volatile
+    internal var shakes: ShakeManager? = null
+
+    @JvmStatic
+    fun shake(player: org.bukkit.entity.Player, strength: Double, ticks: Int): Boolean = shake(player, strength, ticks, 0.5, 0.5, 0.3)
+
+    @JvmStatic
+    fun shake(player: org.bukkit.entity.Player, strength: Double, ticks: Int, rate: Double, balance: Double, roll: Double): Boolean =
+        RepackAPI.onMain(false) { shakes?.start(player, strength, ticks, rate, balance, roll) ?: false }
+
+    @JvmStatic
+    fun stopShake(player: org.bukkit.entity.Player) = RepackAPI.onMain(Unit) { shakes?.stop(player) ?: Unit }
 }

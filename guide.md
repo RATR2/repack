@@ -75,6 +75,7 @@ If Distortion is installed too, both plugins send their packs in one request whe
 | `/repack list` | The ids that can be placed. |
 | `/repack animate <animation\|none> [loop\|once\|hold\|default] [pos]` | Makes the block you look at (or at pos) play an animation from the start, for testing. |
 | `/repack distortion spawn <hex> <radius> <ticks> [pos]` | A ripple of that color growing to that radius in blocks over that many ticks. Also `/distortion ...`. |
+| `/repack shake <players> <strength> <ticks> [rate balance roll]` | Shakes the screen of those players, fading out. 1.21.6 and newer clients with the pack. |
 | `/repack distortion debug [on\|off]` | Shows outlines and the raw data of the ripples. 26.3 and newer clients only. |
 
 ## Block files
@@ -222,6 +223,10 @@ Nametags and other see-through text are not animated.
 ## Ripple effects
 
 Repack includes Distortion: a ripple spawned at a spot in the world distorts the screen of players who have the pack, in the color and size you give. From 26.3 on it works with any graphics setting; on 1.21.4 to 26.2 players see it only with Fabulous! graphics. Spawn one with `/repack distortion spawn 55CCFF 8 40` (color, radius in blocks, ticks), from Skript with `spawn a ripple at ...`, or from Java with `RepackAPI.ripple`. Up to 256 ripples show at once. The pack has one build per client version, because the shaders differ in every game version. If the old Distortion plugin is still installed, Repack says so and keeps its own ripples off until you remove it.
+
+## Screen shake
+
+Part of the same effects as the ripples: `/repack shake <players> <strength> <ticks> [rate balance roll]` shakes the screen of the players you name. Strength is 0 to 1 and the shake fades out over the ticks (strength is squared, so a weak shake stays gentle). The optional numbers, each 0 to 1, say how fast it jitters (`rate`), how much of it is up and down rather than sideways (`balance`, 0.5 is even) and how much it turns the picture (`roll`). A second shake while one runs only replaces it when it is at least as strong as what is left. It works for 1.21.6 and newer clients that have the pack loaded; on 1.21.6 to 26.2 players see it only with Fabulous! graphics, and from 26.3 on the pack adds the shake as a post effect only while a player shakes. From Skript: `shake player's screen with strength 0.5 for 40 ticks`, `stop shaking player's screen`; from Java: `RepackAPI.shake(player, 0.5, 40)`. It needs the `distortion.shake` permission (operators have it) and switches off with `distortion.enabled`.
 
 ## Troubleshooting
 

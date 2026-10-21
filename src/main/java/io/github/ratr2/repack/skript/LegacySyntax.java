@@ -23,6 +23,7 @@ final class LegacySyntax {
         Skript.registerEffect(EffRegisterCustomBlock.class, EffRegisterCustomBlock.PATTERNS);
         Skript.registerEffect(EffEditCustomBlock.class, EffEditCustomBlock.PATTERNS);
         Skript.registerEffect(EffBlockAnimation.class, EffBlockAnimation.PATTERNS);
+        Skript.registerEffect(EffShake.class, EffShake.PATTERNS);
 
         Skript.registerExpression(ExprCustomBlockId.class, String.class, ExpressionType.PROPERTY, ExprCustomBlockId.PATTERNS);
         Skript.registerExpression(ExprCustomBlockIds.class, String.class, ExpressionType.SIMPLE, ExprCustomBlockIds.PATTERNS);

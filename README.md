@@ -22,7 +22,7 @@ If you find any issues, please report them [here](https://github.com/RATR2/repac
 
 ## What is this
 
-Repack is a customization kit for what players see and use: custom blocks and items made from Blockbench models, world-anchored ripple effects (what used to be the Distortion plugin), animated text colors, and more to come (the roadmap is in the repository). Everything is built into one resource pack per client version.
+Repack is a customization kit for what players see and use: custom blocks and items made from Blockbench models, world-anchored ripple effects and screen shake (what used to be the Distortion plugin), animated text colors, and more to come (the roadmap is in the repository). Everything is built into one resource pack per client version.
 
 ### Custom blocks
 

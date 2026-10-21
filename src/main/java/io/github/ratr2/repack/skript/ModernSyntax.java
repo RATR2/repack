@@ -32,6 +32,8 @@ final class ModernSyntax {
                 .supplier(EffEditCustomBlock::new).addPatterns(EffEditCustomBlock.PATTERNS).build());
         registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffBlockAnimation.class)
                 .supplier(EffBlockAnimation::new).addPatterns(EffBlockAnimation.PATTERNS).build());
+        registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffShake.class)
+                .supplier(EffShake::new).addPatterns(EffShake.PATTERNS).build());
         registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffRegisterCustomBlock.class)
                 .supplier(EffRegisterCustomBlock::new).addPatterns(EffRegisterCustomBlock.PATTERNS).build());
 

@@ -31,6 +31,8 @@ layout(location = 6) out vec3 markerView;
 
 // text_opacity that turns a world text display into a distortion:ripple marker.
 const float MARKER_OPACITY = 123.0;
+// text_opacity that turns a text display into a screen shake marker; its slot is its block light, 0 to 15.
+const float SHAKE_OPACITY = 122.0;
 const int MARKER_SLOTS = 256;
 // Side of the data block at framebuffer texel (0,0); must match text.fsh.
 const float MARKER_BLOCK_PX = 96.0;
@@ -42,12 +44,15 @@ void main() {
     texCoord0 = UV0;
 
 #if !defined(IS_GUI) && !defined(IS_SEE_THROUGH)
-    if (abs(Color.a * 255.0 - MARKER_OPACITY) < 0.5) {
+    bool shakeMarker = abs(Color.a * 255.0 - SHAKE_OPACITY) < 0.5;
+    if (abs(Color.a * 255.0 - MARKER_OPACITY) < 0.5 || shakeMarker) {
         vec4 viewPos = ModelViewMat * vec4(Position, 1.0);
         vec4 clip = ProjMat * viewPos;
 
         // Slot = brightness block + 16 * sky (UV2 is light * 16).
-        vMarker = float(clamp(UV2.x / 16 + 16 * (UV2.y / 16), 0, MARKER_SLOTS - 1) + 1);
+        float slot = float(clamp(UV2.x / 16 + 16 * (UV2.y / 16), 0, MARKER_SLOTS - 1) + 1);
+        // A shake marker is told apart by the sign.
+        vMarker = shakeMarker ? -slot : slot;
         markerScreen = clip.xy / clip.w * 0.5 + 0.5;
         markerView = viewPos.xyz;
         vertexColor = Color;

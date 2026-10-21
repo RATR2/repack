@@ -30,7 +30,8 @@ class DistortionCommand(private val plugin: Repack) {
         source.sender.hasPermission(permission) || source.sender.hasPermission(RepackCommand.ADMIN)
 
     fun tree(name: String): LiteralArgumentBuilder<CommandSourceStack> = Commands.literal(name)
-        .requires { allowed(it, SPAWN) || allowed(it, DEBUG) }
+        .requires { allowed(it, SPAWN) || allowed(it, DEBUG) || allowed(it, SHAKE) }
+        .then(shakeTree())
         .then(
             Commands.literal("spawn")
                 .requires { allowed(it, SPAWN) }
@@ -59,6 +60,47 @@ class DistortionCommand(private val plugin: Repack) {
                 .then(Commands.literal("on").executes { debug(it, true) })
                 .then(Commands.literal("off").executes { debug(it, false) })
         )
+
+    fun shakeTree(): LiteralArgumentBuilder<CommandSourceStack> = Commands.literal("shake")
+        .requires { allowed(it, SHAKE) }
+        .then(
+            Commands.argument("players", ArgumentTypes.players())
+                .then(
+                    Commands.argument("strength", DoubleArgumentType.doubleArg(0.0, 1.0))
+                        .then(
+                            Commands.argument("ticks", IntegerArgumentType.integer(1, 12000))
+                                .executes { shake(it, 0.5, 0.5, 0.3) }
+                                .then(
+                                    Commands.argument("rate", DoubleArgumentType.doubleArg(0.0, 1.0))
+                                        .then(
+                                            Commands.argument("balance", DoubleArgumentType.doubleArg(0.0, 1.0))
+                                                .then(
+                                                    Commands.argument("roll", DoubleArgumentType.doubleArg(0.0, 1.0))
+                                                        .executes {
+                                                            shake(it, DoubleArgumentType.getDouble(it, "rate"), DoubleArgumentType.getDouble(it, "balance"), DoubleArgumentType.getDouble(it, "roll"))
+                                                        }
+                                                )
+                                        )
+                                )
+                        )
+                )
+        )
+
+    private fun shake(context: CommandContext<CommandSourceStack>, rate: Double, balance: Double, roll: Double): Int {
+        val sender = context.source.sender
+        val manager = DistortionAPI.shakes
+        if (manager == null) {
+            sender.sendMessage(Component.text("Screen shake is switched off (distortion.enabled in config.yml).", NamedTextColor.RED))
+            return 0
+        }
+        val targets = context.getArgument("players", io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver::class.java).resolve(context.source)
+        val strength = DoubleArgumentType.getDouble(context, "strength")
+        val ticks = IntegerArgumentType.getInteger(context, "ticks")
+        val shaken = targets.count { manager.start(it, strength, ticks, rate, balance, roll) }
+        val skipped = targets.size - shaken
+        sender.sendMessage(Component.text("Shaking $shaken player${if (shaken == 1) "" else "s"}." + if (skipped > 0) " $skipped could not show it (they need the pack and a 1.21.6 or newer client)." else "", if (shaken > 0) NamedTextColor.GREEN else NamedTextColor.YELLOW))
+        return if (shaken > 0) Command.SINGLE_SUCCESS else 0
+    }
 
     private fun ripples(context: CommandContext<CommandSourceStack>): RippleManager? {
         val manager = DistortionAPI.manager
@@ -99,5 +141,6 @@ class DistortionCommand(private val plugin: Repack) {
     companion object {
         const val SPAWN = "distortion.spawn"
         const val DEBUG = "distortion.debug"
+        const val SHAKE = "distortion.shake"
     }
 }

@@ -45,6 +45,10 @@ A block whose model has animations (see the guide) plays the one named in its fi
 
 `RepackAPI.ripple(location, 0x55CCFF, 8.0, 40)` spawns a ripple (color, radius in blocks, ticks), `activeRipples()` and `maxRipples()` count them. In Skript: `spawn a ripple at player's location with color "55CCFF" radius 8 lasting 40 ticks`.
 
+### Screen shake
+
+`RepackAPI.shake(player, 0.5, 40)` shakes one player's screen (strength 0 to 1, ticks) and returns false when their client cannot show it (it needs the pack and a 1.21.6 or newer client); `shake(player, strength, ticks, rate, balance, roll)` sets how fast it jitters, how much is up and down and how much it turns the picture, each 0 to 1; `stopShake(player)` ends it. In Skript: `shake player's screen with strength 0.5 for 40 ticks` and `stop shaking player's screen`.
+
 ### Events
 
 `on custom block interact [of %strings%]` (or `click`) fires when a player clicks a custom block, with right or left click. Event values: `event-block`, `event-player`, `event-location`, `event-string` (the id).

@@ -33,7 +33,6 @@ class PackSender(
 
     fun hasLoaded(player: Player) = player.uniqueId in loaded
 
-    /** The era of the pack this player has loaded, or null when they have none. */
     fun loadedEra(player: Player): PackEra? = loaded[player.uniqueId]
 
     fun usesPostEffects(player: Player) = loaded[player.uniqueId]?.usesPostEffects == true

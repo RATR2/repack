@@ -57,7 +57,7 @@ client-notices: true
 # The console says so when the server runs a version older than 26.3, where the ripple effects need Fabulous! graphics. false: say nothing.
 recommend-latest: true
 
-# Distortion, now part of Repack: ripple effects anchored in the world, made by the pack's shaders. false: no shaders in the pack and no ripples.
+# Distortion, now part of Repack: ripple effects anchored in the world and screen shake, made by the pack's shaders. false: no shaders in the pack, no ripples and no shake.
 # Change it and restart the server; the pack changes at the next /repack build.
 distortion:
   enabled: true

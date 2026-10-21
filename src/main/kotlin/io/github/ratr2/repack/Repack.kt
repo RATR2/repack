@@ -80,6 +80,13 @@ class Repack : JavaPlugin() {
         private set
     var ripples: io.github.ratr2.repack.distortion.RippleManager? = null
         private set
+
+    /** The skyboxes. */
+    var skyboxes: io.github.ratr2.repack.sky.SkyboxManager? = null
+        private set
+
+    var shakes: io.github.ratr2.repack.distortion.ShakeManager? = null
+        private set
     val players: PlayerSettings by lazy { PlayerSettings(this) }
     lateinit var display: DisplayManager
         private set
@@ -151,6 +158,7 @@ class Repack : JavaPlugin() {
         RepackAPI.plugin = null
         io.github.ratr2.repack.distortion.DistortionAPI.manager = null
         ripples?.clear()
+        shakes?.clear()
         recipeKeys.values.forEach { server.removeRecipe(it) }
         if (::hold.isInitialized) hold.endAll()
         if (::host.isInitialized) host.stop()
@@ -163,11 +171,18 @@ class Repack : JavaPlugin() {
             return
         }
         val manager = io.github.ratr2.repack.distortion.RippleManager(this, sender)
+        val shakes = io.github.ratr2.repack.distortion.ShakeManager(this, sender)
         sender.onLoaded = manager::onPackLoaded
-        sender.onLost = manager::onPackLost
+        sender.onLost = { player, usedPostEffects ->
+            manager.onPackLost(player, usedPostEffects)
+            shakes.onPackLost(player)
+        }
         server.pluginManager.registerEvents(manager, this)
+        server.pluginManager.registerEvents(shakes, this)
         io.github.ratr2.repack.distortion.DistortionAPI.manager = manager
+        io.github.ratr2.repack.distortion.DistortionAPI.shakes = shakes
         ripples = manager
+        this.shakes = shakes
     }
 
     private fun serverVersionNotice() {

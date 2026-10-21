@@ -137,6 +137,7 @@ class RepackCommand(private val plugin: Repack) {
                 .then(Commands.literal("host").executes { reload(it, blocks = false, config = false, host = true) })
                 .then(Commands.literal("all").executes { reloadPack(it, config = true, host = true) })
         )
+        .then(io.github.ratr2.repack.distortion.DistortionCommand(plugin).shakeTree())
         .then(io.github.ratr2.repack.distortion.DistortionCommand(plugin).tree("distortion"))
         .build()
 

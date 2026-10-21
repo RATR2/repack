@@ -37,6 +37,9 @@ enum class PackEra(
         class New(val minMajor: Int, val minMinor: Int, val maxMajor: Int, val maxMinor: Int) : Format
     }
 
+    /** Whether this era's pack can shake the screen (1.21.6 and newer: older text shaders have no game time and no room for the marker). */
+    val shakes: Boolean get() = ordinal >= V1_21_8.ordinal
+
     fun putFormat(pack: JsonObject) {
         when (val f = format) {
             is Format.Old -> {
