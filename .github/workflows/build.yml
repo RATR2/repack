@@ -66,6 +66,8 @@ jobs:
           jar="build/libs/repack-$VERSION.jar"
           test -f "$jar"
           [ -s "$RUNNER_TEMP/notes.md" ] || echo "Repack $VERSION" > "$RUNNER_TEMP/notes.md"
+          # Modrinth gets the description only, without the commit list.
+          cp "$RUNNER_TEMP/notes.md" "$RUNNER_TEMP/notes-modrinth.md"
           # The changelog and the contributors go below the description; a long list of commits is a dropdown.
           { echo; VERSION="$VERSION" scripts/ci/changelog.py; } >> "$RUNNER_TEMP/notes.md"
           flags=()
@@ -80,6 +82,16 @@ jobs:
           git commit -m "bump version to $snapshot [skip ci]"
           git pull --rebase origin "$GITHUB_REF_NAME"
           git push origin "HEAD:$GITHUB_REF_NAME"
+
+      # Needs the MODRINTH_TOKEN secret and the MODRINTH_PROJECT_ID secret; without them this step does nothing.
+      - name: Publish to Modrinth
+        if: github.event_name == 'push' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && steps.tags.outputs.VERSION != '' && steps.tags.outputs.RELEASE == 'true'
+        env:
+          MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
+          MODRINTH_PROJECT_ID: ${{ secrets.MODRINTH_PROJECT_ID }}
+          VERSION: ${{ steps.tags.outputs.VERSION }}
+        run: |
+          JAR="build/libs/repack-$VERSION.jar" NOTES="$RUNNER_TEMP/notes-modrinth.md" scripts/ci/modrinth.sh
 
       # version="X" without release: only moves the version in gradle.properties.
       - name: Set the version
