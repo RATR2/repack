@@ -49,6 +49,10 @@ A block whose model has animations (see the guide) plays the one named in its fi
 
 `RepackAPI.shake(player, 0.5, 40)` shakes one player's screen (strength 0 to 1, ticks) and returns false when their client cannot show it (it needs the pack and a 1.21.6 or newer client); `shake(player, strength, ticks, rate, balance, roll)` sets how fast it jitters, how much is up and down and how much it turns the picture, each 0 to 1; `stopShake(player)` ends it. In Skript: `shake player's screen with strength 0.5 for 40 ticks` and `stop shaking player's screen`.
 
+### Skyboxes
+
+`RepackAPI.skyboxIds()` lists them, `setSkybox(player, "stars")` makes a player see one whatever fits where they are (`"none"` for no sky, `null` to go back to the one that fits; false for an unknown id), and `skyboxOf(player)` says which one they see. Not saved. In Skript: `set player's skybox to "stars"`, `hide player's skybox`, `reset player's skybox`.
+
 ### Events
 
 `on custom block interact [of %strings%]` (or `click`) fires when a player clicks a custom block, with right or left click. Event values: `event-block`, `event-player`, `event-location`, `event-string` (the id).

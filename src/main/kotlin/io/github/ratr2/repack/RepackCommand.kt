@@ -137,6 +137,7 @@ class RepackCommand(private val plugin: Repack) {
                 .then(Commands.literal("host").executes { reload(it, blocks = false, config = false, host = true) })
                 .then(Commands.literal("all").executes { reloadPack(it, config = true, host = true) })
         )
+        .then(skyboxTree())
         .then(io.github.ratr2.repack.distortion.DistortionCommand(plugin).shakeTree())
         .then(io.github.ratr2.repack.distortion.DistortionCommand(plugin).tree("distortion"))
         .build()
@@ -150,6 +151,42 @@ class RepackCommand(private val plugin: Repack) {
             return 0
         }
         plugin.gui.open(player, io.github.ratr2.repack.gui.HubScreen(plugin.gui, player))
+        return Command.SINGLE_SUCCESS
+    }
+
+    private fun suggestSkyboxes(context: CommandContext<CommandSourceStack>, builder: SuggestionsBuilder): CompletableFuture<Suggestions> {
+        val typed = builder.remainingLowerCase
+        plugin.skyboxes?.definitions?.map { it.id }.orEmpty().filter { it.startsWith(typed) }.forEach(builder::suggest)
+        return builder.buildFuture()
+    }
+
+    private fun skyboxTree() = admin("skybox")
+        .then(
+            Commands.literal("set").then(
+                Commands.argument("players", ArgumentTypes.players()).then(
+                    Commands.argument("id", StringArgumentType.word()).suggests(::suggestSkyboxes).executes { skybox(it, StringArgumentType.getString(it, "id")) }
+                )
+            )
+        )
+        .then(Commands.literal("clear").then(Commands.argument("players", ArgumentTypes.players()).executes { skybox(it, null) }))
+        .then(Commands.literal("off").then(Commands.argument("players", ArgumentTypes.players()).executes { skybox(it, io.github.ratr2.repack.sky.SkyboxManager.HIDDEN) }))
+        .then(
+            Commands.literal("list").executes {
+                val ids = plugin.skyboxes?.definitions?.map { it.id }.orEmpty()
+                reply(it, if (ids.isEmpty()) "There are no skyboxes. Add files to the skyboxes folder and run /repack build." else "Skyboxes: ${ids.joinToString()}", NamedTextColor.YELLOW)
+                Command.SINGLE_SUCCESS
+            }
+        )
+
+    private fun skybox(context: CommandContext<CommandSourceStack>, id: String?): Int {
+        val targets = context.getArgument("players", PlayerSelectorArgumentResolver::class.java).resolve(context.source)
+        val manager = plugin.skyboxes
+        if (manager == null || (id != null && id != io.github.ratr2.repack.sky.SkyboxManager.HIDDEN && manager.definitions.none { it.id == id })) {
+            reply(context, "There is no skybox '$id'. /repack skybox list shows them.", NamedTextColor.RED)
+            return 0
+        }
+        targets.forEach { manager.choose(it, id) }
+        reply(context, "${targets.size} player${if (targets.size == 1) "" else "s"} ${when (id) { null -> "see the skybox that fits where they are"; io.github.ratr2.repack.sky.SkyboxManager.HIDDEN -> "see no skybox"; else -> "see the skybox $id" }}. Only clients with the pack on 1.21.6 or newer show it.", NamedTextColor.GREEN)
         return Command.SINGLE_SUCCESS
     }
 

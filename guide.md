@@ -76,6 +76,7 @@ If Distortion is installed too, both plugins send their packs in one request whe
 | `/repack animate <animation\|none> [loop\|once\|hold\|default] [pos]` | Makes the block you look at (or at pos) play an animation from the start, for testing. |
 | `/repack distortion spawn <hex> <radius> <ticks> [pos]` | A ripple of that color growing to that radius in blocks over that many ticks. Also `/distortion ...`. |
 | `/repack shake <players> <strength> <ticks> [rate balance roll]` | Shakes the screen of those players, fading out. 1.21.6 and newer clients with the pack. |
+| `/repack skybox set\|off\|clear <players> [id]`, `/repack skybox list` | Choose the skybox of players, or list the skyboxes (see [Skyboxes](#skyboxes)). |
 | `/repack distortion debug [on\|off]` | Shows outlines and the raw data of the ripples. 26.3 and newer clients only. |
 
 ## Block files
@@ -227,6 +228,20 @@ Repack includes Distortion: a ripple spawned at a spot in the world distorts the
 ## Screen shake
 
 Part of the same effects as the ripples: `/repack shake <players> <strength> <ticks> [rate balance roll]` shakes the screen of the players you name. Strength is 0 to 1 and the shake fades out over the ticks (strength is squared, so a weak shake stays gentle). The optional numbers, each 0 to 1, say how fast it jitters (`rate`), how much of it is up and down rather than sideways (`balance`, 0.5 is even) and how much it turns the picture (`roll`). A second shake while one runs only replaces it when it is at least as strong as what is left. It works for 1.21.6 and newer clients that have the pack loaded; on 1.21.6 to 26.2 players see it only with Fabulous! graphics, and from 26.3 on the pack adds the shake as a post effect only while a player shakes. From Skript: `shake player's screen with strength 0.5 for 40 ticks`, `stop shaking player's screen`; from Java: `RepackAPI.shake(player, 0.5, 40)`. It needs the `distortion.shake` permission (operators have it) and switches off with `distortion.enabled`.
+
+## Skyboxes
+
+A skybox replaces the sky around a player: a picture of the whole sky wrapped around them, or a small piece of GLSL that works out the color of every direction. Skyboxes are files in `plugins/Repack/skyboxes/`, and only players with the pack on a 1.21.6 or newer client see them (at most 24 can exist). `_example.yml` in that folder explains every option; the short version:
+
+1. Put `forest.png` (a panorama of the whole sky, twice as wide as it is high) in the folder, and write `forest.yml` next to it. An empty file is enough: it uses `forest.png`, or else `forest.glsl`. For a sky that comes with Repack write `source: builtin:stars` (the others are `gradient` and `clouds`).
+2. Say where it shows with `when:` (`dimensions`, `worlds`, `biomes`), how it ranks with `priority`, and who sees it with `permission`. A skybox shows for a player when everything in `when` that is not empty fits where they are; if several fit, the highest priority wins, then the one that names more. The check runs when they join, change world or biome.
+3. `/repack build`.
+
+A GLSL sky is only the statements that end by setting `color`, with the direction `dir`, the time of day `skyTime`, the player's height `skyHeight`, a clock `skyAnim` and helpers such as `skyGradient`, `skyNoise`, `skyFbm`, `skyStars` and `skySunDirection` (the list is in `_example.yml`). Your GLSL is only checked by the player's game when it loads the pack, so try a new sky on one client first.
+
+Make someone see a particular one with `/repack skybox set <players> <id>`, `off <players>` for none, `clear <players>` to go back to the one that fits, and `list`. Not saved: it lasts until they leave. From Skript: `set player's skybox to "stars"`, `hide player's skybox`, `reset player's skybox`.
+
+How it works: each player gets a display that only they see (nothing is spawned on the server), scaled inside out around them and sent as a passenger of their own entity, so it moves with them exactly. The pack replaces the game's item shader with the same one plus a branch that draws a sprite whose alpha is a sky code as a sky; it changes nothing for any other item, but another pack that replaces that same shader would clash with it. The time of day and the height reach the sky through the color of the item. The idea is [SkyboxEngine](https://github.com/Dragoncraft000/SkyboxEngine)'s (MIT, in NOTICE).
 
 ## Troubleshooting
 

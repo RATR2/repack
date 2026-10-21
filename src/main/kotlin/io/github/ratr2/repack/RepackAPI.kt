@@ -148,4 +148,17 @@ object RepackAPI {
 
     @JvmStatic
     fun stopShake(player: org.bukkit.entity.Player) = io.github.ratr2.repack.distortion.DistortionAPI.stopShake(player)
+
+    @JvmStatic
+    fun skyboxIds(): List<String> = onMain(emptyList()) { api -> api.skyboxes?.definitions?.map { it.id }.orEmpty() }
+
+    /**
+     * Makes the player see skybox id whatever fits where they are, or none for "none"; null goes back to the one that fits.
+     * False if there is no such skybox. Not saved.
+     */
+    @JvmStatic
+    fun setSkybox(player: org.bukkit.entity.Player, id: String?): Boolean = onMain(false) { api -> api.skyboxes?.choose(player, id) ?: false }
+
+    @JvmStatic
+    fun skyboxOf(player: org.bukkit.entity.Player): String? = onMain(null) { api -> api.skyboxes?.skyboxOf(player)?.id }
 }

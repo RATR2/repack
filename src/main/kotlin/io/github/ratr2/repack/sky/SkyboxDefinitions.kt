@@ -107,7 +107,6 @@ object SkyboxDefinitions {
         return code.replace("\r\n", "\n")
     }
 
-    /** The skybox that fits a place, or null: the highest priority among those that match and may be seen, and among equals the one that names more. */
     fun best(skies: List<SkyboxDefinition>, dimension: String, world: String, biome: String, has: (String) -> Boolean): SkyboxDefinition? =
         skies.filter { it.matches(dimension, world, biome) && (it.permission == null || has(it.permission)) }
             .maxWithOrNull(compareBy({ it.priority }, { it.specificity }, { -it.code }))

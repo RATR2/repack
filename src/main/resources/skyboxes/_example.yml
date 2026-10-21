@@ -1,0 +1,39 @@
+# Skyboxes. Each skybox is a file here, skyboxes/<id>.yml, and shows around the players it fits as their sky. Only 1.21.6 and newer clients with the pack
+# loaded see them, and at most 24 can exist. Change something, then /repack build. This file is only documentation: it is written again at every start.
+#
+# What the sky is made of, one of:
+#   source: forest.png        a picture of the whole sky, twice as wide as it is high (an equirectangular panorama), in this folder
+#   source: forest.glsl       a piece of GLSL, in this folder (see below)
+#   source: builtin:stars     a sky that comes with Repack: gradient, stars or clouds
+# Leave `source` out and the file with the same name as this one is used: forest.png, or else forest.glsl.
+source: builtin:stars
+
+# Which one shows when several fit: the highest priority, and when those are equal the one that names more below.
+priority: 100
+
+# How much the fog of the game covers it, 0 (not at all) to 1 (like anything far away).
+fog: 0.25
+
+# Where it shows. Everything that is not empty has to match. With nothing here it shows everywhere, as long as nothing better fits.
+when:
+  dimensions: []        # for example [minecraft:the_end]
+  worlds: []            # world names, for example [world_nether]
+  biomes: []            # for example [minecraft:desert, minecraft:badlands]
+
+# Only players with this permission see it. Leave out for everyone.
+# permission: myserver.sky.stars
+
+# ---- A GLSL sky ----
+# A .glsl file holds only the statements that work out the color, which end by setting `color` (a vec3, red green blue from 0 to 1). It can use:
+#   dir         a vec3, the direction the player looks at that part of the sky: x east, y up, z south, of length 1
+#   skyTime     the time of day from 0 (sunrise) over 0.25 (noon) and 0.5 (sunset) to 1
+#   skyHeight   the height of the player, in blocks
+#   skyAnim     seconds that run on, for things that move
+#   skySunDirection(skyTime)         where the sun is, y is up (below 0 at night)
+#   skyGradient(top, horizon, dir)   a blend from the horizon to the top
+#   skyNoise(vec3), skyFbm(vec3)     smooth random values from 0 to 1, and cloudy ones
+#   skyStars(dir, density)           points of light, density 0 to 1
+# For example:
+#   color = skyGradient(vec3(0.2, 0.4, 0.9), vec3(0.8, 0.9, 1.0), dir);
+# A mistake in the GLSL is only found by the player's game when it loads the pack, so try a new sky on one client first.
+# #version, #include and main are not allowed.

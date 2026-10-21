@@ -81,7 +81,6 @@ class Repack : JavaPlugin() {
     var ripples: io.github.ratr2.repack.distortion.RippleManager? = null
         private set
 
-    /** The skyboxes. */
     var skyboxes: io.github.ratr2.repack.sky.SkyboxManager? = null
         private set
 
@@ -95,6 +94,7 @@ class Repack : JavaPlugin() {
         saveDefaultConfig()
         migrateConfig()
         saveResource("blocks/_example.yml", true)
+        saveResource("skyboxes/_example.yml", true)
         installDefaults()
         store = PackStore(dataFolder)
         sending = config.getBoolean("resource-pack.send", true)
@@ -106,6 +106,7 @@ class Repack : JavaPlugin() {
         server.pluginManager.registerEvents(sender, this)
         server.pluginManager.registerEvents(hold, this)
         startRipples()
+        startSkyboxes()
         serverVersionNotice()
         io.github.ratr2.repack.text.Colors.effects = TextEffects.rules(config.getConfigurationSection("text-effects")).first.associate { it.name to it.triggerHex }
         gui = Gui(this)
@@ -159,6 +160,7 @@ class Repack : JavaPlugin() {
         io.github.ratr2.repack.distortion.DistortionAPI.manager = null
         ripples?.clear()
         shakes?.clear()
+        skyboxes?.close()
         recipeKeys.values.forEach { server.removeRecipe(it) }
         if (::hold.isInitialized) hold.endAll()
         if (::host.isInitialized) host.stop()
@@ -183,6 +185,22 @@ class Repack : JavaPlugin() {
         io.github.ratr2.repack.distortion.DistortionAPI.shakes = shakes
         ripples = manager
         this.shakes = shakes
+    }
+
+    private fun startSkyboxes() {
+        val manager = io.github.ratr2.repack.sky.SkyboxManager(this, sender)
+        val loaded = sender.onLoaded
+        val lost = sender.onLost
+        sender.onLoaded = { player ->
+            loaded(player)
+            manager.onPackLoaded(player)
+        }
+        sender.onLost = { player, usedPostEffects ->
+            lost(player, usedPostEffects)
+            manager.onPackLost(player)
+        }
+        server.pluginManager.registerEvents(manager, this)
+        skyboxes = manager
     }
 
     private fun serverVersionNotice() {
@@ -473,6 +491,7 @@ class Repack : JavaPlugin() {
         val cache = ModelCache(File(dataFolder, "cache/models"), "${description.version}-${file.lastModified()}")
         server.scheduler.runTaskAsynchronously(this, Runnable {
             var library: LibraryResult? = null
+            var skies: io.github.ratr2.repack.sky.LoadedSkyboxes? = null
             var zips: Map<PackEra, ByteArray>? = null
             var universal: ByteArray? = null
             var failure: String? = null
@@ -487,18 +506,23 @@ class Repack : JavaPlugin() {
                     val effects = TextEffects.snippet(rules)
                     val shaders = config.getBoolean("distortion.enabled", true) || effects != null
                     val gui = GuiPack.files()
-                    val eraShaders = PackEra.entries.associateWith { era -> if (shaders) EraAssets.files(file, era, effects) else emptyMap() }
+                    val loadedSkies = io.github.ratr2.repack.sky.SkyboxDefinitions.load(skyboxesFolder).also { skies = it }
+                    val skyAssets = io.github.ratr2.repack.sky.SkyboxShaders.assets(loadedSkies.definitions)
+                    val eraShaders = PackEra.entries.associateWith { era ->
+                        (if (shaders) EraAssets.files(file, era, effects) else emptyMap()) + io.github.ratr2.repack.sky.SkyboxShaders.files(era, loadedSkies.definitions)
+                    }
                     zips = PackEra.entries.associateWith { era ->
                         progress.update(PARSE_SHARE + (ZIP_SHARE - PARSE_SHARE) * era.ordinal / PackEra.entries.size, "zipping the ${era.id} pack")
                         val files = HashMap(library.files.getValue(era.family))
                         files.putAll(gui)
                         files.putAll(eraShaders.getValue(era))
+                        if (io.github.ratr2.repack.sky.SkyboxShaders.supports(era)) files.putAll(skyAssets)
                         files["pack.mcmeta"] = PackBuilder.meta(era)
                         files["pack.png"] = PackBuilder.icon()
                         PackBuilder.zip(files)
                     }
                     if (exportFolder() != null) {
-                        universal = PackBuilder.universal(library.files.getValue(PackVariant.LEGACY), library.files.getValue(PackVariant.MODERN), gui, eraShaders)
+                        universal = PackBuilder.universal(library.files.getValue(PackVariant.LEGACY) + skyAssets, library.files.getValue(PackVariant.MODERN) + skyAssets, gui, eraShaders)
                     }
                 }
             } catch (e: Throwable) {
@@ -527,6 +551,13 @@ class Repack : JavaPlugin() {
                     return@Runnable
                 }
                 progress.update(ZIP_SHARE, "loading the block files")
+                skies?.let { loaded ->
+                    loaded.errors.forEach { logger.warning(it) }
+                    if (zips != null) skyboxes?.load(loaded.definitions)
+                    if (loaded.definitions.isNotEmpty() && PackEra.entries.any { !io.github.ratr2.repack.sky.SkyboxShaders.supports(it) }) {
+                        logger.info("Skyboxes show for 1.21.6 and newer clients; ${PackEra.entries.filterNot(io.github.ratr2.repack.sky.SkyboxShaders::supports).joinToString { it.label }} do not see them.")
+                    }
+                }
                 val rigFiles = library.files[PackVariant.MODERN].orEmpty()
                 rigs = rigFiles.mapNotNull { (path, bytes) ->
                     val id = path.removePrefix(io.github.ratr2.repack.model.ItemModelGenerator.RIG_FOLDER).removeSuffix(".json")
