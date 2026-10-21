@@ -17,6 +17,15 @@ class BlockItems(private val plugin: Repack) {
     private val legacy = LegacyComponentSerializer.legacyAmpersand()
 
     fun create(definition: BlockDefinition, amount: Int = 1): ItemStack {
+        val saved = definition.item.stack?.let { ItemStack.deserializeBytes(it) }
+        if (saved != null) {
+            saved.amount = amount.coerceIn(1, 99)
+            if (definition.item.overrideModel) {
+                saved.setData(DataComponentTypes.ITEM_MODEL, Key.key(ItemModelGenerator.NAMESPACE, definition.item.model ?: definition.model))
+            }
+            saved.editPersistentDataContainer { it.set(idKey, PersistentDataType.STRING, definition.id) }
+            return saved
+        }
         val item = ItemStack(definition.item.base, amount.coerceIn(1, 99))
         item.setData(DataComponentTypes.ITEM_MODEL, Key.key(ItemModelGenerator.NAMESPACE, definition.item.model ?: definition.model))
         val name = definition.item.name ?: definition.id.split('_', '-').joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }

@@ -29,6 +29,7 @@ import java.util.concurrent.CompletableFuture
  * /repack remove [pos]        removes the custom block there
  * /repack list                lists the ids that can be placed
  * /repack menu              opens a screen with every block item to take
+ * /repack builder [id]      the block builder: edit a block's settings, item and recipe in screens
  * /repack give <id> [amount] [players]   gives the item that places a custom block
  * /repack distortion spawn <hex> <radius> <ticks> [pos]   a ripple effect; debug [on|off] shows the debug view
  * /repack reload [blocks|config|host|all]   reads the block files, builds the pack and pushes it to everyone online (default); blocks, config and host do only that part; all also reloads the config and the pack server
@@ -37,15 +38,15 @@ import java.util.concurrent.CompletableFuture
 class RepackCommand(private val plugin: Repack) {
 
     fun node(): LiteralCommandNode<CommandSourceStack> = Commands.literal("repack")
-        .requires { it.sender.hasPermission(ADMIN) }
+        .executes(::hub)
         .then(
-            Commands.literal("build")
+            admin("build")
                 .executes { build(it, force = false) }
                 .then(Commands.literal("force").executes { build(it, force = true) })
                 .then(Commands.literal("fresh").executes { build(it, force = false, fresh = true) })
         )
         .then(
-            Commands.literal("push")
+            admin("push")
                 .executes { push(it, plugin.server.onlinePlayers.toList()) }
                 .then(
                     Commands.argument("players", ArgumentTypes.players())
@@ -55,9 +56,9 @@ class RepackCommand(private val plugin: Repack) {
                         }
                 )
         )
-        .then(Commands.literal("status").executes(::status))
+        .then(admin("status").executes(::status))
         .then(
-            Commands.literal("place").then(
+            admin("place").then(
                 Commands.argument("id", StringArgumentType.word())
                     .suggests(::suggestIds)
                     .executes { place(it, it.source.location) }
@@ -68,23 +69,32 @@ class RepackCommand(private val plugin: Repack) {
             )
         )
         .then(
-            Commands.literal("remove")
+            admin("remove")
                 .executes { remove(it, it.source.location) }
                 .then(
                     Commands.argument("pos", ArgumentTypes.blockPosition())
                         .executes { remove(it, positionOf(it)) }
                 )
         )
-        .then(Commands.literal("list").executes(::list))
+        .then(admin("list").executes(::list))
         .then(
-            Commands.literal("menu").executes {
+            admin("builder")
+                .executes { builder(it, null) }
+                .then(
+                    Commands.argument("id", StringArgumentType.word())
+                        .suggests(::suggestIds)
+                        .executes { builder(it, StringArgumentType.getString(it, "id")) }
+                )
+        )
+        .then(
+            admin("menu").executes {
                 val player = it.source.sender as? Player
                 if (player == null) reply(it, "Only players can open the menu.", NamedTextColor.RED) else plugin.menu.open(player)
                 Command.SINGLE_SUCCESS
             }
         )
         .then(
-            Commands.literal("give").then(
+            admin("give").then(
                 Commands.argument("id", StringArgumentType.word())
                     .suggests(::suggestIds)
                     .executes { give(it, 1, listOfNotNull(it.source.sender as? Player)) }
@@ -102,7 +112,7 @@ class RepackCommand(private val plugin: Repack) {
             )
         )
         .then(
-            Commands.literal("reload")
+            admin("reload")
                 .executes { reloadPack(it, config = false, host = false) }
                 .then(Commands.literal("blocks").executes { reload(it, blocks = true, config = false, host = false) })
                 .then(Commands.literal("config").executes { reload(it, blocks = false, config = true, host = false) })
@@ -110,6 +120,18 @@ class RepackCommand(private val plugin: Repack) {
                 .then(Commands.literal("all").executes { reloadPack(it, config = true, host = true) })
         )
         .build()
+
+    private fun admin(name: String) = Commands.literal(name).requires { it.sender.hasPermission(ADMIN) }
+
+    private fun hub(context: CommandContext<CommandSourceStack>): Int {
+        val player = context.source.sender as? Player
+        if (player == null) {
+            reply(context, "Only players can open the settings. From the console: /repack build, push, status, reload.", NamedTextColor.RED)
+            return 0
+        }
+        plugin.gui.open(player, io.github.ratr2.repack.gui.HubScreen(plugin.gui, player))
+        return Command.SINGLE_SUCCESS
+    }
 
     private fun positionOf(context: CommandContext<CommandSourceStack>): Location =
         context.getArgument("pos", BlockPositionResolver::class.java).resolve(context.source).toLocation(context.source.location.world)
@@ -251,6 +273,23 @@ class RepackCommand(private val plugin: Repack) {
         return Command.SINGLE_SUCCESS
     }
 
+    private fun builder(context: CommandContext<CommandSourceStack>, id: String?): Int {
+        val player = context.source.sender as? Player
+        if (player == null) {
+            reply(context, "Only players can open the builder.", NamedTextColor.RED)
+            return 0
+        }
+        if (id == null) {
+            plugin.gui.open(player, io.github.ratr2.repack.gui.ListScreen(plugin.gui, player))
+        } else if (plugin.gui.draftOf(player, id.lowercase()) == null) {
+            reply(context, "There is no block with the id '$id'.", NamedTextColor.RED)
+            return 0
+        } else {
+            plugin.gui.open(player, io.github.ratr2.repack.gui.OverviewScreen(plugin.gui, player, id.lowercase()))
+        }
+        return Command.SINGLE_SUCCESS
+    }
+
     private fun short(entry: PackEntry) = entry.sha1.take(8)
 
     private fun reply(context: CommandContext<CommandSourceStack>, text: String, color: NamedTextColor) {
@@ -259,6 +298,7 @@ class RepackCommand(private val plugin: Repack) {
 
     companion object {
         const val ADMIN = "repack.admin"
+        const val SETTINGS = "repack.settings"
         private const val MAX_LINES = 5
     }
 }

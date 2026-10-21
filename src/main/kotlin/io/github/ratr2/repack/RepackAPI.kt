@@ -1,6 +1,7 @@
 package io.github.ratr2.repack
 
 import org.bukkit.Bukkit
+import io.github.ratr2.repack.edit.BlockBuilder
 import org.bukkit.Location
 import org.bukkit.block.Block
 import org.bukkit.inventory.ItemStack
@@ -58,6 +59,20 @@ object RepackAPI {
 
     @JvmStatic
     fun reload(): List<String> = onMain(emptyList()) { it.reloadDefinitions() }
+
+    @JvmStatic
+    fun edit(id: String): BlockBuilder = onMain(BlockBuilder(null, "Repack is not running.")) { api ->
+        val draft = api.gui.editor.open(id)
+        BlockBuilder(draft, if (draft == null) "There is no block with the id '$id'." else null)
+    }
+
+    @JvmStatic
+    fun create(id: String, model: String): BlockBuilder = onMain(BlockBuilder(null, "Repack is not running.")) { api ->
+        api.gui.editor.create(id, model).fold(
+            onSuccess = { BlockBuilder(it, null) },
+            onFailure = { BlockBuilder(null, it.message ?: "Could not make the block.") },
+        )
+    }
 
     @JvmStatic
     fun ids(): Set<String> = onMain(emptySet()) { it.blocks.types.toSet() }

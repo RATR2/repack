@@ -56,6 +56,7 @@ Repack writes `plugins/Repack/blocks/table.yml` for every model, with every opti
 | `/repack place <id> [pos]` | Places a custom block (at your feet by default) |
 | `/repack remove [pos]` | Removes a custom block |
 | `/repack give <id> [amount] [players]` | Gives the item that places a block |
+| `/repack builder [id]` | The block builder: edit a block in screens, with an exact item and recipe |
 | `/repack menu` | Opens a screen with every block item; click to take one, shift-click for a stack |
 
 Vanilla `/give @s repack:<id> [count]` works too, with tab completion. An item can show a different model than its block with `item.model` in the block file.

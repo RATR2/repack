@@ -139,9 +139,17 @@ object BlockDefinitions {
                 lore = item?.getStringList("lore").orEmpty(),
                 glint = item?.getBoolean("glint", false) ?: false,
                 model = item?.getString("model")?.let(ModelLibrary::cleanId),
+                stack = item?.getString("stack")?.let { bytesOf(it, "item.stack") },
+                overrideModel = item?.getBoolean("override-model", true) ?: true,
             ),
             recipe = recipeOf(section.getConfigurationSection("recipe"), materials),
         )
+    }
+
+    private fun bytesOf(text: String, where: String): ByteArray = try {
+        java.util.Base64.getDecoder().decode(text.trim())
+    } catch (e: IllegalArgumentException) {
+        throw DefinitionException("$where is not valid base64.")
     }
 
     private val CATEGORIES = setOf("building", "redstone", "equipment", "misc")
@@ -163,14 +171,20 @@ object BlockDefinitions {
             if (!materials.isItem(name)) throw DefinitionException("recipe.ingredients.$key $name is not an item.")
             ingredients[key[0]] = name
         }
+        val exact = LinkedHashMap<Char, ByteArray>()
+        val exactSection = section.getConfigurationSection("exact")
+        for (key in exactSection?.getKeys(false).orEmpty()) {
+            if (key.length != 1 || key == " ") throw DefinitionException("recipe.exact key '$key' must be a single character that is not a space.")
+            exact[key[0]] = bytesOf(exactSection!!.getString(key).orEmpty(), "recipe.exact.$key")
+        }
         for (char in rows.joinToString("").toSet() - ' ') {
-            if (char !in ingredients) throw DefinitionException("recipe.shape uses '$char' but recipe.ingredients has no '$char'.")
+            if (char !in ingredients && char !in exact) throw DefinitionException("recipe.shape uses '$char' but recipe.ingredients and recipe.exact have no '$char'.")
         }
         val amount = section.getInt("amount", 1)
         if (amount !in 1..64) throw DefinitionException("recipe.amount must be 1 to 64.")
         val category = section.getString("category")?.lowercase()
         if (category != null && category !in CATEGORIES) throw DefinitionException("recipe.category '$category' is not one of ${CATEGORIES.joinToString()}.")
-        return RecipeOptions(rows, ingredients, amount, section.getString("group"), category)
+        return RecipeOptions(rows, ingredients, amount, section.getString("group"), category, exact)
     }
 
     /** `scale: 1.5` for all three axes, or `scale: [1.01, 1.15, 1.01]` for x, y and z. */

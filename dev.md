@@ -136,6 +136,81 @@ public void onCustomBlock(CustomBlockEvent event) {
 }
 ```
 
+## The block builder from code
+
+Everything the builder screens do is also here, and both use the same checks and the same files. `RepackAPI.edit(id)` opens an existing block and `RepackAPI.create(id, model)` starts a new one with the defaults. Chain the changes and finish with `save()`, which checks the block, writes `blocks/<id>.yml` and loads it at once. It returns what is wrong, or null when it worked.
+
+```java
+String error = RepackAPI.create("chair", "chair")
+    .proxy("LIGHT").breakingTime(2.0).tool("axe").tier("stone")
+    .clearDrops().dropBlock().dropItem(Material.STICK, 2, 0.5)
+    .offset(0, 0.04, 0).scale(1.01, 1.08, 1.01).brightness(15)
+    .item(myItem, true)                       // an exact item; true puts the block's model on it
+    .recipe(Arrays.asList(a, b, a, null, b, null, null, null, null), false, 2)
+    .save();
+```
+
+| Call | Sets |
+|---|---|
+| `proxy`, `mode`, `vanillaInteraction` | `proxy.*` |
+| `breakingTime`, `tool`, `tier`, `dropsNeedTool`, `xp` | `breaking.*` |
+| `clearDrops`, `dropBlock`, `dropItem` | `drops` |
+| `explosionResistant`, `explosionDrops`, `piston` | `explosion.*`, `piston` |
+| `offset`, `scale`, `viewRange`, `brightness`, `rotateToPlacer`, `context` | `display.*` |
+| `itemBase`, `itemName`, `itemLore`, `glint`, `itemModel` | `item.*` |
+| `item(stack, overrideModel)` | `item.stack` and `item.override-model`: the exact item, kept as it is |
+| `recipe(grid, exact, amount)`, `clearRecipe` | `recipe.*`: a 3x3 grid row by row, null for empty. Custom items are exact, `exact` makes plain ones exact too |
+| `set(path, value)` | Any key of the block file, such as `breaking.time` |
+| `problem()`, `save()` | What is wrong, or null; and write it |
+
+### From Skript
+
+```
+create custom block "chair" using model "chair"
+set custom block "chair"'s option "breaking.time" to 2.5
+set custom block "chair"'s option "display.scale" to 1, 1.2, 1
+set custom block "chair"'s item to {_sword}
+set custom block "chair"'s item to {_sword} without the block's model
+set custom block "chair"'s recipe to {_a}, {_b}, {_a}, air, {_b}, air, air, air, air with amount 2
+clear custom block "chair"'s item
+clear custom block "chair"'s recipe
+```
+
+Each line saves the block at once. A problem is written to the console as a warning with the block's id.
+
+## Art for the builder screens
+
+The screens work without art. To give them custom backgrounds and icons, put PNG files in the plugin's resources and build:
+
+- **Backgrounds:** `src/main/resources/gui/screens/<screen>.png` for `list`, `models`, `overview`, `proxy`, `breaking`, `drops`, `rules`, `display`, `item` and `recipe`. They are 176 pixels wide and 168 (3 rows) or 222 (6 rows) high, and must keep **transparent holes** where the items are, because the picture is drawn above them. Unused chest slots should be covered by the picture.
+- **Icons:** `src/main/resources/gui/icons/<icon>.png`, 16x16, named as in the table below. A missing icon is the vanilla item named there. An icon can move: make the PNG a column of frames (16 wide and a multiple of 16 high) and add `<icon>.png.mcmeta` next to it with `{"animation": {"frametime": 4}}`, the same as any item texture.
+- The files go into Repack's pack by themselves. A background is the title of the chest screen in the font `repack:gui`, positioned with an ascent of 13 and a space glyph that shifts it 8 pixels left. If a picture sits a few pixels off in the game, that offset is the place to change (`GuiPack`).
+- Templates with the holes already cut, and numbered guides, are made by `.dev/tools/gui-templates.py` into `.dev/gui-templates/`.
+
+### Icons the screens use
+
+| Icon | Where | Vanilla item until there is a picture |
+|---|---|---|
+| `back` | Every Back button (all settings screens, the model list, the Overview's way to the block list) | arrow |
+| `previous`, `next` | Page buttons of the block list and the model list | arrow |
+| `close` | Close, in the block list | barrier |
+| `new` | New block, in the block list | emerald |
+| `save` | Save, in the Overview | lime dye |
+| `reset` | Throw away changes (Overview), Back to the default (Drops), Clear the grid (Recipe) | red dye |
+| `check`, `cross` | Every on and off button: vanilla interaction, drops need the tool, explosions, rotate to placer, shine, the block's model, exact items | lime dye, gray dye |
+| `breaking`, `drops`, `rules`, `display`, `item`, `recipe` | The six settings buttons of the Overview (rules is explosions and pistons) | iron pickaxe, chest, TNT, item frame, name tag, crafting table |
+| `mode` | Proxy mode | clock |
+| `time`, `tool`, `tier`, `xp` | Breaking time, tool, tier and experience | clock, iron pickaxe, netherite ingot, experience bottle |
+| `piston` | Piston behaviour | piston |
+| `block`, `add` | Drops: drop the block itself, add a drop | chest, hopper |
+| `offset`, `scale`, `view`, `light`, `context` | Display: offset, scale, view range, light and context | compass, spyglass, ender eye, light block, item frame |
+| `name`, `lore` | The item's name and lore | name tag, writable book |
+| `category` | The recipe's book category | knowledge book |
+
+The Overview's proxy button shows the real proxy block, the item screen's slots show the real items, and the model list shows paper, so none of those take an icon.
+
+The vanilla "Inventory" label is still drawn over the picture, since the game draws it after the title.
+
 ## Pack hosting for other plugins
 
 A plugin that sends its own server resource pack can share Repack's web server and the single join prompt. Repack and Distortion do this through a Bukkit service of type `java.util.Map` made only of JDK types, because each plugin has its own copy of every class. The protocol is in `SharedHost.kt` (identical in both plugins, apart from the package line): a plugin registers a name for its files and an offer function for joining players, and the plugin that started first hosts for all of them.

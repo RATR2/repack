@@ -13,6 +13,8 @@ import io.github.ratr2.repack.block.PlacedBlocks
 import io.github.ratr2.repack.config.ConfigMigrator
 import io.github.ratr2.repack.config.ConfigVersions
 import io.github.ratr2.repack.display.DisplayManager
+import io.github.ratr2.repack.gui.Gui
+import io.github.ratr2.repack.gui.GuiPack
 import io.github.ratr2.repack.model.LibraryResult
 import io.github.ratr2.repack.model.ModelCache
 import io.github.ratr2.repack.model.ModelLibrary
@@ -29,6 +31,8 @@ import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
 import org.bukkit.Material
 import org.bukkit.NamespacedKey
 import org.bukkit.configuration.file.YamlConfiguration
+import org.bukkit.inventory.ItemStack
+import org.bukkit.inventory.RecipeChoice
 import org.bukkit.inventory.ShapedRecipe
 import org.bukkit.inventory.recipe.CraftingBookCategory
 import org.bukkit.plugin.java.JavaPlugin
@@ -41,6 +45,8 @@ class Repack : JavaPlugin() {
     lateinit var sender: PackSender
         private set
     private lateinit var hold: LoadingHold
+    lateinit var gui: Gui
+        private set
     lateinit var blocks: PlacedBlocks
         private set
     lateinit var items: BlockItems
@@ -49,6 +55,7 @@ class Repack : JavaPlugin() {
         private set
     lateinit var menu: BlockMenu
         private set
+    val players: PlayerSettings by lazy { PlayerSettings(this) }
     private lateinit var display: DisplayManager
 
     override fun onEnable() {
@@ -64,6 +71,8 @@ class Repack : JavaPlugin() {
         if (versions.hasViaBackwards) logger.warning("ViaBackwards found: clients older than 1.21.4 will not be able to see Repack blocks.")
         server.pluginManager.registerEvents(sender, this)
         server.pluginManager.registerEvents(hold, this)
+        gui = Gui(this)
+        server.pluginManager.registerEvents(gui, this)
 
         blocks = PlacedBlocks(this)
         items = BlockItems(this)
@@ -331,7 +340,8 @@ class Repack : JavaPlugin() {
                 val recipe = ShapedRecipe(key, items.create(definition, options.amount))
                 recipe.shape(*options.shape.toTypedArray())
                 val used = options.shape.joinToString("").toSet() - ' '
-                for ((char, name) in options.ingredients) if (char in used) recipe.setIngredient(char, Material.matchMaterial(name)!!)
+                for ((char, name) in options.ingredients) if (char in used && char !in options.exact) recipe.setIngredient(char, Material.matchMaterial(name)!!)
+                for ((char, bytes) in options.exact) if (char in used) recipe.setIngredient(char, RecipeChoice.ExactChoice(ItemStack.deserializeBytes(bytes)))
                 options.group?.let { recipe.group = it }
                 options.category?.let { recipe.category = CraftingBookCategory.valueOf(it.uppercase()) }
                 server.addRecipe(recipe)
@@ -435,6 +445,7 @@ class Repack : JavaPlugin() {
                     zips = PackVariant.entries.associateWith { variant ->
                         progress.update(PARSE_SHARE + (ZIP_SHARE - PARSE_SHARE) * variant.ordinal / PackVariant.entries.size, "zipping the ${variant.id} pack")
                         val files = HashMap(library.files.getValue(variant))
+                        files.putAll(GuiPack.files())
                         files["pack.mcmeta"] = PackBuilder.meta(variant)
                         files["pack.png"] = PackBuilder.icon()
                         PackBuilder.zip(files)

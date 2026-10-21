@@ -29,7 +29,7 @@ resource-pack:
   # A player who joins gets the newest build, even one that was never pushed. false: only the pack that was last pushed.
   join-latest-build: true
   # While a player's client reloads a pack you sent them (from "downloaded" until "loaded", at most 20 seconds) they are held: they cannot be
-  # hurt, move, attack or interact, see no other entities, and the blocks around them are shown as black concrete. It does not start
+  # hurt, move, attack or interact, see no other entities, and every block around them, air included, is shown as black concrete (except the two they stand in). It does not start
   # again for two minutes, and a client that fakes its status gains almost nothing.
   invulnerable-while-loading: true
   black-blocks-while-loading: true
@@ -48,3 +48,7 @@ workflow:
   build-on-change: true
   # Show operators (repack.admin) a boss bar with the progress while the pack builds.
   progress-bar: true
+
+gui:
+  # Use the pictures for the builder screens when the plugin has them. false: plain chest titles and vanilla items.
+  textures: true

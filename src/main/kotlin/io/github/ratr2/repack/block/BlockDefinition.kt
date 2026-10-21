@@ -100,6 +100,8 @@ class ItemOptions(
     val lore: List<String>,
     val glint: Boolean,
     val model: String? = null,
+    val stack: ByteArray? = null,
+    val overrideModel: Boolean = true,
 ) {
     val base: Material by lazy { Material.matchMaterial(baseName)!! }
 }
@@ -112,6 +114,7 @@ class RecipeOptions(
     val group: String?,
     /** building, redstone, equipment or misc. */
     val category: String?,
+    val exact: Map<Char, ByteArray> = emptyMap(),
 )
 
 class BlockDefinition(

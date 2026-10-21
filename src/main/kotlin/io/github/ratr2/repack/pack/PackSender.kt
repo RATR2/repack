@@ -104,7 +104,7 @@ class PackSender(
     }
 
     private fun notice(player: Player, message: String) {
-        if (plugin.config.getBoolean("client-notices", true)) player.sendMessage(Component.text(message, NamedTextColor.YELLOW))
+        if (plugin.config.getBoolean("client-notices", true) && plugin.players.bool(player.uniqueId, io.github.ratr2.repack.PlayerSettings.NOTICES)) player.sendMessage(Component.text(message, NamedTextColor.YELLOW))
     }
 
     @EventHandler

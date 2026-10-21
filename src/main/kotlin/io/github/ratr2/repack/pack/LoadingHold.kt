@@ -56,7 +56,7 @@ class LoadingHold(private val plugin: Repack) : Listener {
         player.velocity = player.velocity.zero()
         for (entity in player.getNearbyEntities(ENTITY_RANGE, ENTITY_RANGE, ENTITY_RANGE)) hide(player, state, entity)
         plugin.displays()?.hideAllFor(player)
-        if (plugin.config.getBoolean("resource-pack.black-blocks-while-loading", true)) screen.show(player)
+        if (plugin.config.getBoolean("resource-pack.black-blocks-while-loading", true) && plugin.players.bool(playerId, io.github.ratr2.repack.PlayerSettings.LOADING_SCREEN)) screen.show(player)
         timers[playerId] = plugin.server.scheduler.runTaskLater(plugin, Runnable { end(playerId) }, TIMEOUT_TICKS)
     }
 

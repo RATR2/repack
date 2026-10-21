@@ -12,3 +12,6 @@ permissions:
   repack.admin:
     description: Allows /repack build, push and status.
     default: op
+  repack.settings:
+    description: Allows editing the server settings in /repack.
+    default: op

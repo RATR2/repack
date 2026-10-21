@@ -12,7 +12,7 @@ class BuildProgress(private val plugin: Repack) {
     fun start() {
         if (!plugin.config.getBoolean("workflow.progress-bar", true)) return
         val created = BossBar.bossBar(Component.text("Repack: starting the build"), 0f, BossBar.Color.BLUE, BossBar.Overlay.PROGRESS)
-        viewers = plugin.server.onlinePlayers.filter { it.hasPermission(RepackCommand.ADMIN) }
+        viewers = plugin.server.onlinePlayers.filter { it.hasPermission(RepackCommand.ADMIN) && plugin.players.bool(it.uniqueId, PlayerSettings.PROGRESS_BAR) }
         viewers.forEach { it.showBossBar(created) }
         bar = created
     }

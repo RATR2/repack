@@ -41,7 +41,7 @@ Repack rebuilds the pack by itself and only sends it when you say so:
 - **`/repack reload`** reads the block files, rebuilds the pack and pushes it to everyone online, unless it came out the same as the pack last pushed.
 - **A player who joins** gets the newest build, even one that was never pushed. Set `resource-pack.join-latest-build: false` to give joiners only the pack that was last pushed.
 - A build with errors is never used. The previous build stays, and the errors are in the chat and the console.
-- **While a pack loads:** the screen freezes while a client reloads a pack. From the moment the client reports it has downloaded a pack Repack just sent it (a push or a join) until it has loaded it, for 20 seconds at most, the player is held. They cannot be hurt and cannot move (the server puts their position back, they are held in the air without falling, and they are allowed to hover so the server does not kick them for flying). They cannot attack, use items, break, place, drop or interact with anything. They see no other entities at all, and the blocks around them look like black concrete. All of it is sent to that player only, and the real blocks and entities come back when it is done. The same player cannot be held again for two minutes, so a modified client that fakes its status gains only a few seconds of standing still. Their normal settings are put back when it ends, if they leave, or if the server stops. Turn it off with `resource-pack.invulnerable-while-loading`, the black blocks with `resource-pack.black-blocks-while-loading`, and change the size with `resource-pack.loading-radius`.
+- **While a pack loads:** the screen freezes while a client reloads a pack. From the moment the client reports it has downloaded a pack Repack just sent it (a push or a join) until it has loaded it, for 20 seconds at most, the player is held. They cannot be hurt and cannot move (the server puts their position back, they are held in the air without falling, and they are allowed to hover so the server does not kick them for flying). They cannot attack, use items, break, place, drop or interact with anything. They see no other entities at all, and every block around them, air included, looks like black concrete (all but the two they stand in). All of it is sent to that player only, and the real blocks and entities come back when it is done. The same player cannot be held again for two minutes, so a modified client that fakes its status gains only a few seconds of standing still. Their normal settings are put back when it ends, if they leave, or if the server stops. Turn it off with `resource-pack.invulnerable-while-loading`, the black blocks with `resource-pack.black-blocks-while-loading`, and change the size with `resource-pack.loading-radius`.
 
 Two settings under `workflow:` in `config.yml` control the building:
 
@@ -70,6 +70,7 @@ All of them need `repack.admin` (given to operators by default). `/give` also wo
 | `/repack status` | Built and published packs per version, and the pack server. |
 | `/repack give <id> [amount] [players]` | Gives the item that places a block. |
 | `/give @s repack:<id> [count]` | The same through vanilla `/give`, with tab completion. |
+| `/repack builder [id]` | The block builder: edit a block's settings, item and recipe in screens (see [The block builder](#the-block-builder)). |
 | `/repack menu` | A screen with every block item. Click to take one, shift-click for 64. |
 | `/repack place <id> [pos]` and `/repack remove [pos]` | Place or remove a block without an item. |
 | `/repack list` | The ids that can be placed. |
@@ -127,6 +128,18 @@ To make a second block from the same model, copy the file (`chair2.yml`) and kee
 
 Edits to a block file are picked up a few seconds after you save it, and only that block is reloaded. A file with a mistake is reported with the file name and the problem, and that block is not loaded until it is fixed: blocks of that type that are already placed stay in the world but show nothing.
 
+### The block builder
+
+`/repack builder` opens a list of every block, and `/repack builder <id>` opens one block. Everything in the block file can be changed there, and the same checks as for a hand-edited file apply. A block is written to `blocks/<id>.yml` only when you press **Save**, and that block is reloaded at once. Changes you have not saved are kept until you save, press "Throw away changes", or leave the server.
+
+- **New block:** the "New block" button asks for an id (an anvil screen: type the name, then take the result), then shows the models in `models/` to pick one.
+- **Numbers and choices:** buttons. Click adds or switches to the next, right click goes back, shift makes the step bigger.
+- **Drops:** click an item in your own inventory to add a drop. Click raises the chance, shift click the amount, and Q removes it.
+- **The exact item:** in the Item screen, put an item on your cursor and click the slot, or shift click it in your inventory. It is saved exactly, with its name, lore, enchantments and any custom data, and `item.stack` in the file holds it. "Use the block's model" says whether Repack puts the block's model on it or leaves the model the item already has, for example one from another pack.
+- **The recipe:** a 3x3 grid like a dropper. Put an item on your cursor and click a slot, or shift click an item in your inventory to fill the next free slot. Custom items are kept exactly (`recipe.exact` in the file), and "Exact items" does the same for plain ones. The result slot sets how many it makes.
+
+Only operators (`repack.admin`) can open it. With pictures for the screens (see dev.md) they look like custom screens; without them they are plain chests with vanilla items, which work the same.
+
 ### How a block behaves
 
 - The model is a packet-only item display. Nothing is spawned on the server and nothing is saved in the world for it. Placed blocks are stored in the chunk data and survive restarts.
@@ -164,7 +177,8 @@ If Distortion (or another plugin that uses the same scheme) is installed, the fi
 | `resource-pack.send-gap-ticks` | `20` | Minimum time between packs from different plugins to one player. |
 | `resource-pack.required` / `prompt` | `false` / text | Kick players who decline, and the text of the prompt. |
 | `client-notices` | `true` | Tell players their client is too old. |
-| `workflow.*` | see above | Automatic rebuilding and sending. |
+| `workflow.*` | see above | Automatic rebuilding and the progress bar. |
+| `gui.textures` | `true` | Use the pictures for the builder screens when there are any. |
 
 Every settings file starts with `config-version` and a note not to edit it. When a new Repack version changes the shipped `config.yml` or the block template, the file is updated on the next start: new options are added, your values and comments are kept, and the old file is saved as `<name>.bak-<version>` if anything besides the version changed.
 
