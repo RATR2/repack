@@ -30,6 +30,8 @@ class PackStore(private val dataFolder: File) {
             entryOf(state.getString("built.${era.id}"))?.let { builtEntries[era] = it }
             entryOf(state.getString("published.${era.id}"))?.let { publishedEntries[era] = it }
         }
+        // Packs left over from before the server stopped are cleaned up at once, not at the next build.
+        prune()
     }
 
     fun add(variant: PackEra, zip: ByteArray): PackEntry {
@@ -75,7 +77,7 @@ class PackStore(private val dataFolder: File) {
     }
 
     /**
-     * Deletes packs that neither state refers to, once they are a day old: a client may still be downloading the pack that was
+     * Deletes packs that neither state refers to, once they are an hour old: a client may still be downloading the pack that was
      * published a moment ago.
      */
     private fun prune() {
@@ -89,6 +91,6 @@ class PackStore(private val dataFolder: File) {
 
     private companion object {
         val HASH = Regex("[0-9a-f]{40}")
-        const val PRUNE_AFTER_MILLIS = 24L * 60 * 60 * 1000
+        const val PRUNE_AFTER_MILLIS = 60L * 60 * 1000
     }
 }
