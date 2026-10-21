@@ -55,11 +55,11 @@ Repack builds one pack per client version range (`legacy` for 1.21.4 to 1.21.8 a
 
 Converted models are cached in `plugins/Repack/cache/models/`, one file per model, named by the model's id and a hash of its file. A build only converts the models that changed, and the first build after a restart reuses the cache too. The cache is thrown away when Repack's version changes. If a model looks stale anyway, for example on a development build with an unchanged version number, run `/repack build fresh`, or delete that folder.
 
-If Distortion is installed too, both plugins send their packs in one request when a player joins, so there is a single "accept the resource pack" prompt.
+If another plugin that uses the same scheme is installed too, both send their packs in one request when a player joins, so there is a single "accept the resource pack" prompt.
 
 ## Commands
 
-`/repack` alone opens the settings screens for everyone: personal settings, and for those with `repack.settings` the server settings. Every other command needs `repack.admin` (given to operators by default); `/repack distortion` needs `distortion.spawn` or `distortion.debug`. `/give` also works with Repack's ids.
+`/repack` alone opens the settings screens for everyone: personal settings, and for those with `repack.settings` the server settings. Every other command needs `repack.admin` (given to operators by default); `/repack distortion` needs `repack.distortion.spawn` or `repack.distortion.debug`. `/give` also works with Repack's ids.
 
 | Command | |
 |---|---|
@@ -167,7 +167,7 @@ Repack runs a small web server for the pack, by default on port **8086**. Player
 2. Make sure `resource-pack.port` is open to players in your firewall.
 3. After changing the port or address run `/repack reload host`. No restart is needed.
 
-If Distortion (or another plugin that uses the same scheme) is installed, the first plugin that starts hosts the server for all of them, and the others serve their packs under it. Turn that off with `resource-pack.share-host: false`.
+If another plugin that uses the same scheme is installed, the first plugin that starts hosts the server for all of them, and the others serve their packs under it. Turn that off with `resource-pack.share-host: false`.
 
 ## config.yml
 
@@ -223,11 +223,11 @@ Nametags and other see-through text are not animated.
 
 ## Ripple effects
 
-A ripple spawned at a spot in the world distorts the screen of players who have the pack, in the color and size you give. From 26.3 on it works with any graphics setting; on 1.21.4 to 26.2 players see it only with Fabulous! graphics. Spawn one with `/repack distortion spawn 55CCFF 8 40` (color, radius in blocks, ticks), from Skript with `spawn a ripple at ...`, or from Java with `RepackAPI.ripple`. Up to 256 ripples show at once. The pack has one build per client version, because the shaders differ in every game version. If a separate Distortion plugin is installed, Repack says so and keeps its own ripples off until you remove it.
+A ripple spawned at a spot in the world distorts the screen of players who have the pack, in the color and size you give. From 26.3 on it works with any graphics setting; on 1.21.4 to 26.2 players see it only with Fabulous! graphics. Spawn one with `/repack distortion spawn 55CCFF 8 40` (color, radius in blocks, ticks), from Skript with `spawn a ripple at ...`, or from Java with `RepackAPI.ripple`. Up to 256 ripples show at once. The pack has one build per client version, because the shaders differ in every game version.
 
 ## Screen shake
 
-Part of the same effects as the ripples: `/repack shake <players> <strength> <ticks> [rate balance roll]` shakes the screen of the players you name. Strength is 0 to 1 and the shake fades out over the ticks (strength is squared, so a weak shake stays gentle). The optional numbers, each 0 to 1, say how fast it jitters (`rate`), how much of it is up and down rather than sideways (`balance`, 0.5 is even) and how much it turns the picture (`roll`). A second shake while one runs only replaces it when it is at least as strong as what is left. It works for 1.21.6 and newer clients that have the pack loaded; on 1.21.6 to 26.2 players see it only with Fabulous! graphics, and from 26.3 on the pack adds the shake as a post effect only while a player shakes. From Skript: `shake player's screen with strength 0.5 for 40 ticks`, `stop shaking player's screen`; from Java: `RepackAPI.shake(player, 0.5, 40)`. It needs the `distortion.shake` permission (operators have it) and switches off with `distortion.enabled`.
+Part of the same effects as the ripples: `/repack shake <players> <strength> <ticks> [rate balance roll]` shakes the screen of the players you name. Strength is 0 to 1 and the shake fades out over the ticks (strength is squared, so a weak shake stays gentle). The optional numbers, each 0 to 1, say how fast it jitters (`rate`), how much of it is up and down rather than sideways (`balance`, 0.5 is even) and how much it turns the picture (`roll`). A second shake while one runs only replaces it when it is at least as strong as what is left. It works for 1.21.6 and newer clients that have the pack loaded; on 1.21.6 to 26.2 players see it only with Fabulous! graphics, and from 26.3 on the pack adds the shake as a post effect only while a player shakes. From Skript: `shake player's screen with strength 0.5 for 40 ticks`, `stop shaking player's screen`; from Java: `RepackAPI.shake(player, 0.5, 40)`. It needs the `repack.distortion.shake` permission (operators have it) and switches off with `distortion.enabled`.
 
 ## Skyboxes
 

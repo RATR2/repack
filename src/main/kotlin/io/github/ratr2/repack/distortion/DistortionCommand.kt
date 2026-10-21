@@ -139,8 +139,8 @@ class DistortionCommand(private val plugin: Repack) {
     }
 
     companion object {
-        const val SPAWN = "distortion.spawn"
-        const val DEBUG = "distortion.debug"
-        const val SHAKE = "distortion.shake"
+        const val SPAWN = "repack.distortion.spawn"
+        const val DEBUG = "repack.distortion.debug"
+        const val SHAKE = "repack.distortion.shake"
     }
 }

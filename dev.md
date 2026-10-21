@@ -233,7 +233,7 @@ The vanilla "Inventory" label is still drawn over the picture, since the game dr
 
 ## Pack hosting for other plugins
 
-A plugin that sends its own server resource pack can share Repack's web server and the single join prompt. Repack and Distortion do this through a Bukkit service of type `java.util.Map` made only of JDK types, because each plugin has its own copy of every class. The protocol is in `SharedHost.kt` (identical in both plugins, apart from the package line): a plugin registers a name for its files and an offer function for joining players, and the plugin that started first hosts for all of them.
+A plugin that sends its own server resource pack can share Repack's web server and the single join prompt. Repack and the plugins that share with it do this through a Bukkit service of type `java.util.Map` made only of JDK types, because each plugin has its own copy of every class. The protocol is in `SharedHost.kt` (identical in each plugin, apart from the package line): a plugin registers a name for its files and an offer function for joining players, and the plugin that started first hosts for all of them.
 
 ## Releasing
 

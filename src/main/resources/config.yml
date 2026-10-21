@@ -31,7 +31,7 @@ resource-pack:
   # Change it and run /repack reload host, no restart needed.
   port: 8086
   bind: 0.0.0.0
-  # Share one pack server with Distortion (or any other plugin using this scheme). Whichever plugin starts first hosts it and
+  # Share one pack server with other plugins using this scheme. Whichever plugin starts first hosts it and
   # decides the address and port; the others serve under it and ignore their own public-host and port while they do.
   share-host: true
   # Wait this long after a player joins before sending the pack, so it does not arrive with everything else (20 ticks = 1 second).
@@ -57,7 +57,7 @@ client-notices: true
 # The console says so when the server runs a version older than 26.3, where the ripple effects need Fabulous! graphics. false: say nothing.
 recommend-latest: true
 
-# Distortion, now part of Repack: ripple effects anchored in the world and screen shake, made by the pack's shaders. false: no shaders in the pack, no ripples and no shake.
+# Ripple effects anchored in the world and screen shake, made by the pack's shaders. false: no shaders in the pack, no ripples and no shake.
 # Change it and restart the server; the pack changes at the next /repack build.
 distortion:
   enabled: true

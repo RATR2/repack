@@ -168,10 +168,6 @@ class Repack : JavaPlugin() {
 
     private fun startRipples() {
         if (!config.getBoolean("distortion.enabled", true)) return
-        if (server.pluginManager.getPlugin("distortion") != null) {
-            logger.warning("The Distortion plugin is installed too: Repack includes it now, so remove distortion.jar. Repack's own ripples are off until you do.")
-            return
-        }
         val manager = io.github.ratr2.repack.distortion.RippleManager(this, sender)
         val shakes = io.github.ratr2.repack.distortion.ShakeManager(this, sender)
         sender.onLoaded = manager::onPackLoaded
