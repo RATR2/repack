@@ -12,6 +12,17 @@ messages:
   no-permission: "You can't do that here."
 
 resource-pack:
+  # true: Repack hosts the pack itself (the address and port below) and sends it to players.
+  # false: Repack only builds it, and another plugin that sends resource packs (ItemsAdder, CraftEngine, ...) sends it: add the zip written to `export`
+  # as that plugin's external zip. The pack server is not started and /repack push does nothing. Needs a restart.
+  send: true
+  # Also write the built pack into this folder (absolute, or relative to this one), for a plugin that adds an external zip or folder.
+  # repack.zip is the pack of the era named in export-era, repack-<era>.zip is the pack of each, and repack-all.zip serves every client version at once
+  # (overlays: untested on every version, keep repack.zip as a fallback). Empty: nowhere, or `export` when send is false.
+  export: ""
+  # Which client version repack.zip is for: 1.21.4, 1.21.5, 1.21.8 (1.21.6 to 1.21.8), 1.21.10 (1.21.9 and 1.21.10), 1.21.11, 26.1, 26.2 or 26.3
+  # (26.3 and newer). The sending plugin sends one pack to everybody, so pick the version most of your players use.
+  export-era: "26.3"
   # Address players' clients download the pack from: your server's public IP or domain.
   # Empty uses server-ip from server.properties, or localhost if that is empty too.
   public-host: ""

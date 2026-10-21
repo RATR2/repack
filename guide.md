@@ -151,6 +151,12 @@ Only operators (`repack.admin`) can open it. With pictures for the screens (see 
 - Changing `proxy.block` of a block that is already placed moves the placed blocks over to the new proxy as their chunks load.
 - WorldGuard is checked when someone starts mining, breaks or clicks, and when placing. A denied action shows no mining progress and does nothing.
 
+## Sending the pack through another plugin
+
+By default Repack hosts the pack itself and sends it (`resource-pack.public-host` and `port`). If you already use a plugin that sends a resource pack, such as ItemsAdder or CraftEngine, set `resource-pack.send: false` and restart. Repack then starts no pack server and sends nothing; each build is written to `plugins/Repack/export/` (or the folder in `resource-pack.export`) as `repack.zip`, with a file per client version next to it (`repack-26.3.zip` and so on). Add `repack.zip` as an external zip in that plugin's settings, which is how BetterModel is added too, and it sends it with its own pack. `resource-pack.export-era` says which client version `repack.zip` is made for, 26.3 and newer by default; the sending plugin sends one pack to everybody, so pick the version most of your players use.
+
+With `send: true` you can still set `resource-pack.export` to also write the zips. Ripples need to know when a player's client has loaded the pack: when Repack does not send it, any server pack a client loads counts.
+
 ## Pack hosting
 
 Repack runs a small web server for the pack, by default on port **8086**. Players' clients download from it, so:

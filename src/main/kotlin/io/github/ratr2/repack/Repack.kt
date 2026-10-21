@@ -21,6 +21,8 @@ import io.github.ratr2.repack.model.ModelLibrary
 import io.github.ratr2.repack.pack.LoadingHold
 import io.github.ratr2.repack.pack.PackBuilder
 import io.github.ratr2.repack.pack.EraAssets
+import io.github.ratr2.repack.pack.PackExport
+import io.github.ratr2.repack.pack.PackVariant
 import io.github.ratr2.repack.pack.TextEffects
 import io.github.ratr2.repack.pack.PackEra
 import io.github.ratr2.repack.pack.PackEntry
@@ -58,6 +60,14 @@ class Repack : JavaPlugin() {
     val itemEditor: io.github.ratr2.repack.edit.ItemEditor by lazy { io.github.ratr2.repack.edit.ItemEditor(this) }
     lateinit var host: SharedHost
         private set
+
+    var sending: Boolean = true
+        private set
+
+    fun exportFolder(): File? {
+        val path = config.getString("resource-pack.export").orEmpty().trim().ifEmpty { if (sending) return null else "export" }
+        return File(path).let { if (it.isAbsolute) it else File(dataFolder, path) }
+    }
     lateinit var menu: BlockMenu
         private set
     var ripples: io.github.ratr2.repack.distortion.RippleManager? = null
@@ -71,10 +81,11 @@ class Repack : JavaPlugin() {
         saveResource("blocks/_example.yml", true)
         installDefaults()
         store = PackStore(dataFolder)
-        host = SharedHost(this, "repack", 8086) { name -> store.file(name.removeSuffix(".zip"))?.readBytes() }.also { it.start() }
+        sending = config.getBoolean("resource-pack.send", true)
+        host = SharedHost(this, "repack", 8086) { name -> store.file(name.removeSuffix(".zip"))?.readBytes() }.also { if (sending) it.start() }
         val versions = ClientVersions(this)
         hold = LoadingHold(this)
-        sender = PackSender(this, store, host, versions, hold)
+        sender = PackSender(this, store, host, versions, hold, sending)
         if (versions.hasViaBackwards) logger.warning("ViaBackwards found: clients older than 1.21.4 will not be able to see Repack blocks.")
         server.pluginManager.registerEvents(sender, this)
         server.pluginManager.registerEvents(hold, this)
@@ -103,7 +114,11 @@ class Repack : JavaPlugin() {
         }
         blocks.start()
         RepackAPI.plugin = this
-        if (!store.hasPublished) logger.info("No pack published yet: run /repack build, then /repack push, to send players the pack.")
+        if (sending) {
+            if (!store.hasPublished) logger.info("No pack published yet: run /repack build, then /repack push, to send players the pack.")
+        } else {
+            logger.info("Repack does not send the pack (resource-pack.send: false): it builds it into ${exportFolder()} for another plugin to add as an external zip.")
+        }
         lastStamp = stamp()
         pendingBuild = config.getBoolean("workflow.build-on-change", true)
         server.scheduler.runTaskTimer(this, Runnable { watch() }, WATCH_TICKS, WATCH_TICKS)
@@ -384,6 +399,10 @@ class Repack : JavaPlugin() {
 
     fun rebuildAndPush(force: Boolean = false, done: (BuildReport) -> Unit) {
         rebuild(force) { report ->
+            if (!sending) {
+                done(report)
+                return@rebuild
+            }
             if (!report.rejected && report.entries.isNotEmpty()) {
                 if (report.entries == store.published) {
                     report.unchanged = true
@@ -429,6 +448,7 @@ class Repack : JavaPlugin() {
         server.scheduler.runTaskAsynchronously(this, Runnable {
             var library: LibraryResult? = null
             var zips: Map<PackEra, ByteArray>? = null
+            var universal: ByteArray? = null
             var failure: String? = null
             try {
                 library = ModelLibrary.build(folder, cache, fresh) { done, total ->
@@ -440,21 +460,40 @@ class Repack : JavaPlugin() {
                     ruleErrors.forEach { logger.warning(it) }
                     val effects = TextEffects.snippet(rules)
                     val shaders = config.getBoolean("distortion.enabled", true) || effects != null
+                    val gui = GuiPack.files()
+                    val eraShaders = PackEra.entries.associateWith { era -> if (shaders) EraAssets.files(file, era, effects) else emptyMap() }
                     zips = PackEra.entries.associateWith { era ->
                         progress.update(PARSE_SHARE + (ZIP_SHARE - PARSE_SHARE) * era.ordinal / PackEra.entries.size, "zipping the ${era.id} pack")
                         val files = HashMap(library.files.getValue(era.family))
-                        files.putAll(GuiPack.files())
-                        if (shaders) files.putAll(EraAssets.files(file, era, effects))
+                        files.putAll(gui)
+                        files.putAll(eraShaders.getValue(era))
                         files["pack.mcmeta"] = PackBuilder.meta(era)
                         files["pack.png"] = PackBuilder.icon()
                         PackBuilder.zip(files)
+                    }
+                    if (exportFolder() != null) {
+                        universal = PackBuilder.universal(library.files.getValue(PackVariant.LEGACY), library.files.getValue(PackVariant.MODERN), gui, eraShaders)
                     }
                 }
             } catch (e: Throwable) {
                 failure = "The build failed: ${e.javaClass.simpleName}: ${e.message}"
             }
+            var exported: String? = null
+            if (zips != null) {
+                val folder = exportFolder()
+                if (folder != null) {
+                    val main = PackExport.eraOf(config.getString("resource-pack.export-era").orEmpty()) ?: PackEra.newest
+                    exported = try {
+                        PackExport.write(folder, zips, main, universal)
+                    } catch (e: java.io.IOException) {
+                        logger.warning("The pack could not be written to $folder: ${e.message}")
+                        null
+                    }
+                }
+            }
             server.scheduler.runTask(this, Runnable {
                 building = false
+                exportedTo = exported
                 if (failure != null || library == null) {
                     progress.finish(false, "build failed")
                     logger.severe(failure ?: "The build failed.")

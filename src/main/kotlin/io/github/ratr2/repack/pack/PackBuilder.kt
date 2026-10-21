@@ -8,6 +8,19 @@ import java.util.zip.ZipOutputStream
 
 object PackBuilder {
 
+    /** 1.21.4. */
+    private const val FIRST_FORMAT = 46
+
+    /** 1.21.7 and 1.21.8: the last formats that read `supported_formats` instead of `min_format` and `max_format`. */
+    private const val LAST_RANGE_FORMAT = 64
+
+    /** 1.21.9: the first format that reads `min_format` and `max_format`. */
+    private const val MODERN_FORMAT = 69
+
+    /** 26.3 (97.1), the newest format. */
+    private const val NEWEST_MAJOR = 97
+    private const val NEWEST_MINOR = 1
+
     fun meta(era: PackEra): ByteArray {
         val pack = JsonObject()
         era.putFormat(pack)

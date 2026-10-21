@@ -166,6 +166,7 @@ class RepackCommand(private val plugin: Repack) {
         } else {
             val built = "Built ${report.entries.entries.joinToString { (variant, entry) -> "${variant.id} ${short(entry)}" }} from ${report.models.size} model(s). "
             val next = when {
+                !plugin.sending -> plugin.exportedTo?.let { "Repack does not send it: it is in $it (repack.zip), for another plugin to add as an external zip." } ?: "Repack does not send it (resource-pack.send: false)."
                 report.sent != null -> "Sent it to ${report.sent} player(s)."
                 report.unchanged -> "It is the same as the pack last pushed, so nothing was sent. /repack push sends it anyway."
                 else -> "Nobody was sent it. Run /repack push to send it to everyone online, or /repack push <player> to one."
@@ -179,6 +180,10 @@ class RepackCommand(private val plugin: Repack) {
     }
 
     private fun push(context: CommandContext<CommandSourceStack>, targets: List<Player>): Int {
+        if (!plugin.sending) {
+            reply(context, "Repack does not send the pack (resource-pack.send: false). Another plugin sends it: add ${plugin.exportFolder()}${java.io.File.separator}repack.zip as its external zip.", NamedTextColor.RED)
+            return 0
+        }
         val published = plugin.store.publish()
         if (published.isEmpty()) {
             reply(context, "Nothing built yet. Run /repack build first.", NamedTextColor.RED)
@@ -197,7 +202,9 @@ class RepackCommand(private val plugin: Repack) {
             val note = if (built != null && built != published) " (the built one has not been pushed yet)" else ""
             reply(context, "${variant.id} (${variant.label}): built ${built?.let(::short) ?: "none"}, published ${published?.let(::short) ?: "none"}$note", NamedTextColor.YELLOW)
         }
-        reply(context, "Pack server: ${plugin.host.description}.", NamedTextColor.YELLOW)
+        if (plugin.sending) reply(context, "Pack server: ${plugin.host.description}.", NamedTextColor.YELLOW)
+        else reply(context, "Not sending the pack (resource-pack.send: false); it is built into ${plugin.exportFolder()} for another plugin.", NamedTextColor.YELLOW)
+        if (plugin.sending) plugin.exportFolder()?.let { reply(context, "Also written to $it.", NamedTextColor.YELLOW) }
         return Command.SINGLE_SUCCESS
     }
 
@@ -258,7 +265,7 @@ class RepackCommand(private val plugin: Repack) {
 
     private fun reloadPack(context: CommandContext<CommandSourceStack>, config: Boolean, host: Boolean): Int {
         if (config) plugin.reloadConfig()
-        if (host) {
+        if (host && plugin.sending) {
             val error = plugin.host.restart()
             if (error != null) reply(context, error, NamedTextColor.RED) else reply(context, "Pack server ${plugin.host.description}.", NamedTextColor.GREEN)
         }
@@ -274,7 +281,7 @@ class RepackCommand(private val plugin: Repack) {
             errors.take(MAX_LINES).forEach { reply(context, it, NamedTextColor.RED) }
             reply(context, "Loaded ${plugin.blocks.types.size} block type(s)${if (errors.isEmpty()) "" else ", ${errors.size} with errors"}.", NamedTextColor.GREEN)
         }
-        if (host) {
+        if (host && plugin.sending) {
             val error = plugin.host.restart()
             if (error != null) reply(context, error, NamedTextColor.RED) else reply(context, "Pack server ${plugin.host.description}.", NamedTextColor.GREEN)
         }

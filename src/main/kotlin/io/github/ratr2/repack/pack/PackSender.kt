@@ -21,6 +21,7 @@ class PackSender(
     private val host: SharedHost,
     private val versions: ClientVersions,
     private val hold: LoadingHold,
+    private val sending: Boolean = true,
 ) : Listener {
 
     private val id: UUID = UUID.nameUUIDFromBytes("repack-pack".toByteArray())
@@ -42,7 +43,7 @@ class PackSender(
     fun loadedPlayers(): List<Player> = loaded.keys.mapNotNull(plugin.server::getPlayer)
 
     init {
-        host.offer(::joinOffer)
+        if (sending) host.offer(::joinOffer)
     }
 
     private fun joinOffer(playerId: UUID): Map<String, String>? {
@@ -63,7 +64,7 @@ class PackSender(
         if (plugin.config.getBoolean("resource-pack.join-latest-build", true)) store.built[variant] ?: store.published[variant] else store.published[variant]
 
     fun send(players: Collection<Player>): Int {
-        if (!store.hasPublished) return 0
+        if (!sending || !store.hasPublished) return 0
         val online = players.filter { it.isOnline }
         online.forEach { player -> host.enqueue(player.uniqueId) { if (player.isOnline) sendNow(player) } }
         return online.count { player -> variantOf(player)?.let(store.published::get) != null }
@@ -99,16 +100,18 @@ class PackSender(
 
     @EventHandler
     fun onStatus(event: PlayerResourcePackStatusEvent) {
-        if (event.id != id) return
+        // When Repack does not send the pack, whatever pack another plugin sent that the client loads counts as this one.
+        val own = event.id == id
+        if (!own && sending) return
         val playerId = event.player.uniqueId
         when (event.status) {
-            Status.DOWNLOADED -> {
+            Status.DOWNLOADED -> if (own) {
                 val sent = sentAt.remove(playerId)
                 if (sent != null && System.currentTimeMillis() - sent < SENT_VALID_MILLIS) hold.start(event.player)
             }
             Status.SUCCESSFULLY_LOADED -> {
                 sentAt.remove(playerId)
-                hold.end(playerId)
+                if (own) hold.end(playerId)
                 val era = variantOf(event.player)
                 if (era != null && loaded.put(playerId, era) == null) {
                     onLoaded(event.player)
@@ -119,7 +122,7 @@ class PackSender(
             }
             Status.DECLINED, Status.FAILED_DOWNLOAD, Status.FAILED_RELOAD, Status.INVALID_URL, Status.DISCARDED -> {
                 sentAt.remove(playerId)
-                hold.end(playerId)
+                if (own) hold.end(playerId)
                 loaded.remove(playerId)?.let { onLost(event.player, it.usesPostEffects) }
             }
             else -> {}
@@ -143,7 +146,7 @@ class PackSender(
             notice(player, "Repack custom blocks are not available on your client version: they need Minecraft 1.21.4 or newer.")
             return
         }
-        host.joined(player.uniqueId)
+        if (sending) host.joined(player.uniqueId)
     }
 
     private companion object {
