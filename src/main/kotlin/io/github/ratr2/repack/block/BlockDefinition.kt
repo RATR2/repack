@@ -79,6 +79,13 @@ enum class DisplayContext(val value: Byte) {
     FIXED(8),
 }
 
+enum class BreakAnimation {
+    /** A player who breaks it sees the animation first, and the block goes when it is over. Other ways it goes (an explosion, a piston) leave the model for the animation (as LINGER). */
+    DELAY,
+    LINGER,
+    OFF,
+}
+
 class DisplayOptions(
     val offsetX: Double,
     val offsetY: Double,
@@ -94,6 +101,7 @@ class DisplayOptions(
     val context: DisplayContext,
     val animation: String? = null,
     val animationMode: io.github.ratr2.repack.model.AnimationMode? = null,
+    val breakAnimation: BreakAnimation = BreakAnimation.DELAY,
 )
 
 class ItemOptions(

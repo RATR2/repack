@@ -129,6 +129,7 @@ object BlockDefinitions {
                 context = enumOf(display?.getString("context") ?: "none", DisplayContext::class.java, "display.context"),
                 animation = display?.getString("animation")?.takeIf { it.isNotBlank() }?.let(ModelLibrary::cleanId),
                 animationMode = display?.getString("animation-mode")?.takeIf { it.isNotBlank() }?.let { enumOf(it, io.github.ratr2.repack.model.AnimationMode::class.java, "display.animation-mode") },
+                breakAnimation = enumOf(display?.getString("break-animation") ?: "delay", BreakAnimation::class.java, "display.break-animation"),
             ),
             item = ItemOptions(
                 baseName = itemBase,

@@ -47,8 +47,9 @@ object BlockTemplate {
           # brightness: 15              # 0 to 15, leave out to light it like the world around it
           rotate-to-placer: false       # face the player who places it, in 90 degree steps
           context: none                 # which Display tab setting the placed block uses: none, gui, ground, fixed, head, ...
-          # animation: idle             # a model with animations plays this Blockbench animation all the time (its name, lowercase)
+          # animation: idle             # plays all the time (its name, lowercase). Leave out: an animation called idle loops, and place and break play when it is placed and broken
           # animation-mode: loop        # loop, once (then back to the built pose) or hold (stays in the last pose); leave out for what Blockbench says
+          break-animation: delay        # delay: the break animation plays before the block goes. linger: the block goes and its model stays for the animation. off
 
         item:
           base: PAPER                   # what the item that places this block is made from

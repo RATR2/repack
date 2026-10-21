@@ -17,6 +17,7 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity
 import io.github.ratr2.repack.block.BlockDefinition
 import io.github.ratr2.repack.block.BlockPos
+import io.github.ratr2.repack.block.BreakAnimation
 import io.github.ratr2.repack.block.DisplayContext
 import io.github.ratr2.repack.block.PlacedBlock
 import io.github.ratr2.repack.block.PlacedBlocks
@@ -51,10 +52,8 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
 
     private val played = HashMap<Key, Played>()
 
-    /** Blocks that cannot be broken until a tick, while their place or break animation plays. */
     private val locks = HashMap<Key, Int>()
 
-    /** The model of a block that is gone, kept for a moment to play its break animation. */
     private class Linger(val player: UUID, val shown: Shown, val until: Int)
 
     private val lingering = ArrayList<Linger>()
@@ -62,14 +61,102 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
     private val shown = HashMap<UUID, HashMap<Key, Shown>>()
 
     override fun placed(world: World, pos: BlockPos, block: PlacedBlock, definition: BlockDefinition) {
+        val key = Key(world.uid, pos)
+        plugin.rigs[definition.model]?.clip(PLACE)?.let { clip ->
+            val now = Bukkit.getCurrentTick()
+            played[key] = Played(clip.key, now, AnimationMode.ONCE)
+            locks[key] = now + ticksOf(clip, AnimationMode.ONCE)
+        }
         val chunkKey = Chunk.getChunkKey(pos.x shr 4, pos.z shr 4)
         world.players.filter { it.isChunkSent(chunkKey) }.forEach { show(it, world, pos, block, definition) }
     }
 
     override fun removed(world: World, pos: BlockPos, block: PlacedBlock, definition: BlockDefinition) {
         val key = Key(world.uid, pos)
+        val already = played[key]?.clip == BREAK
         played.remove(key)
-        world.players.forEach { hide(it, key) }
+        locks.remove(key)
+        val clip = plugin.rigs[definition.model]?.clip(BREAK)
+        // The model of a block with a break animation stays for it (unless it just played in front of the player who broke the block).
+        val linger = clip != null && !already && definition.display.breakAnimation != BreakAnimation.OFF
+        for (player in world.players) {
+            if (linger) lingerOne(player, key, clip!!) else hide(player, key)
+        }
+    }
+
+    private fun lingerOne(player: Player, key: Key, clip: RigClip) {
+        val entry = shown[player.uniqueId]?.remove(key) ?: return
+        val rig = entry.rig ?: return RigDisplays.destroy(player, entry.ids)
+        val now = Bukkit.getCurrentTick()
+        entry.clip = clip
+        entry.start = now
+        entry.mode = AnimationMode.HOLD
+        RigDisplays.update(listOf(player), entry.ids, entry.look ?: return, displaysOf(rig, clip, now, AnimationMode.HOLD), null)
+        lingering += Linger(player.uniqueId, entry, now + ticksOf(clip, AnimationMode.HOLD))
+    }
+
+    private fun ticksOf(clip: RigClip, mode: AnimationMode): Int =
+        Math.ceil((clip.animation.length + if (mode == AnimationMode.ONCE) AnimationSampler.TWEEN_BACK else 0.0) * 20).toInt() + 2
+
+    fun locked(location: org.bukkit.Location): Boolean {
+        val world = location.world ?: return false
+        val key = Key(world.uid, BlockPos(location.blockX, location.blockY, location.blockZ))
+        val until = locks[key] ?: return false
+        if (until > Bukkit.getCurrentTick()) return true
+        locks.remove(key)
+        return false
+    }
+
+    fun beginBreak(location: org.bukkit.Location): Int {
+        val world = location.world ?: return 0
+        val block = location.block
+        val definition = blocks.idAt(block)?.let(blocks::definitionOf) ?: return 0
+        if (definition.display.breakAnimation != BreakAnimation.DELAY) return 0
+        val rig = plugin.rigs[definition.model] ?: return 0
+        val clip = rig.clip(BREAK) ?: return 0
+        val key = Key(world.uid, BlockPos(block.x, block.y, block.z))
+        val now = Bukkit.getCurrentTick()
+        played[key] = Played(clip.key, now, AnimationMode.HOLD)
+        val ticks = ticksOf(clip, AnimationMode.HOLD)
+        locks[key] = now + ticks
+        for ((id, mine) in shown) {
+            val entry = mine[key] ?: continue
+            val player = Bukkit.getPlayer(id) ?: continue
+            entry.clip = clip
+            entry.start = now
+            entry.mode = AnimationMode.HOLD
+            RigDisplays.update(listOf(player), entry.ids, entry.look ?: continue, displaysOf(rig, clip, now, AnimationMode.HOLD), null)
+        }
+        return ticks
+    }
+
+    fun unlock(location: org.bukkit.Location) {
+        val world = location.world ?: return
+        locks.remove(Key(world.uid, BlockPos(location.blockX, location.blockY, location.blockZ)))
+    }
+
+    fun reset(location: org.bukkit.Location) {
+        val world = location.world ?: return
+        val key = Key(world.uid, BlockPos(location.blockX, location.blockY, location.blockZ))
+        locks.remove(key)
+        if (played.remove(key) == null) return
+        for ((id, mine) in shown) {
+            val entry = mine[key] ?: continue
+            val player = Bukkit.getPlayer(id) ?: continue
+            val rig = entry.rig ?: continue
+            val base = entry.definition?.let { baseOf(it, rig) } ?: continue
+            entry.clip = base.first
+            entry.start = 0
+            entry.mode = base.second
+            RigDisplays.update(listOf(player), entry.ids, entry.look ?: continue, displaysOf(rig, entry.clip, 0, entry.mode), null)
+        }
+    }
+
+    /** What a block plays when nothing was set on it: the animation its file names, or one called idle (which loops unless the file says otherwise). */
+    private fun baseOf(definition: BlockDefinition, rig: Rig): Pair<RigClip?, AnimationMode?> {
+        val named = definition.display.animation
+        return if (named != null) rig.clip(named) to definition.display.animationMode
+        else rig.clip(IDLE) to (definition.display.animationMode ?: AnimationMode.LOOP)
     }
 
     @EventHandler
@@ -151,11 +238,12 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
         if (rig != null) {
             val look = lookOf(definition)
             val override = played[key]
-            val clip = (if (override != null) override.clip else definition.display.animation)?.let(rig::clip)
+            val base = baseOf(definition, rig)
+            val clip = if (override != null) override.clip?.let(rig::clip) else base.first
             val start = override?.start ?: 0
-            val mode = if (override != null) override.mode else definition.display.animationMode
+            val mode = if (override != null) override.mode else base.second
             val entityIds = RigDisplays.newIds(rig)
-            ids[key] = Shown(entityIds, rig, definition.model, clip, look, start, mode)
+            ids[key] = Shown(entityIds, rig, definition.model, clip, look, start, mode, definition)
             RigDisplays.spawn(player, definition.model, rig, entityIds, location, look, displaysOf(rig, clip, start, mode))
             return
         }
@@ -221,19 +309,49 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
     }
 
     fun animate() {
+        val tick = Bukkit.getCurrentTick()
         val previous = lastSent
         val now = HashMap<String, List<BoneDisplay>>()
         for ((id, blocksOf) in shown) {
             val player = Bukkit.getPlayer(id) ?: continue
-            for (entry in blocksOf.values) {
+            for ((key, entry) in blocksOf) {
                 val rig = entry.rig ?: continue
-                val clip = entry.clip ?: continue
+                var clip = entry.clip
+                if (clip != null && played[key] != null && (entry.mode ?: AnimationMode.of(clip.animation.loop)) == AnimationMode.ONCE && tick - entry.start > ticksOf(clip, AnimationMode.ONCE)) {
+                    played.remove(key)
+                    val definition = entry.definition
+                    if (definition != null) {
+                        val base = baseOf(definition, rig)
+                        entry.clip = base.first
+                        entry.start = 0
+                        entry.mode = base.second
+                        clip = entry.clip
+                        RigDisplays.update(listOf(player), entry.ids, entry.look ?: continue, displaysOf(rig, clip, 0, entry.mode), null)
+                    }
+                }
+                clip ?: continue
                 val group = "${entry.model}/${clip.key}/${entry.start}/${entry.mode}"
                 now.getOrPut(group) { displaysOf(rig, clip, entry.start, entry.mode) }
                 RigDisplays.update(listOf(player), entry.ids, entry.look!!, now.getValue(group), previous[group])
             }
         }
         lastSent = now
+        val done = lingering.iterator()
+        while (done.hasNext()) {
+            val stay = done.next()
+            val player = Bukkit.getPlayer(stay.player)
+            if (player == null) {
+                done.remove()
+                continue
+            }
+            if (tick >= stay.until) {
+                RigDisplays.destroy(player, stay.shown.ids)
+                done.remove()
+                continue
+            }
+            val entry = stay.shown
+            RigDisplays.update(listOf(player), entry.ids, entry.look ?: continue, displaysOf(entry.rig ?: continue, entry.clip, entry.start, entry.mode), null)
+        }
     }
 
     private var lastSent: Map<String, List<BoneDisplay>> = emptyMap()
@@ -262,6 +380,10 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
     }
 
     private companion object {
+        const val IDLE = "idle"
+        const val PLACE = "place"
+        const val BREAK = "break"
+
         // Display entity metadata indexes for Minecraft 1.21.4 to 26.3 (position/rotation interpolation exists from 1.21.2).
         const val FLAGS = 0
         const val INVISIBLE: Byte = 0x20

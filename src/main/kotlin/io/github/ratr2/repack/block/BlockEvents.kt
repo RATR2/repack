@@ -269,9 +269,20 @@ class BlockEvents(
         }
     }
 
-    private fun finishBreak(player: Player, session: Mining) {
+    private fun finishBreak(player: Player, session: Mining, animated: Boolean = false) {
         mining.remove(player.uniqueId)
         val block = session.block
+        if (!animated) {
+            val wait = plugin.display.beginBreak(block.location)
+            if (wait > 0) {
+                plugin.server.scheduler.runTaskLater(plugin, Runnable {
+                    plugin.display.unlock(block.location)
+                    if (blocks.idAt(block) == null) return@Runnable
+                    if (player.isOnline) finishBreak(player, session, animated = true) else plugin.display.reset(block.location)
+                }, wait.toLong())
+                return
+            }
+        }
         val event = BlockBreakEvent(block, player)
         completing += player.uniqueId
         try {
@@ -295,6 +306,10 @@ class BlockEvents(
     fun onBreak(event: BlockBreakEvent) {
         val hit = hit(event.block) ?: return
         val player = event.player
+        if (plugin.display.locked(event.block.location)) {
+            event.isCancelled = true
+            return
+        }
 
         // The proxy's own mining must not finish a block that is on our timer.
         if (hit.definition.proxyMode == ProxyMode.CUSTOM && (player.gameMode == GameMode.SURVIVAL || player.gameMode == GameMode.ADVENTURE) && player.uniqueId !in completing) {
@@ -344,7 +359,12 @@ class BlockEvents(
     private fun explode(list: MutableList<Block>, cause: Event) {
         val iterator = list.iterator()
         while (iterator.hasNext()) {
-            val hit = hit(iterator.next()) ?: continue
+            val next = iterator.next()
+            val hit = hit(next) ?: continue
+            if (plugin.display.locked(next.location)) {
+                iterator.remove()
+                continue
+            }
             if (fire(hit, BlockAction.EXPLODE, null, cause, cancelledByDefault = hit.definition.explosionResistant).isCancelled) iterator.remove()
         }
     }
