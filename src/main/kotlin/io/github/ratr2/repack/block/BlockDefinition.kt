@@ -92,8 +92,8 @@ class DisplayOptions(
     val brightness: Int?,
     val rotateToPlacer: Boolean,
     val context: DisplayContext,
-    /** The animation of a model with meshes that the block plays all the time, by the name it has in Blockbench (made lowercase, other characters turned to _), or null for the still model. */
     val animation: String? = null,
+    val animationMode: io.github.ratr2.repack.model.AnimationMode? = null,
 )
 
 class ItemOptions(

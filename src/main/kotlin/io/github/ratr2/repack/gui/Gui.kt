@@ -53,27 +53,6 @@ class Gui(val plugin: Repack) : Listener {
         itemDrafts[player.uniqueId]?.remove(id)
     }
 
-    val entityEditor get() = plugin.entityEditor
-
-    /** The model entity type each player has open, with the changes they have not saved yet. */
-    private val entityDrafts = HashMap<UUID, MutableMap<String, io.github.ratr2.repack.edit.EntityDraft>>()
-
-    fun entityDraftOf(player: Player, id: String): io.github.ratr2.repack.edit.EntityDraft? {
-        val mine = entityDrafts.getOrPut(player.uniqueId) { HashMap() }
-        mine[id]?.let { return it }
-        val fresh = entityEditor.open(id) ?: return null
-        mine[id] = fresh
-        return fresh
-    }
-
-    fun adoptEntity(player: Player, draft: io.github.ratr2.repack.edit.EntityDraft) {
-        entityDrafts.getOrPut(player.uniqueId) { HashMap() }[draft.id] = draft
-    }
-
-    fun discardEntity(player: Player, id: String) {
-        entityDrafts[player.uniqueId]?.remove(id)
-    }
-
     private val inputs = HashMap<UUID, TextInput>()
 
     val textures: Boolean get() = plugin.config.getBoolean("gui.textures", true)
@@ -171,7 +150,6 @@ class Gui(val plugin: Repack) : Listener {
     fun onQuit(event: PlayerQuitEvent) {
         drafts.remove(event.player.uniqueId)
         itemDrafts.remove(event.player.uniqueId)
-        entityDrafts.remove(event.player.uniqueId)
         inputs.remove(event.player.uniqueId)
     }
 

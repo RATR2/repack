@@ -128,6 +128,7 @@ object BlockDefinitions {
                 rotateToPlacer = display?.getBoolean("rotate-to-placer", false) ?: false,
                 context = enumOf(display?.getString("context") ?: "none", DisplayContext::class.java, "display.context"),
                 animation = display?.getString("animation")?.takeIf { it.isNotBlank() }?.let(ModelLibrary::cleanId),
+                animationMode = display?.getString("animation-mode")?.takeIf { it.isNotBlank() }?.let { enumOf(it, io.github.ratr2.repack.model.AnimationMode::class.java, "display.animation-mode") },
             ),
             item = ItemOptions(
                 baseName = itemBase,

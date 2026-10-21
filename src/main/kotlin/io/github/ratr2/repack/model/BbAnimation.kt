@@ -5,12 +5,11 @@ class BbKeyframe(val channel: String, val time: Double, val before: Vec3, val af
 
 class BbAnimation(val name: String, val length: Double, val loop: String, val animators: Map<String, List<BbKeyframe>>)
 
-/** How an animation repeats: [LOOP] over and over, [ONCE] one time and then back to the pose the model is built in, [HOLD] one time and then stays in its last pose. */
+/** How an animation repeats: LOOP over and over, ONCE one time and then back to the pose the model is built in, HOLD one time and then stays in its last pose. */
 enum class AnimationMode {
     LOOP, ONCE, HOLD;
 
     companion object {
-        /** Blockbench's `loop` setting is `loop`, `once` or `hold`. */
         fun of(text: String?): AnimationMode = entries.firstOrNull { it.name.equals(text?.trim(), ignoreCase = true) } ?: ONCE
     }
 }
@@ -23,6 +22,27 @@ class BoneTransform(val position: Vec3, val rotation: Vec3, val scale: Vec3) {
 
 /** Evaluates an animation at a time, the way Blockbench plays it: linear and catmull-rom curves and steps; bezier handles are treated as catmull-rom. */
 object AnimationSampler {
+
+    const val TWEEN_BACK = 0.25
+
+    fun pose(animation: BbAnimation, seconds: Double, mode: AnimationMode = AnimationMode.of(animation.loop)): Map<String, BoneTransform> = when (mode) {
+        AnimationMode.LOOP -> sample(animation, seconds % animation.length)
+        AnimationMode.HOLD -> sample(animation, seconds.coerceIn(0.0, animation.length))
+        AnimationMode.ONCE -> when {
+            seconds <= animation.length -> sample(animation, seconds.coerceAtLeast(0.0))
+            seconds >= animation.length + TWEEN_BACK -> emptyMap()
+            else -> {
+                val left = 1 - (seconds - animation.length) / TWEEN_BACK
+                sample(animation, animation.length).mapValues { (_, t) ->
+                    BoneTransform(
+                        Vec3(t.position.x * left, t.position.y * left, t.position.z * left),
+                        Vec3(t.rotation.x * left, t.rotation.y * left, t.rotation.z * left),
+                        Vec3(1 + (t.scale.x - 1) * left, 1 + (t.scale.y - 1) * left, 1 + (t.scale.z - 1) * left),
+                    )
+                }
+            }
+        }
+    }
 
     fun sample(animation: BbAnimation, time: Double): Map<String, BoneTransform> {
         val result = HashMap<String, BoneTransform>()

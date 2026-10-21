@@ -10,7 +10,6 @@ class HubScreen(gui: Gui, player: Player) : Screen(gui, player, 3, "hub", "Repac
 
     override fun render() {
         button(11, "settings", Material.COMPARATOR, "Your settings", "What you see and get told")
-        if (player.hasPermission(RepackCommand.ADMIN)) button(12, "entity_builder", Material.ARMOR_STAND, "Entity builder", "Edit model entities")
         if (player.hasPermission(RepackCommand.ADMIN)) button(13, "builder", Material.CRAFTING_TABLE, "Block builder", "Edit custom blocks")
         if (player.hasPermission(RepackCommand.ADMIN)) button(14, "item_builder", Material.DIAMOND, "Item builder", "Edit custom items")
         if (player.hasPermission(RepackCommand.SETTINGS)) button(15, "settings_admin", Material.REPEATER, "Server settings", "The plugin's config.yml")
@@ -20,7 +19,6 @@ class HubScreen(gui: Gui, player: Player) : Screen(gui, player, 3, "hub", "Repac
     override fun click(slot: Int, event: InventoryClickEvent) {
         when {
             slot == 11 -> gui.openLater(player, PersonalScreen(gui, player))
-            slot == 12 && player.hasPermission(RepackCommand.ADMIN) -> gui.openLater(player, EntityListScreen(gui, player))
             slot == 13 && player.hasPermission(RepackCommand.ADMIN) -> gui.openLater(player, ListScreen(gui, player))
             slot == 14 && player.hasPermission(RepackCommand.ADMIN) -> gui.openLater(player, ItemListScreen(gui, player))
             slot == 15 && player.hasPermission(RepackCommand.SETTINGS) -> gui.openLater(player, ServerScreen(gui, player))

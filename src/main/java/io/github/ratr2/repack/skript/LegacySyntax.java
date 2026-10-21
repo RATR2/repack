@@ -17,13 +17,12 @@ final class LegacySyntax {
 
         Skript.registerCondition(CondIsCustomBlock.class, CondIsCustomBlock.PATTERNS);
 
-        Skript.registerEffect(EffSummonModel.class, EffSummonModel.PATTERNS);
-        Skript.registerEffect(EffModelEntities.class, EffModelEntities.PATTERNS);
         Skript.registerEffect(EffSpawnRipple.class, EffSpawnRipple.PATTERNS);
         Skript.registerEffect(EffPlaceCustomBlock.class, EffPlaceCustomBlock.PATTERNS);
         Skript.registerEffect(EffRemoveCustomBlock.class, EffRemoveCustomBlock.PATTERNS);
         Skript.registerEffect(EffRegisterCustomBlock.class, EffRegisterCustomBlock.PATTERNS);
         Skript.registerEffect(EffEditCustomBlock.class, EffEditCustomBlock.PATTERNS);
+        Skript.registerEffect(EffBlockAnimation.class, EffBlockAnimation.PATTERNS);
 
         Skript.registerExpression(ExprCustomBlockId.class, String.class, ExpressionType.PROPERTY, ExprCustomBlockId.PATTERNS);
         Skript.registerExpression(ExprCustomBlockIds.class, String.class, ExpressionType.SIMPLE, ExprCustomBlockIds.PATTERNS);

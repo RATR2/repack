@@ -28,7 +28,7 @@ The builder writes `plugins/Repack/blocks/chair.yml` with every option. You can 
 
 What Blockbench features carry over:
 - Cubes with their faces, textures and UV, and the Display tab (hand, inventory, ground, item frame, head, shelf). A model that only uses these is a plain vanilla block model, which every client from 1.21.4 shows.
-- Anything a vanilla model cannot do is drawn with objmc's technique instead, automatically: meshes, animations, rotated groups, cubes rotated freely on several axes or by any angle, and cubes reaching outside -16 to 32. See [Models with meshes](#models-with-meshes). The `objmc` setting in `config.yml` can force it for every model (`always`) or turn it off (`never`, which leaves out what vanilla cannot show). Clients up to 1.21.8 cannot run objmc, so they see a simplified vanilla version of those models.
+- Rotated groups, cubes rotated freely on any axis or by any angle, cubes reaching outside -16 to 32, and animations work by splitting the model into bones (see [Bones and animations](#bones-and-animations)). Meshes are skipped with a warning.
 - Animated textures and other element types (locators, null objects) are not supported yet and are skipped with a warning.
 
 ## The pack: build and send
@@ -73,7 +73,7 @@ If Distortion is installed too, both plugins send their packs in one request whe
 | `/repack menu` | A screen with every block item. Click to take one, shift-click for 64. |
 | `/repack place <id> [pos]` and `/repack remove [pos]` | Place or remove a block without an item. |
 | `/repack list` | The ids that can be placed. |
-| `/repack entity summon <id> [pos] [yaw]` | Puts a model entity in the world. `list [radius]`, `remove [radius]` and `play <animation\|none> [radius]` work on the ones around you. |
+| `/repack animate <animation\|none> [loop\|once\|hold\|default] [pos]` | Makes the block you look at (or at pos) play an animation from the start, for testing. |
 | `/repack distortion spawn <hex> <radius> <ticks> [pos]` | A ripple of that color growing to that radius in blocks over that many ticks. Also `/distortion ...`. |
 | `/repack distortion debug [on\|off]` | Shows outlines and the raw data of the ripples. 26.3 and newer clients only. |
 
@@ -193,19 +193,13 @@ If Distortion (or another plugin that uses the same scheme) is installed, the fi
 
 Every settings file starts with `config-version` and a note not to edit it. When a new Repack version changes the shipped `config.yml` or the block template, the file is updated on the next start: new options are added, your values and comments are kept, and the old file is saved as `<name>.bak-<version>` if anything besides the version changed.
 
-## Model entities
+## Bones and animations
 
-A model entity is a model standing in the world at any position and rotation, with no block under it, and with an animation that can change. It is not a mob: it has no health, hitbox or AI, only a look. Make a type in `/repack` > Entity builder (pick an id and a model, then the animation, scale, offset, light and view range), or write `entities/<id>.yml` yourself. Put one in the world with `/repack entity summon <id>` (or the "Put one here" button), take them away with `/repack entity remove [radius]`, list the ones around you with `/repack entity list`, and change what they play with `/repack entity play <animation|none> [radius]`. Entities are saved in the chunk they stand in, so they stay through restarts, and only players who have that chunk see them. From Skript: `summon model entity "guard" at player's location facing 90 playing "idle"`, `remove model entities within 3 blocks of player's location`, and `make model entities within 3 blocks of player's location play "walk"`. A model used only by an entity does not become a block.
+A model that a single vanilla model cannot hold (it has animations, a rotated group, a cube rotated on several axes or by an odd angle, or a cube outside -16 to 32) is split into **bones**, the way BetterModel does it. Every group of the outliner is a bone, and so is every cube with a rotation vanilla cannot draw. The pack gets one small vanilla model for each bone, and the game shows one item display for each: nothing but plain item models, so it needs no shaders and works on every client from 1.21.4 on. Rotations and animations only change the transform of each display. The model you hold or see in an inventory is still the single plain model (without the rotations).
 
-## Models with meshes
+Animations are the Blockbench ones, and each repeats the way Blockbench says: `loop` over and over, `once` one time and then settles back into the pose the model is built in (over a quarter of a second), and `hold` one time and then stays in its last pose. A block file can override that with `display.animation-mode` (`loop`, `once` or `hold`), and the API, the command and Skript can too. Bones are the groups of the outliner; position, rotation and scale keyframes with linear, catmull-rom and step curves are used (bezier handles are treated as catmull-rom, and Molang expressions count as 0). A block plays one all the time when `display.animation` in its block file is the animation's name in lowercase (`Spin Fast` is `spin_fast`), and every copy of a block plays in step. Set from a script or another plugin, `RepackAPI.playAnimation` and the Skript effect `play animation "spin" on custom block at ...` start one on a single block (and `stop the animation of custom block at ...` stops it); that is not saved. Only blocks use bones: the model in a hand or an inventory is the single plain model, and nothing is drawn as a separate entity. Animations are sent about ten times a second, and the client blends between the steps.
 
-A Blockbench model can have **mesh** elements, with free faces and any shape, animations, rotated groups and other things a vanilla block model cannot show. Repack shows those with the technique of [objmc](https://github.com/Godlander/objmc): the whole model is stored in the pixels of a texture, and a core shader builds it again in the game. Nothing changes for you: put the `.bbmodel` in `models/` like any other, and Repack uses this for every model that needs it, cubes and all (so rotations on any axis and in nested groups work). The pack gets objmc's shaders only when such a model exists.
-
-Limits for now: one texture per model (combine them in Blockbench), and it only shows for 1.21.9 and newer clients, because objmc's shaders are written or ported for them (1.21.8 and older see nothing). The shaders replace the game's entity and item shaders and need a graphics card with OpenGL 4.5, which nearly all have.
-
-### Animations
-
-The animations of a model with meshes work too. Each Blockbench animation is sampled into frames (20 a second, at most 120) and becomes its own model, which plays by itself in a loop from the game time. Bones are the groups of the outliner; position, rotation and scale keyframes with linear, catmull-rom and step curves are used (bezier handles are treated as catmull-rom, and Molang expressions count as 0). To make a block play one, set `display.animation` in its block file to the animation's name in lowercase (`Spin Fast` is `spin_fast`). Every copy of a block plays in step with the others, and a block that is not set to play one shows the model as it is built, without animation.
+Limits: the scale of the block is applied on top of the bones, which is exact for an even scale only, and a model with many bones sends more packets while it plays.
 
 ## Custom items
 

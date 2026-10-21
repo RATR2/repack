@@ -11,7 +11,7 @@
 [![License](https://img.shields.io/github/license/RATR2/repack?style=for-the-badge&logo=github)](LICENSE)
 [![Status](https://img.shields.io/badge/status-in--development-yellow?style=for-the-badge)](#status)
 
-> Rendering of Entities, Post-effects, & Advanced Customization Kit: custom blocks, items, meshes, ripples and animated text, with no client mod.
+> Rendering of Entities, Post-effects, & Advanced Customization Kit: custom blocks, items, models, ripples and animated text, with no client mod.
 > A Paper plugin and its own resource pack.
 
 If you find any issues, please report them [here](https://github.com/RATR2/repack/issues)
@@ -22,7 +22,7 @@ If you find any issues, please report them [here](https://github.com/RATR2/repac
 
 ## What is this
 
-Repack is a customization kit for what players see and use: custom blocks and items made from Blockbench models, models with meshes, animations and any rotation (drawn with objmc's technique, automatically when a model needs it), world-anchored ripple effects (what used to be the Distortion plugin), animated text colors, and more to come (the roadmap is in the repository). Everything is built into one resource pack per client version.
+Repack is a customization kit for what players see and use: custom blocks and items made from Blockbench models, world-anchored ripple effects (what used to be the Distortion plugin), animated text colors, and more to come (the roadmap is in the repository). Everything is built into one resource pack per client version.
 
 ### Custom blocks
 

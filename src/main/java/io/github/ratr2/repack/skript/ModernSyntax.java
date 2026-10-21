@@ -22,10 +22,6 @@ final class ModernSyntax {
         registry.register(SyntaxRegistry.CONDITION, SyntaxInfo.builder(CondIsCustomBlock.class)
                 .supplier(CondIsCustomBlock::new).addPatterns(CondIsCustomBlock.PATTERNS).build());
 
-        registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffSummonModel.class)
-                .supplier(EffSummonModel::new).addPatterns(EffSummonModel.PATTERNS).build());
-        registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffModelEntities.class)
-                .supplier(EffModelEntities::new).addPatterns(EffModelEntities.PATTERNS).build());
         registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffSpawnRipple.class)
                 .supplier(EffSpawnRipple::new).addPatterns(EffSpawnRipple.PATTERNS).build());
         registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffPlaceCustomBlock.class)
@@ -34,6 +30,8 @@ final class ModernSyntax {
                 .supplier(EffRemoveCustomBlock::new).addPatterns(EffRemoveCustomBlock.PATTERNS).build());
         registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffEditCustomBlock.class)
                 .supplier(EffEditCustomBlock::new).addPatterns(EffEditCustomBlock.PATTERNS).build());
+        registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffBlockAnimation.class)
+                .supplier(EffBlockAnimation::new).addPatterns(EffBlockAnimation.PATTERNS).build());
         registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffRegisterCustomBlock.class)
                 .supplier(EffRegisterCustomBlock::new).addPatterns(EffRegisterCustomBlock.PATTERNS).build());
 

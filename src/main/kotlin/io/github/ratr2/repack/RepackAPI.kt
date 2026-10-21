@@ -111,39 +111,27 @@ object RepackAPI {
         )
     }
 
-    /** Puts a model entity of the type id at location, which stays there until removed. Null for an unknown type or world. */
     @JvmStatic
-    fun spawnEntity(id: String, location: Location): io.github.ratr2.repack.entity.ModelEntity? = onMain(null) { api ->
-        api.modelEntities.definitions[id]?.let { api.modelEntities.spawn(it, location) }
+    fun animations(id: String): List<String> = onMain(emptyList()) { api ->
+        val model = api.blocks.definitionOf(id)?.model ?: return@onMain emptyList()
+        api.modelClips[model].orEmpty()
     }
 
-    /** Every model entity in the loaded chunks. */
     @JvmStatic
-    fun entities(): List<io.github.ratr2.repack.entity.ModelEntity> = onMain(emptyList()) { it.modelEntities.all.toList() }
+    fun playAnimation(location: Location, animation: String?): Boolean = playAnimation(location, animation, null)
 
-    /** The model entities within radius blocks of location. */
+    /**
+     * As above, repeating as mode says: `loop`, `once` (back to the built pose) or `hold` (stays in the last pose). Null or
+     * anything else uses the animation's Blockbench setting.
+     */
     @JvmStatic
-    fun entitiesNear(location: Location, radius: Double): List<io.github.ratr2.repack.entity.ModelEntity> = onMain(emptyList()) { api ->
-        api.modelEntities.all.filter { e -> e.location?.let { it.world == location.world && it.distanceSquared(location) <= radius * radius } == true }
+    fun playAnimation(location: Location, animation: String?, mode: String?): Boolean = onMain(false) {
+        it.display.play(location, animation?.lowercase(), mode?.let { m -> io.github.ratr2.repack.model.AnimationMode.entries.firstOrNull { e -> e.name.equals(m.trim(), ignoreCase = true) } })
     }
 
-    /** The ids of the model entity types. */
     @JvmStatic
-    fun entityIds(): Set<String> = onMain(emptySet()) { it.modelEntities.definitions.keys.toSet() }
+    fun stopAnimation(location: Location): Boolean = playAnimation(location, null)
 
-    /** Opens an existing model entity type for editing: chain the changes and finish with save(). */
     @JvmStatic
-    fun editEntity(id: String): io.github.ratr2.repack.edit.EntityBuilder = onMain(io.github.ratr2.repack.edit.EntityBuilder(null, "Repack is not running.")) { api ->
-        val draft = api.entityEditor.open(id)
-        io.github.ratr2.repack.edit.EntityBuilder(draft, if (draft == null) "There is no entity '$id'." else null)
-    }
-
-    /** Starts a new model entity type that shows model: chain the changes and finish with save(). */
-    @JvmStatic
-    fun createEntity(id: String, model: String): io.github.ratr2.repack.edit.EntityBuilder = onMain(io.github.ratr2.repack.edit.EntityBuilder(null, "Repack is not running.")) { api ->
-        api.entityEditor.create(id, model).fold(
-            onSuccess = { io.github.ratr2.repack.edit.EntityBuilder(it, null) },
-            onFailure = { io.github.ratr2.repack.edit.EntityBuilder(null, it.message ?: "Could not make the entity.") },
-        )
-    }
+    fun animationAt(location: Location): String? = onMain(null) { it.display.playing(location) }
 }

@@ -37,9 +37,9 @@ command /table:
 
 `RepackAPI.item(id, amount)` gives the stack for a block or custom item id. `itemIds()`, `itemIdOf(stack)`, `registerItem(id, "EMERALD", model)` and `unregisterItem(id)` (until the next reload), and `createItem(id)` / `editItem(id)` return an `ItemBuilder`: chain `base`, `model`, `name`, `lore`, `glint`, `exact`, `components`, then `save()`, which writes `items/<id>.yml`. In Skript: `custom item "ruby"`, with `x 3` for a count.
 
-### Model entities
+### Block animations
 
-`RepackAPI.spawnEntity("guard", location)` puts one in the world and returns a `ModelEntity` with `play("walk")` (or `play(null)` for the still model), `teleport(location)`, `remove()`, `getUuid()` and `isValid()`. `entities()` and `entitiesNear(location, radius)` list them, `entityIds()` the types, and `createEntity(id, model)` / `editEntity(id)` return an `EntityBuilder` (`animation`, `scale`, `offset`, `viewRange`, `brightness`, `context`, then `save()`).
+A block whose model has animations (see the guide) plays the one named in its file. `RepackAPI.animations("table")` lists the animation names of a block type, `playAnimation(location, "spin")` makes the block at a location play one from the start (`null` stops it), and `playAnimation(location, "spin", "loop")` repeats it as `loop`, `once` (one time, then back to the built pose) or `hold` (one time, then stays in the last pose) whatever Blockbench says, `stopAnimation(location)` does the same, and `animationAt(location)` says what plays. It is not saved: after a restart a block plays what its file says again. In Skript: `play animation "spin" [as loop|once|hold] on custom block at event-location` and `stop the animation of custom block at event-location`.
 
 ### Ripples
 

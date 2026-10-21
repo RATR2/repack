@@ -33,7 +33,6 @@ import java.util.concurrent.CompletableFuture
  * /repack menu              opens a screen with every block item to take
  * /repack builder [id]      the block builder: edit a block's settings, item and recipe in screens
  * /repack give <id> [amount] [players]   gives the item that places a custom block
- * /repack entity summon <id> [pos] [yaw]   puts a model entity in the world; list, remove [radius], play <clip|none> [radius] work on the ones around you
  * /repack distortion spawn <hex> <radius> <ticks> [pos]   a ripple effect; debug [on|off] shows the debug view
  * /repack reload [blocks|config|host|all]   reads the block files, builds the pack and pushes it to everyone online (default); blocks, config and host do only that part; all also reloads the config and the pack server
  * ```
@@ -81,6 +80,22 @@ class RepackCommand(private val plugin: Repack) {
         )
         .then(admin("list").executes(::list))
         .then(
+            admin("animate").then(
+                Commands.argument("animation", StringArgumentType.word())
+                    .suggests(::suggestAnimations)
+                    .executes { animate(it, null) }
+                    .then(
+                        Commands.argument("mode", StringArgumentType.word())
+                            .suggests { _, builder -> listOf("loop", "once", "hold", "default").filter { it.startsWith(builder.remainingLowerCase) }.forEach(builder::suggest); builder.buildFuture() }
+                            .executes { animate(it, null) }
+                            .then(
+                                Commands.argument("pos", ArgumentTypes.blockPosition())
+                                    .executes { animate(it, positionOf(it)) }
+                            )
+                    )
+            )
+        )
+        .then(
             admin("builder")
                 .executes { builder(it, null) }
                 .then(
@@ -122,41 +137,6 @@ class RepackCommand(private val plugin: Repack) {
                 .then(Commands.literal("host").executes { reload(it, blocks = false, config = false, host = true) })
                 .then(Commands.literal("all").executes { reloadPack(it, config = true, host = true) })
         )
-        .then(
-            admin("entity")
-                .then(
-                    Commands.literal("summon").then(
-                        Commands.argument("id", StringArgumentType.word())
-                            .suggests(::suggestEntityIds)
-                            .executes { summonEntity(it, it.source.location) }
-                            .then(
-                                Commands.argument("pos", ArgumentTypes.finePosition(false))
-                                    .executes { summonEntity(it, finePositionOf(it)) }
-                                    .then(
-                                        Commands.argument("yaw", FloatArgumentType.floatArg(-360f, 360f))
-                                            .executes { summonEntity(it, finePositionOf(it).apply { yaw = FloatArgumentType.getFloat(it, "yaw") }) }
-                                    )
-                            )
-                    )
-                )
-                .then(
-                    Commands.literal("list")
-                        .executes { listEntities(it, 32.0) }
-                        .then(Commands.argument("radius", DoubleArgumentType.doubleArg(1.0, 1024.0)).executes { listEntities(it, DoubleArgumentType.getDouble(it, "radius")) })
-                )
-                .then(
-                    Commands.literal("remove")
-                        .executes { removeEntities(it, 2.0) }
-                        .then(Commands.argument("radius", DoubleArgumentType.doubleArg(0.5, 1024.0)).executes { removeEntities(it, DoubleArgumentType.getDouble(it, "radius")) })
-                )
-                .then(
-                    Commands.literal("play").then(
-                        Commands.argument("clip", StringArgumentType.word())
-                            .executes { playEntities(it, 3.0) }
-                            .then(Commands.argument("radius", DoubleArgumentType.doubleArg(0.5, 1024.0)).executes { playEntities(it, DoubleArgumentType.getDouble(it, "radius")) })
-                    )
-                )
-        )
         .then(io.github.ratr2.repack.distortion.DistortionCommand(plugin).tree("distortion"))
         .build()
 
@@ -172,6 +152,26 @@ class RepackCommand(private val plugin: Repack) {
         return Command.SINGLE_SUCCESS
     }
 
+    private fun suggestAnimations(context: CommandContext<CommandSourceStack>, builder: SuggestionsBuilder): CompletableFuture<Suggestions> {
+        val typed = builder.remainingLowerCase
+        (plugin.modelClips.values.flatten().distinct() + "none").sorted().filter { it.startsWith(typed) }.forEach(builder::suggest)
+        return builder.buildFuture()
+    }
+
+    private fun animate(context: CommandContext<CommandSourceStack>, at: Location?): Int {
+        val location = at ?: (context.source.sender as? Player)?.getTargetBlockExact(8)?.location
+        if (location == null) {
+            reply(context, "Look at a custom block, or give its position.", NamedTextColor.RED)
+            return 0
+        }
+        val name = StringArgumentType.getString(context, "animation").lowercase()
+        val mode = runCatching { StringArgumentType.getString(context, "mode") }.getOrNull()
+        val ok = RepackAPI.playAnimation(location, name.takeIf { it != "none" }, mode)
+        if (ok) reply(context, if (name == "none") "Stopped." else "Playing $name.", NamedTextColor.GREEN)
+        else reply(context, "There is no custom block with an animation '$name' there. Animations of the model: ${RepackAPI.idAt(location.block)?.let { RepackAPI.animations(it) }.orEmpty().joinToString().ifEmpty { "none" }}.", NamedTextColor.RED)
+        return if (ok) Command.SINGLE_SUCCESS else 0
+    }
+
     private fun positionOf(context: CommandContext<CommandSourceStack>): Location =
         context.getArgument("pos", BlockPositionResolver::class.java).resolve(context.source).toLocation(context.source.location.world)
 
@@ -181,56 +181,8 @@ class RepackCommand(private val plugin: Repack) {
         return builder.buildFuture()
     }
 
-    private fun suggestEntityIds(context: CommandContext<CommandSourceStack>, builder: SuggestionsBuilder): CompletableFuture<Suggestions> {
-        val typed = builder.remainingLowerCase
-        plugin.modelEntities.definitions.keys.sorted().filter { it.startsWith(typed) }.forEach(builder::suggest)
-        return builder.buildFuture()
-    }
-
     private fun finePositionOf(context: CommandContext<CommandSourceStack>): Location =
         context.getArgument("pos", io.papermc.paper.command.brigadier.argument.resolvers.FinePositionResolver::class.java).resolve(context.source).toLocation(context.source.location.world)
-
-    private fun summonEntity(context: CommandContext<CommandSourceStack>, location: Location): Int {
-        val id = StringArgumentType.getString(context, "id")
-        val definition = plugin.modelEntities.definitions[id]
-        if (definition == null) {
-            reply(context, "There is no entity type '$id'. Make one in /repack > Entity builder, or in a file in entities/.", NamedTextColor.RED)
-            return 0
-        }
-        val at = location.clone().apply { if (context.source.sender is Player && yaw == 0f) yaw = (context.source.sender as Player).location.yaw }
-        plugin.modelEntities.spawn(definition, at)
-        reply(context, "Put a '$id' at ${"%.1f".format(at.x)} ${"%.1f".format(at.y)} ${"%.1f".format(at.z)}.", NamedTextColor.GREEN)
-        return Command.SINGLE_SUCCESS
-    }
-
-    private fun entitiesNear(context: CommandContext<CommandSourceStack>, radius: Double) =
-        context.source.location.let { here -> plugin.modelEntities.all.filter { e -> e.location?.let { it.world == here.world && it.distanceSquared(here) <= radius * radius } == true } }
-
-    private fun listEntities(context: CommandContext<CommandSourceStack>, radius: Double): Int {
-        val found = entitiesNear(context, radius).sortedBy { it.location?.distanceSquared(context.source.location) }
-        if (found.isEmpty()) {
-            reply(context, "No model entities within ${radius.toInt()} blocks.", NamedTextColor.YELLOW)
-            return Command.SINGLE_SUCCESS
-        }
-        found.take(MAX_LINES).forEach { e -> reply(context, "${e.definitionId} ${e.uuid.toString().take(8)} at ${"%.1f".format(e.x)} ${"%.1f".format(e.y)} ${"%.1f".format(e.z)}${e.clip?.let { " playing $it" } ?: ""}", NamedTextColor.YELLOW) }
-        if (found.size > MAX_LINES) reply(context, "${found.size - MAX_LINES} more.", NamedTextColor.GRAY)
-        return Command.SINGLE_SUCCESS
-    }
-
-    private fun removeEntities(context: CommandContext<CommandSourceStack>, radius: Double): Int {
-        val found = entitiesNear(context, radius)
-        found.forEach { it.remove() }
-        reply(context, "Removed ${found.size} model entit${if (found.size == 1) "y" else "ies"}.", if (found.isEmpty()) NamedTextColor.YELLOW else NamedTextColor.GREEN)
-        return Command.SINGLE_SUCCESS
-    }
-
-    private fun playEntities(context: CommandContext<CommandSourceStack>, radius: Double): Int {
-        val clip = StringArgumentType.getString(context, "clip").lowercase().takeIf { it != "none" }
-        val found = entitiesNear(context, radius)
-        found.forEach { it.play(clip) }
-        reply(context, "${found.size} model entit${if (found.size == 1) "y plays" else "ies play"} ${clip ?: "nothing"}.", if (found.isEmpty()) NamedTextColor.YELLOW else NamedTextColor.GREEN)
-        return Command.SINGLE_SUCCESS
-    }
 
     private fun suggestGiveIds(context: CommandContext<CommandSourceStack>, builder: SuggestionsBuilder): CompletableFuture<Suggestions> {
         val typed = builder.remainingLowerCase

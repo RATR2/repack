@@ -58,14 +58,12 @@ class Repack : JavaPlugin() {
         private set
     lateinit var customItems: io.github.ratr2.repack.item.CustomItems
         private set
-    lateinit var modelEntities: io.github.ratr2.repack.entity.ModelEntities
-        private set
-    val entityEditor: io.github.ratr2.repack.edit.EntityEditor by lazy { io.github.ratr2.repack.edit.EntityEditor(this) }
 
-    /** The animations of each model with meshes, by model id, as of the last build. */
     @Volatile
-    var modelClips: Map<String, List<String>> = emptyMap()
+    var rigs: Map<String, io.github.ratr2.repack.model.Rig> = emptyMap()
         private set
+
+    val modelClips: Map<String, List<String>> get() = rigs.mapValues { (_, rig) -> rig.clips.map { it.key }.sorted() }.filterValues { it.isNotEmpty() }
 
     val itemEditor: io.github.ratr2.repack.edit.ItemEditor by lazy { io.github.ratr2.repack.edit.ItemEditor(this) }
     lateinit var host: SharedHost
@@ -83,7 +81,8 @@ class Repack : JavaPlugin() {
     var ripples: io.github.ratr2.repack.distortion.RippleManager? = null
         private set
     val players: PlayerSettings by lazy { PlayerSettings(this) }
-    private lateinit var display: DisplayManager
+    lateinit var display: DisplayManager
+        private set
 
     override fun onEnable() {
         saveDefaultConfig()
@@ -108,10 +107,7 @@ class Repack : JavaPlugin() {
         blocks = PlacedBlocks(this)
         items = BlockItems(this)
         customItems = io.github.ratr2.repack.item.CustomItems(this)
-        modelEntities = io.github.ratr2.repack.entity.ModelEntities(this)
-        modelEntities.hidden = hold::isHeld
-        server.pluginManager.registerEvents(modelEntities, this)
-        display = DisplayManager(blocks)
+        display = DisplayManager(this, blocks)
         display.hidden = hold::isHeld
         blocks.listeners += display
         reloadDefinitions()
@@ -126,7 +122,6 @@ class Repack : JavaPlugin() {
             it.start()
         }
         blocks.start()
-        modelEntities.start()
         RepackAPI.plugin = this
         if (sending) {
             if (!store.hasPublished) logger.info("No pack published yet: run /repack build, then /repack push, to send players the pack.")
@@ -136,6 +131,7 @@ class Repack : JavaPlugin() {
         lastStamp = stamp()
         pendingBuild = config.getBoolean("workflow.build-on-change", true)
         server.scheduler.runTaskTimer(this, Runnable { watch() }, WATCH_TICKS, WATCH_TICKS)
+        server.scheduler.runTaskTimer(this, Runnable { display.animate() }, io.github.ratr2.repack.display.RigDisplays.STEP_TICKS.toLong(), io.github.ratr2.repack.display.RigDisplays.STEP_TICKS.toLong())
         if (server.pluginManager.isPluginEnabled("Skript")) {
             try {
                 SkriptHook.register(this)
@@ -155,7 +151,6 @@ class Repack : JavaPlugin() {
         RepackAPI.plugin = null
         io.github.ratr2.repack.distortion.DistortionAPI.manager = null
         ripples?.clear()
-        if (::modelEntities.isInitialized) modelEntities.stop()
         recipeKeys.values.forEach { server.removeRecipe(it) }
         if (::hold.isInitialized) hold.endAll()
         if (::host.isInitialized) host.stop()
@@ -194,8 +189,8 @@ class Repack : JavaPlugin() {
     val itemsFolder: File
         get() = File(dataFolder, "items").apply { mkdirs() }
 
-    val entitiesFolder: File
-        get() = File(dataFolder, "entities").apply { mkdirs() }
+    val skyboxesFolder: File
+        get() = File(dataFolder, "skyboxes").apply { mkdirs() }
 
     private val backupsFolder: File
         get() = File(dataFolder, "backups")
@@ -204,7 +199,7 @@ class Repack : JavaPlugin() {
 
     private fun stamp(): Map<String, String> {
         val stamps = HashMap<String, String>()
-        for (folder in listOf(modelsFolder, blocksFolder, itemsFolder, entitiesFolder)) {
+        for (folder in listOf(modelsFolder, blocksFolder, itemsFolder)) {
             for (file in folder.listFiles { f -> f.isFile && !f.name.startsWith("_") }.orEmpty()) {
                 stamps["${folder.name}/${file.name}"] = "${file.length()}:${file.lastModified()}"
             }
@@ -256,17 +251,7 @@ class Repack : JavaPlugin() {
         if (server.pluginManager.isPluginEnabled(this)) server.onlinePlayers.forEach { it.updateCommands() }
     }
 
-    /** Reads the entity files again and shows the changes to everyone. Returns the errors found. */
-    fun reloadEntities(): List<String> {
-        val loaded = io.github.ratr2.repack.entity.EntityDefinitions.load(entitiesFolder, ModelLibrary.ids(modelsFolder))
-        loaded.errors.forEach { logger.severe(it) }
-        modelEntities.definitions = loaded.definitions
-        if (server.pluginManager.isPluginEnabled(this)) modelEntities.refreshAll()
-        return loaded.errors
-    }
-
-    /** Models that items or entities use: they do not turn into blocks of their own. */
-    private fun modelsInUse(): Set<String> = fileItems.values.mapNotNullTo(HashSet()) { it.model } + modelEntities.definitions.values.map { it.model }
+    private fun modelsInUse(): Set<String> = fileItems.values.mapNotNullTo(HashSet()) { it.model }
 
     fun registerItem(id: String, base: String, model: String?): String? {
         if (!ID.matches(id)) return "Item ids use only a-z, 0-9, _ and -."
@@ -329,7 +314,7 @@ class Repack : JavaPlugin() {
     }
 
     fun reloadDefinitions(only: Set<String>? = null): List<String> {
-        val itemErrors = reloadItems() + reloadEntities()
+        val itemErrors = reloadItems()
         migrateBlockFiles()
         createMissingBlockFiles()
         val loaded = BlockDefinitions.load(blocksFolder, ModelLibrary.ids(modelsFolder), only, modelsInUse(), config.getBoolean("auto-blocks", false))
@@ -477,7 +462,7 @@ class Repack : JavaPlugin() {
             var universal: ByteArray? = null
             var failure: String? = null
             try {
-                library = ModelLibrary.build(folder, cache, fresh, mode = io.github.ratr2.repack.model.ObjmcMode.fromConfig(config.getString("objmc"))) { done, total ->
+                library = ModelLibrary.build(folder, cache, fresh) { done, total ->
                     progress.update(PARSE_SHARE * done / maxOf(total, 1), "converting models $done/$total")
                 }
                 // A model that failed to convert is missing from the pack, so a pack built around it could replace a working one.
@@ -487,15 +472,7 @@ class Repack : JavaPlugin() {
                     val effects = TextEffects.snippet(rules)
                     val shaders = config.getBoolean("distortion.enabled", true) || effects != null
                     val gui = GuiPack.files()
-                    // Models with meshes need objmc's shaders, which go into the eras that can use them.
-                    val usesObjmc = library.files.values.any { files -> files.keys.any { it.startsWith(io.github.ratr2.repack.model.ItemModelGenerator.OBJMC_MARKER) } }
-                    if (usesObjmc) {
-                        val missing = PackEra.entries.filterNot(io.github.ratr2.repack.pack.ObjmcShaders::supports).joinToString { it.label }
-                        logger.warning("Models with meshes are in the pack. Clients on $missing see a simplified version of them, because the objmc shaders only run on 1.21.9 and newer.")
-                    }
-                    val eraShaders = PackEra.entries.associateWith { era ->
-                        (if (shaders) EraAssets.files(file, era, effects) else emptyMap()) + (if (usesObjmc) io.github.ratr2.repack.pack.ObjmcShaders.files(era) else emptyMap())
-                    }
+                    val eraShaders = PackEra.entries.associateWith { era -> if (shaders) EraAssets.files(file, era, effects) else emptyMap() }
                     zips = PackEra.entries.associateWith { era ->
                         progress.update(PARSE_SHARE + (ZIP_SHARE - PARSE_SHARE) * era.ordinal / PackEra.entries.size, "zipping the ${era.id} pack")
                         val files = HashMap(library.files.getValue(era.family))
@@ -534,9 +511,13 @@ class Repack : JavaPlugin() {
                     done(BuildReport(emptyMap(), emptyList(), emptyList(), listOf(failure ?: "The build failed."), rejected = true))
                     return@Runnable
                 }
-                modelClips = library.files[PackVariant.MODERN].orEmpty().keys.mapNotNull { Regex("assets/repack/items/([^/]+)/anim/([^/]+)\\.json").matchEntire(it) }
-                    .groupBy({ it.groupValues[1] }, { it.groupValues[2] }).mapValues { it.value.sorted() }
                 progress.update(ZIP_SHARE, "loading the block files")
+                val rigFiles = library.files[PackVariant.MODERN].orEmpty()
+                rigs = rigFiles.mapNotNull { (path, bytes) ->
+                    val id = path.removePrefix(io.github.ratr2.repack.model.ItemModelGenerator.RIG_FOLDER).removeSuffix(".json")
+                    if (!path.startsWith(io.github.ratr2.repack.model.ItemModelGenerator.RIG_FOLDER) || '/' in id) null
+                    else runCatching { id to io.github.ratr2.repack.model.Rig.fromJson(String(bytes, Charsets.UTF_8)) }.getOrNull()
+                }.toMap()
                 library.warnings.forEach { logger.warning(it) }
                 library.errors.forEach { logger.severe(it) }
                 val definitionErrors = reloadDefinitions()
