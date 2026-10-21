@@ -10,6 +10,7 @@ import io.github.ratr2.repack.block.PickBlock
 import io.github.ratr2.repack.block.BlockTemplate
 import io.github.ratr2.repack.block.Loot
 import io.github.ratr2.repack.block.PlacedBlocks
+import io.github.ratr2.repack.config.ConfigMigration
 import io.github.ratr2.repack.config.ConfigMigrator
 import io.github.ratr2.repack.config.ConfigVersions
 import io.github.ratr2.repack.display.DisplayManager
@@ -57,6 +58,15 @@ class Repack : JavaPlugin() {
         private set
     lateinit var customItems: io.github.ratr2.repack.item.CustomItems
         private set
+    lateinit var modelEntities: io.github.ratr2.repack.entity.ModelEntities
+        private set
+    val entityEditor: io.github.ratr2.repack.edit.EntityEditor by lazy { io.github.ratr2.repack.edit.EntityEditor(this) }
+
+    /** The animations of each model with meshes, by model id, as of the last build. */
+    @Volatile
+    var modelClips: Map<String, List<String>> = emptyMap()
+        private set
+
     val itemEditor: io.github.ratr2.repack.edit.ItemEditor by lazy { io.github.ratr2.repack.edit.ItemEditor(this) }
     lateinit var host: SharedHost
         private set
@@ -98,6 +108,9 @@ class Repack : JavaPlugin() {
         blocks = PlacedBlocks(this)
         items = BlockItems(this)
         customItems = io.github.ratr2.repack.item.CustomItems(this)
+        modelEntities = io.github.ratr2.repack.entity.ModelEntities(this)
+        modelEntities.hidden = hold::isHeld
+        server.pluginManager.registerEvents(modelEntities, this)
         display = DisplayManager(blocks)
         display.hidden = hold::isHeld
         blocks.listeners += display
@@ -113,6 +126,7 @@ class Repack : JavaPlugin() {
             it.start()
         }
         blocks.start()
+        modelEntities.start()
         RepackAPI.plugin = this
         if (sending) {
             if (!store.hasPublished) logger.info("No pack published yet: run /repack build, then /repack push, to send players the pack.")
@@ -141,6 +155,7 @@ class Repack : JavaPlugin() {
         RepackAPI.plugin = null
         io.github.ratr2.repack.distortion.DistortionAPI.manager = null
         ripples?.clear()
+        if (::modelEntities.isInitialized) modelEntities.stop()
         recipeKeys.values.forEach { server.removeRecipe(it) }
         if (::hold.isInitialized) hold.endAll()
         if (::host.isInitialized) host.stop()
@@ -179,8 +194,8 @@ class Repack : JavaPlugin() {
     val itemsFolder: File
         get() = File(dataFolder, "items").apply { mkdirs() }
 
-    val skyboxesFolder: File
-        get() = File(dataFolder, "skyboxes").apply { mkdirs() }
+    val entitiesFolder: File
+        get() = File(dataFolder, "entities").apply { mkdirs() }
 
     private val backupsFolder: File
         get() = File(dataFolder, "backups")
@@ -189,7 +204,7 @@ class Repack : JavaPlugin() {
 
     private fun stamp(): Map<String, String> {
         val stamps = HashMap<String, String>()
-        for (folder in listOf(modelsFolder, blocksFolder, itemsFolder)) {
+        for (folder in listOf(modelsFolder, blocksFolder, itemsFolder, entitiesFolder)) {
             for (file in folder.listFiles { f -> f.isFile && !f.name.startsWith("_") }.orEmpty()) {
                 stamps["${folder.name}/${file.name}"] = "${file.length()}:${file.lastModified()}"
             }
@@ -241,8 +256,17 @@ class Repack : JavaPlugin() {
         if (server.pluginManager.isPluginEnabled(this)) server.onlinePlayers.forEach { it.updateCommands() }
     }
 
-    /** Models that items use: they do not turn into blocks of their own. */
-    private fun modelsInUse(): Set<String> = fileItems.values.mapNotNullTo(HashSet()) { it.model }
+    /** Reads the entity files again and shows the changes to everyone. Returns the errors found. */
+    fun reloadEntities(): List<String> {
+        val loaded = io.github.ratr2.repack.entity.EntityDefinitions.load(entitiesFolder, ModelLibrary.ids(modelsFolder))
+        loaded.errors.forEach { logger.severe(it) }
+        modelEntities.definitions = loaded.definitions
+        if (server.pluginManager.isPluginEnabled(this)) modelEntities.refreshAll()
+        return loaded.errors
+    }
+
+    /** Models that items or entities use: they do not turn into blocks of their own. */
+    private fun modelsInUse(): Set<String> = fileItems.values.mapNotNullTo(HashSet()) { it.model } + modelEntities.definitions.values.map { it.model }
 
     fun registerItem(id: String, base: String, model: String?): String? {
         if (!ID.matches(id)) return "Item ids use only a-z, 0-9, _ and -."
@@ -279,10 +303,9 @@ class Repack : JavaPlugin() {
 
     private val unregistered = HashSet<String>()
 
-    /** Writes `blocks/<id>.yml`, with every option at its default, for each model that has no settings file yet. */
     private fun createMissingBlockFiles() {
-        if (!config.getBoolean("create-block-files", true)) return
-        val itemOnly = fileItems.values.mapNotNullTo(HashSet()) { it.model }
+        if (!config.getBoolean("auto-blocks", false)) return
+        val itemOnly = modelsInUse()
         for (id in ModelLibrary.ids(modelsFolder).sorted()) {
             val file = File(blocksFolder, "$id.yml")
             if (file.exists() || id in itemOnly) continue
@@ -294,20 +317,22 @@ class Repack : JavaPlugin() {
     private fun migrateConfig() {
         val shippedConfig = getResource("config.yml")?.reader()?.use { it.readText() } ?: return
         val defaults = YamlConfiguration().apply { loadFromString(shippedConfig) }
-        ConfigMigrator.migrate(File(dataFolder, "config.yml"), ConfigVersions.of(shippedConfig), emptyList(), defaults)?.let(logger::info)
+        ConfigMigrator.gatherBackups(dataFolder, backupsFolder)
+        ConfigMigrator.gatherBackups(blocksFolder, File(backupsFolder, "blocks"))
+        ConfigMigrator.migrate(File(dataFolder, "config.yml"), ConfigVersions.of(shippedConfig), CONFIG_MIGRATIONS, defaults, backupsFolder)?.let(logger::info)
         reloadConfig()
     }
 
     private fun migrateBlockFiles() {
         val files = blocksFolder.listFiles { f -> f.isFile && f.extension == "yml" && !f.name.startsWith("_") }.orEmpty()
-        for (file in files.sortedBy { it.name }) ConfigMigrator.migrate(file, BlockTemplate.version)?.let(logger::info)
+        for (file in files.sortedBy { it.name }) ConfigMigrator.migrate(file, BlockTemplate.version, backups = File(backupsFolder, "blocks"))?.let(logger::info)
     }
 
     fun reloadDefinitions(only: Set<String>? = null): List<String> {
-        val itemErrors = reloadItems()
+        val itemErrors = reloadItems() + reloadEntities()
         migrateBlockFiles()
         createMissingBlockFiles()
-        val loaded = BlockDefinitions.load(blocksFolder, ModelLibrary.ids(modelsFolder), only, fileItems.values.mapNotNullTo(HashSet()) { it.model })
+        val loaded = BlockDefinitions.load(blocksFolder, ModelLibrary.ids(modelsFolder), only, modelsInUse(), config.getBoolean("auto-blocks", false))
         loaded.errors.forEach { logger.severe(it) }
         if (only == null) {
             fileDefinitions = loaded.definitions
@@ -444,14 +469,15 @@ class Repack : JavaPlugin() {
         val progress = BuildProgress(this)
         progress.start()
         val folder = modelsFolder
-        val cache = ModelCache(File(dataFolder, "cache/models"), description.version)
+        // The jar's own time is part of the version, so a new build of the plugin never reads what an older one converted.
+        val cache = ModelCache(File(dataFolder, "cache/models"), "${description.version}-${file.lastModified()}")
         server.scheduler.runTaskAsynchronously(this, Runnable {
             var library: LibraryResult? = null
             var zips: Map<PackEra, ByteArray>? = null
             var universal: ByteArray? = null
             var failure: String? = null
             try {
-                library = ModelLibrary.build(folder, cache, fresh) { done, total ->
+                library = ModelLibrary.build(folder, cache, fresh, mode = io.github.ratr2.repack.model.ObjmcMode.fromConfig(config.getString("objmc"))) { done, total ->
                     progress.update(PARSE_SHARE * done / maxOf(total, 1), "converting models $done/$total")
                 }
                 // A model that failed to convert is missing from the pack, so a pack built around it could replace a working one.
@@ -461,7 +487,15 @@ class Repack : JavaPlugin() {
                     val effects = TextEffects.snippet(rules)
                     val shaders = config.getBoolean("distortion.enabled", true) || effects != null
                     val gui = GuiPack.files()
-                    val eraShaders = PackEra.entries.associateWith { era -> if (shaders) EraAssets.files(file, era, effects) else emptyMap() }
+                    // Models with meshes need objmc's shaders, which go into the eras that can use them.
+                    val usesObjmc = library.files.values.any { files -> files.keys.any { it.startsWith(io.github.ratr2.repack.model.ItemModelGenerator.OBJMC_MARKER) } }
+                    if (usesObjmc) {
+                        val missing = PackEra.entries.filterNot(io.github.ratr2.repack.pack.ObjmcShaders::supports).joinToString { it.label }
+                        logger.warning("Models with meshes are in the pack. Clients on $missing see a simplified version of them, because the objmc shaders only run on 1.21.9 and newer.")
+                    }
+                    val eraShaders = PackEra.entries.associateWith { era ->
+                        (if (shaders) EraAssets.files(file, era, effects) else emptyMap()) + (if (usesObjmc) io.github.ratr2.repack.pack.ObjmcShaders.files(era) else emptyMap())
+                    }
                     zips = PackEra.entries.associateWith { era ->
                         progress.update(PARSE_SHARE + (ZIP_SHARE - PARSE_SHARE) * era.ordinal / PackEra.entries.size, "zipping the ${era.id} pack")
                         val files = HashMap(library.files.getValue(era.family))
@@ -500,6 +534,8 @@ class Repack : JavaPlugin() {
                     done(BuildReport(emptyMap(), emptyList(), emptyList(), listOf(failure ?: "The build failed."), rejected = true))
                     return@Runnable
                 }
+                modelClips = library.files[PackVariant.MODERN].orEmpty().keys.mapNotNull { Regex("assets/repack/items/([^/]+)/anim/([^/]+)\\.json").matchEntire(it) }
+                    .groupBy({ it.groupValues[1] }, { it.groupValues[2] }).mapValues { it.value.sorted() }
                 progress.update(ZIP_SHARE, "loading the block files")
                 library.warnings.forEach { logger.warning(it) }
                 library.errors.forEach { logger.severe(it) }

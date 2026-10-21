@@ -20,17 +20,16 @@ Clients from 1.21.4 to 26.3 are supported. Older clients cannot show the models 
 ## Making a block
 
 1. Make a model in Blockbench (Java Block/Item model) and **embed the textures** when you save it.
-2. Put the `.bbmodel` file in `plugins/Repack/models/`. The file name is the block id: `chair.bbmodel` makes the block `chair`. Use a-z, 0-9, `_` and `-`; other characters in a file name become `_`.
+2. Put the `.bbmodel` file in `plugins/Repack/models/`. The file name is the model's id: `chair.bbmodel` is the model `chair`. Use a-z, 0-9, `_` and `-`; other characters in a file name become `_`. A model is only a model: it is not a block yet.
 3. Save the file. A few seconds later Repack rebuilds the pack, quietly. New players get it when they join, and `/repack reload` or `/repack push` sends it to the ones online. Nothing needs a restart.
-4. `/repack give chair`, place it.
+4. Make a block from it: `/repack` > Block builder > New block, pick an id and the model. Then `/repack give chair`, and place it.
 
-Repack also writes `plugins/Repack/blocks/chair.yml` with every option at its default. Edit that file to change how the block behaves.
+The builder writes `plugins/Repack/blocks/chair.yml` with every option. You can also write that file by hand, and several blocks can share one model. If you would rather have every model be a block at once, set `auto-blocks: true` in `config.yml`.
 
 What Blockbench features carry over:
-- Cubes with their faces, textures and UV, and the Display tab (hand, inventory, ground, item frame, head, shelf).
-- A cube can rotate around one axis by -45, -22.5, 22.5 or 45 degrees. Other rotations are dropped and listed as warnings.
-- Cubes may reach from -16 to 32 on each axis. A model with a cube outside that is an error, because the game would not load it, and it is left out of the pack.
-- Rotated groups, meshes and animated textures are not supported yet and are skipped with a warning.
+- Cubes with their faces, textures and UV, and the Display tab (hand, inventory, ground, item frame, head, shelf). A model that only uses these is a plain vanilla block model, which every client from 1.21.4 shows.
+- Anything a vanilla model cannot do is drawn with objmc's technique instead, automatically: meshes, animations, rotated groups, cubes rotated freely on several axes or by any angle, and cubes reaching outside -16 to 32. See [Models with meshes](#models-with-meshes). The `objmc` setting in `config.yml` can force it for every model (`always`) or turn it off (`never`, which leaves out what vanilla cannot show). Clients up to 1.21.8 cannot run objmc, so they see a simplified vanilla version of those models.
+- Animated textures and other element types (locators, null objects) are not supported yet and are skipped with a warning.
 
 ## The pack: build and send
 
@@ -74,6 +73,7 @@ If Distortion is installed too, both plugins send their packs in one request whe
 | `/repack menu` | A screen with every block item. Click to take one, shift-click for 64. |
 | `/repack place <id> [pos]` and `/repack remove [pos]` | Place or remove a block without an item. |
 | `/repack list` | The ids that can be placed. |
+| `/repack entity summon <id> [pos] [yaw]` | Puts a model entity in the world. `list [radius]`, `remove [radius]` and `play <animation\|none> [radius]` work on the ones around you. |
 | `/repack distortion spawn <hex> <radius> <ticks> [pos]` | A ripple of that color growing to that radius in blocks over that many ticks. Also `/distortion ...`. |
 | `/repack distortion debug [on\|off]` | Shows outlines and the raw data of the ripples. 26.3 and newer clients only. |
 
@@ -173,7 +173,7 @@ If Distortion (or another plugin that uses the same scheme) is installed, the fi
 |---|---|---|
 | `debug` | `false` | Logs clicks and mining, to find out why something does not work. |
 | `install-defaults` | `true` | Install the bundled table the first time. |
-| `create-block-files` | `true` | Write `blocks/<id>.yml` for every model that has none. |
+| `auto-blocks` | `false` | Every model is also a block, with a `blocks/<id>.yml` written for it. Off: models are blocks only when you make one. |
 | `messages.no-permission` | text | Sent when a protection plugin says no. Empty for no message. |
 | `resource-pack.public-host` / `port` / `bind` | empty / `8086` / `0.0.0.0` | Where the pack server listens and what players are told. |
 | `resource-pack.share-host` | `true` | Share the pack server with other plugins that use the same scheme. |
@@ -192,6 +192,20 @@ If Distortion (or another plugin that uses the same scheme) is installed, the fi
 | `gui.textures` | `true` | Use the pictures for the builder screens when there are any. |
 
 Every settings file starts with `config-version` and a note not to edit it. When a new Repack version changes the shipped `config.yml` or the block template, the file is updated on the next start: new options are added, your values and comments are kept, and the old file is saved as `<name>.bak-<version>` if anything besides the version changed.
+
+## Model entities
+
+A model entity is a model standing in the world at any position and rotation, with no block under it, and with an animation that can change. It is not a mob: it has no health, hitbox or AI, only a look. Make a type in `/repack` > Entity builder (pick an id and a model, then the animation, scale, offset, light and view range), or write `entities/<id>.yml` yourself. Put one in the world with `/repack entity summon <id>` (or the "Put one here" button), take them away with `/repack entity remove [radius]`, list the ones around you with `/repack entity list`, and change what they play with `/repack entity play <animation|none> [radius]`. Entities are saved in the chunk they stand in, so they stay through restarts, and only players who have that chunk see them. From Skript: `summon model entity "guard" at player's location facing 90 playing "idle"`, `remove model entities within 3 blocks of player's location`, and `make model entities within 3 blocks of player's location play "walk"`. A model used only by an entity does not become a block.
+
+## Models with meshes
+
+A Blockbench model can have **mesh** elements, with free faces and any shape, animations, rotated groups and other things a vanilla block model cannot show. Repack shows those with the technique of [objmc](https://github.com/Godlander/objmc): the whole model is stored in the pixels of a texture, and a core shader builds it again in the game. Nothing changes for you: put the `.bbmodel` in `models/` like any other, and Repack uses this for every model that needs it, cubes and all (so rotations on any axis and in nested groups work). The pack gets objmc's shaders only when such a model exists.
+
+Limits for now: one texture per model (combine them in Blockbench), and it only shows for 1.21.9 and newer clients, because objmc's shaders are written or ported for them (1.21.8 and older see nothing). The shaders replace the game's entity and item shaders and need a graphics card with OpenGL 4.5, which nearly all have.
+
+### Animations
+
+The animations of a model with meshes work too. Each Blockbench animation is sampled into frames (20 a second, at most 120) and becomes its own model, which plays by itself in a loop from the game time. Bones are the groups of the outliner; position, rotation and scale keyframes with linear, catmull-rom and step curves are used (bezier handles are treated as catmull-rom, and Molang expressions count as 0). To make a block play one, set `display.animation` in its block file to the animation's name in lowercase (`Spin Fast` is `spin_fast`). Every copy of a block plays in step with the others, and a block that is not set to play one shows the model as it is built, without animation.
 
 ## Custom items
 

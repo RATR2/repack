@@ -24,10 +24,6 @@ object BukkitMaterials : MaterialRules {
     override fun isItem(name: String) = Material.matchMaterial(name)?.isItem == true
 }
 
-/**
- * Reads `blocks/<id>.yml`. A model with no file gets the defaults, so dropping a .bbmodel into `models/` is enough to have a
- * working block. Files starting with `_` are ignored (the plugin writes `_example.yml` there as documentation).
- */
 object BlockDefinitions {
 
     /** 100 times the usual display range: far past anything a client draws, and small enough to stay a finite float. */
@@ -66,7 +62,7 @@ object BlockDefinitions {
                 errors += "$id: not valid YAML (${e.message?.lineSequence()?.firstOrNull()})"
             }
         }
-        for (model in modelIds.sorted()) {
+        for (model in if (implicit) modelIds.sorted() else emptyList()) {
             if (only != null && model !in only) continue
             if (model !in itemOnly && model !in definitions && files.none { it.nameWithoutExtension.lowercase() == model }) {
                 definitions[model] = parse(model, YamlConfiguration())
@@ -131,6 +127,7 @@ object BlockDefinitions {
                 brightness = brightness,
                 rotateToPlacer = display?.getBoolean("rotate-to-placer", false) ?: false,
                 context = enumOf(display?.getString("context") ?: "none", DisplayContext::class.java, "display.context"),
+                animation = display?.getString("animation")?.takeIf { it.isNotBlank() }?.let(ModelLibrary::cleanId),
             ),
             item = ItemOptions(
                 baseName = itemBase,

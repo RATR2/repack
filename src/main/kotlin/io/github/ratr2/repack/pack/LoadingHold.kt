@@ -56,6 +56,7 @@ class LoadingHold(private val plugin: Repack) : Listener {
         player.velocity = player.velocity.zero()
         for (entity in player.getNearbyEntities(ENTITY_RANGE, ENTITY_RANGE, ENTITY_RANGE)) hide(player, state, entity)
         plugin.displays()?.hideAllFor(player)
+        plugin.modelEntities.hideAllFor(player)
         if (plugin.config.getBoolean("resource-pack.black-blocks-while-loading", true) && plugin.players.bool(playerId, io.github.ratr2.repack.PlayerSettings.LOADING_SCREEN)) screen.show(player)
         timers[playerId] = plugin.server.scheduler.runTaskLater(plugin, Runnable { end(playerId) }, TIMEOUT_TICKS)
     }
@@ -67,6 +68,7 @@ class LoadingHold(private val plugin: Repack) : Listener {
         screen.hide(player)
         for (entityId in state.hidden) plugin.server.getEntity(entityId)?.let { player.showEntity(plugin, it) }
         plugin.displays()?.showAllFor(player)
+        plugin.modelEntities.showAllFor(player)
         player.setGravity(state.gravity)
         if (!state.allowFlight) {
             player.isFlying = false

@@ -46,6 +46,8 @@ class RippleManager(private val plugin: Repack, private val pack: PackSender) : 
     private val slots = arrayOfNulls<TextDisplay>(SLOTS)
     private val debugging = HashSet<UUID>()
 
+    private val toldAboutFabulous = HashSet<UUID>()
+
     val activeCount get() = slots.count { it != null }
 
     fun spawn(location: Location, rgb: Int, radius: Double, ticks: Int): Boolean {
@@ -70,7 +72,10 @@ class RippleManager(private val plugin: Repack, private val pack: PackSender) : 
         // Visible by default so pack users get plain entity tracking (hidden-by-default plus showEntity kept respawning client-
         // side as players moved); only players without the pack get it hidden.
         plugin.server.onlinePlayers.forEach {
-            if (pack.hasLoaded(it)) applyEffect(it) else it.hideEntity(plugin, display)
+            if (pack.hasLoaded(it)) {
+                applyEffect(it)
+                if (!pack.usesPostEffects(it) && toldAboutFabulous.add(it.uniqueId)) pack.fabulousNotice(it)
+            } else it.hideEntity(plugin, display)
         }
 
         // One client-side interpolation to the end state, like /data merge on a summoned marker; started after a short
@@ -110,6 +115,11 @@ class RippleManager(private val plugin: Repack, private val pack: PackSender) : 
      */
     private fun applyEffect(player: Player) {
         if (pack.usesPostEffects(player)) PostEffectsCompat.add(player, effectFor(player))
+    }
+
+    @EventHandler
+    fun onQuit(event: org.bukkit.event.player.PlayerQuitEvent) {
+        toldAboutFabulous.remove(event.player.uniqueId)
     }
 
     @EventHandler

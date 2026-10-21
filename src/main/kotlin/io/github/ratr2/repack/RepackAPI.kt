@@ -110,4 +110,40 @@ object RepackAPI {
             onFailure = { io.github.ratr2.repack.edit.ItemBuilder(null, it.message ?: "Could not make the item.") },
         )
     }
+
+    /** Puts a model entity of the type id at location, which stays there until removed. Null for an unknown type or world. */
+    @JvmStatic
+    fun spawnEntity(id: String, location: Location): io.github.ratr2.repack.entity.ModelEntity? = onMain(null) { api ->
+        api.modelEntities.definitions[id]?.let { api.modelEntities.spawn(it, location) }
+    }
+
+    /** Every model entity in the loaded chunks. */
+    @JvmStatic
+    fun entities(): List<io.github.ratr2.repack.entity.ModelEntity> = onMain(emptyList()) { it.modelEntities.all.toList() }
+
+    /** The model entities within radius blocks of location. */
+    @JvmStatic
+    fun entitiesNear(location: Location, radius: Double): List<io.github.ratr2.repack.entity.ModelEntity> = onMain(emptyList()) { api ->
+        api.modelEntities.all.filter { e -> e.location?.let { it.world == location.world && it.distanceSquared(location) <= radius * radius } == true }
+    }
+
+    /** The ids of the model entity types. */
+    @JvmStatic
+    fun entityIds(): Set<String> = onMain(emptySet()) { it.modelEntities.definitions.keys.toSet() }
+
+    /** Opens an existing model entity type for editing: chain the changes and finish with save(). */
+    @JvmStatic
+    fun editEntity(id: String): io.github.ratr2.repack.edit.EntityBuilder = onMain(io.github.ratr2.repack.edit.EntityBuilder(null, "Repack is not running.")) { api ->
+        val draft = api.entityEditor.open(id)
+        io.github.ratr2.repack.edit.EntityBuilder(draft, if (draft == null) "There is no entity '$id'." else null)
+    }
+
+    /** Starts a new model entity type that shows model: chain the changes and finish with save(). */
+    @JvmStatic
+    fun createEntity(id: String, model: String): io.github.ratr2.repack.edit.EntityBuilder = onMain(io.github.ratr2.repack.edit.EntityBuilder(null, "Repack is not running.")) { api ->
+        api.entityEditor.create(id, model).fold(
+            onSuccess = { io.github.ratr2.repack.edit.EntityBuilder(it, null) },
+            onFailure = { io.github.ratr2.repack.edit.EntityBuilder(null, it.message ?: "Could not make the entity.") },
+        )
+    }
 }

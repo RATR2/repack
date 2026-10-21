@@ -4,8 +4,14 @@ debug: false
 # Install the table that comes with Repack (models/table.bbmodel and blocks/table.yml) the first time it runs.
 install-defaults: true
 
-# Write a settings file in blocks/ (every option, at its default) for each model that does not have one yet.
-create-block-files: true
+# true: every model in models/ is also a block of its own, with a settings file in blocks/ (every option at its default) written for it.
+# false: a model is only a model, and a block is made from it in /repack > Block builder or with a file in blocks/.
+auto-blocks: false
+
+# How models are drawn. auto: a model vanilla can draw exactly is a vanilla model, and one that needs more (meshes, animations, rotated groups, free rotations,
+# cubes outside what vanilla allows) is drawn with objmc's technique, which every Blockbench feature works with. always: every model uses objmc. never: vanilla
+# models only, and what they cannot show is left out. objmc works for 1.21.9 and newer clients with OpenGL 4.5; older clients see a simplified vanilla version.
+objmc: auto
 
 # Sent in chat when a protection plugin such as WorldGuard says no. Leave empty for no message.
 messages:

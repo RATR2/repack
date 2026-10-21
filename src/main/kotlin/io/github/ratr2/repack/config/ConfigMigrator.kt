@@ -46,10 +46,25 @@ object ConfigMigrator {
         migrations.forEach { it.apply(yaml) }
         if (defaults != null) addMissing(yaml, defaults)
         val changed = snapshot(yaml) != before
-        val backup = File(file.parentFile, "${file.name}.bak-${(found ?: "unversioned").replace(Regex("[^A-Za-z0-9._-]"), "_").take(40)}")
+        val folder = backups?.also { it.mkdirs() } ?: file.parentFile
+        val backup = File(folder, "${file.name}.bak-${(found ?: "unversioned").replace(Regex("[^A-Za-z0-9._-]"), "_").take(40)}")
         if (changed && !backup.exists()) file.copyTo(backup)
+        if (changed && backups != null) prune(folder, file.name)
         withVersion(yaml, current).save(file)
-        return if (changed) "${file.name}: updated to version $current (the old file is kept as ${backup.name})." else null
+        return if (changed) "${file.name}: updated to version $current (the old file is kept as ${if (backups != null) "${backups.name}/" else ""}${backup.name})." else null
+    }
+
+    fun prune(folder: File, name: String) {
+        val all = folder.listFiles { f -> f.isFile && f.name.startsWith("$name.bak-") }.orEmpty().sortedByDescending { it.lastModified() }
+        all.drop(1).forEach { it.delete() }
+    }
+
+    fun gatherBackups(source: File, target: File) {
+        val found = source.listFiles { f -> f.isFile && ".bak-" in f.name }.orEmpty()
+        if (found.isEmpty()) return
+        target.mkdirs()
+        for (file in found) java.nio.file.Files.move(file.toPath(), File(target, file.name).toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        found.map { it.name.substringBefore(".bak-") }.distinct().forEach { prune(target, it) }
     }
 
     private fun snapshot(yaml: YamlConfiguration) = yaml.getValues(true).filterKeys { it != KEY }.mapValues { it.value.toString() }

@@ -47,6 +47,7 @@ object BlockTemplate {
           # brightness: 15              # 0 to 15, leave out to light it like the world around it
           rotate-to-placer: false       # face the player who places it, in 90 degree steps
           context: none                 # which Display tab setting the placed block uses: none, gui, ground, fixed, head, ...
+          # animation: idle             # a model with meshes plays this Blockbench animation all the time (its name, lowercase)
 
         item:
           base: PAPER                   # what the item that places this block is made from

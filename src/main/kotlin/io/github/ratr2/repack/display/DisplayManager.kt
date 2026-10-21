@@ -148,7 +148,7 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
         val item = com.github.retrooper.packetevents.protocol.item.ItemStack.builder()
             .type(ItemTypes.PAPER)
             .amount(1)
-            .component(ComponentTypes.ITEM_MODEL, ItemModel(ResourceLocation(ItemModelGenerator.NAMESPACE, definition.model)))
+            .component(ComponentTypes.ITEM_MODEL, ItemModel(ResourceLocation(ItemModelGenerator.NAMESPACE, definition.display.animation?.let { "${definition.model}/anim/$it" } ?: definition.model)))
             // Jade and similar mods show the item's name for an item display, which would be "Paper".
             .component(ComponentTypes.ITEM_NAME, io.github.ratr2.repack.text.Colors.parse(definition.item.name ?: definition.id.split('_', '-').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }))
             .build()

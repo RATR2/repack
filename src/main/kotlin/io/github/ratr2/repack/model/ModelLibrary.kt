@@ -24,6 +24,7 @@ object ModelLibrary {
         folder: File,
         cache: ModelCache? = null,
         fresh: Boolean = false,
+        mode: ObjmcMode = ObjmcMode.AUTO,
         onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
     ): LibraryResult {
         val files = PackVariant.entries.associateWith { HashMap<String, ByteArray>() }
@@ -42,10 +43,10 @@ object ModelLibrary {
             }
             try {
                 val bytes = source.readBytes()
-                val sha1 = ModelCache.sha1(bytes)
+                val sha1 = ModelCache.sha1(bytes + mode.name.toByteArray())
                 var converted = if (fresh) null else cache?.get(id, sha1)
                 if (converted == null) {
-                    converted = convert(id, String(bytes, Charsets.UTF_8))
+                    converted = convert(id, String(bytes, Charsets.UTF_8), mode)
                     cache?.put(id, sha1, converted)
                 }
                 cache?.let { live += it.nameOf(id, sha1) }
@@ -69,10 +70,12 @@ object ModelLibrary {
         return LibraryResult(files, models, warnings, errors)
     }
 
-    private fun convert(id: String, text: String): Converted {
+    private fun convert(id: String, text: String, mode: ObjmcMode): Converted {
         val model = BbParser.parse(id, text)
-        val generated = PackVariant.entries.associateWith { ItemModelGenerator.generate(id, model, it.shelf) }
-        val first = generated.getValue(PackVariant.entries.first())
-        return Converted(generated.mapValues { it.value.files }, first.warnings, first.errors)
+        val generated = PackVariant.entries.associateWith { ItemModelGenerator.generate(id, model, it.shelf, mode, it.objmc) }
+        // What each version of the pack loses is reported once, in the order it appears.
+        val warnings = generated.values.flatMap { it.warnings }.distinct()
+        val errors = generated.values.flatMap { it.errors }.distinct()
+        return Converted(generated.mapValues { it.value.files }, warnings, errors)
     }
 }

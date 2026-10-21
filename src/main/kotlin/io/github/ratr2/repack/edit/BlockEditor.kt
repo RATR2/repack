@@ -51,8 +51,8 @@ class BlockEditor(
         val model = plugin.blocks.definitionOf(id)?.model ?: id
         val others = plugin.blocks.definitions.values.any { it.id != id && it.model == model }
         val modelFiles = plugin.modelsFolder.listFiles { f -> f.isFile && f.extension.equals("bbmodel", ignoreCase = true) && ModelLibrary.idOf(f) == model }.orEmpty()
-        if (others && id == model && plugin.config.getBoolean("create-block-files", true)) {
-            return "Other blocks show the model '$model', so '$id' would be made again. Delete those first, or turn off create-block-files."
+        if (others && id == model && plugin.config.getBoolean("auto-blocks", false)) {
+            return "Other blocks show the model '$model', so '$id' would be made again. Delete those first, or turn off auto-blocks."
         }
         return try {
             val trash = File(plugin.dataFolder, "deleted/${System.currentTimeMillis()}-$id").apply { mkdirs() }

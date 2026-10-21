@@ -115,9 +115,6 @@ class PackSender(
                 val era = variantOf(event.player)
                 if (era != null && loaded.put(playerId, era) == null) {
                     onLoaded(event.player)
-                    if (!era.usesPostEffects && plugin.config.getBoolean("distortion.enabled", true)) {
-                        notice(event.player, "On your client version, distortion effects only show with Fabulous! graphics (Video Settings > Graphics).")
-                    }
                 }
             }
             Status.DECLINED, Status.FAILED_DOWNLOAD, Status.FAILED_RELOAD, Status.INVALID_URL, Status.DISCARDED -> {
@@ -133,6 +130,10 @@ class PackSender(
     fun onQuit(event: PlayerQuitEvent) {
         sentAt.remove(event.player.uniqueId)
         loaded.remove(event.player.uniqueId)
+    }
+
+    fun fabulousNotice(player: Player) {
+        notice(player, "On your client version, distortion effects only show with Fabulous! graphics (Video Settings > Graphics).")
     }
 
     private fun notice(player: Player, message: String) {

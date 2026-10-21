@@ -11,7 +11,7 @@
 [![License](https://img.shields.io/github/license/RATR2/repack?style=for-the-badge&logo=github)](LICENSE)
 [![Status](https://img.shields.io/badge/status-in--development-yellow?style=for-the-badge)](#status)
 
-> Custom blocks from Blockbench models, with no client mod and no entities on your server.
+> Rendering of Entities, Post-effects, & Advanced Customization Kit: custom blocks, items, meshes, ripples and animated text, with no client mod.
 > A Paper plugin and its own resource pack.
 
 If you find any issues, please report them [here](https://github.com/RATR2/repack/issues)
@@ -22,7 +22,11 @@ If you find any issues, please report them [here](https://github.com/RATR2/repac
 
 ## What is this
 
-Drop a `.bbmodel` file into the plugin folder and you have a custom block. Repack builds a resource pack from your models, places a hidden proxy block (a barrier by default) where the custom block goes, and shows the model on top of it. Players click, mine and collide with the proxy, so everything vanilla and every plugin already understands it.
+Repack is a customization kit for what players see and use: custom blocks and items made from Blockbench models, models with meshes, animations and any rotation (drawn with objmc's technique, automatically when a model needs it), world-anchored ripple effects (what used to be the Distortion plugin), animated text colors, and more to come (the roadmap is in the repository). Everything is built into one resource pack per client version.
+
+### Custom blocks
+
+Drop a `.bbmodel` file into the plugin folder, make a block from it in the builder, and you have a custom block. Repack builds a resource pack from your models, places a hidden proxy block (a barrier by default) where the custom block goes, and shows the model on top of it. Players click, mine and collide with the proxy, so everything vanilla and every plugin already understands it.
 
 - **No entities on the server.** The models are packet-based item displays, sent to each player only while they have the block's chunk loaded.
 - **Saved with the world.** Placements live in the chunk's own data, so they survive restarts and travel with world copies and backups.
@@ -40,11 +44,11 @@ Needs Paper 1.21.4 or newer (built with Java 25, but runs on Java 21 and up) and
 
 1. Put `repack.jar` and `packetevents-spigot-2.14.0.jar` in `plugins/`.
 2. Start the server. The first time, Repack adds a ready-made `table` block (`models/table.bbmodel` and `blocks/table.yml`). Set `install-defaults: false` before the first start to skip it.
-3. Put your own models in `plugins/Repack/models/`. The file name is the block id: `chair.bbmodel` makes the block `chair`. Textures must be embedded in the model.
+3. Put your own models in `plugins/Repack/models/`: `chair.bbmodel` is the model `chair`. Textures must be embedded in the model. Make a block from it in `/repack` > Block builder (or set `auto-blocks: true` to make every model a block).
 4. Save the files. The pack is built by itself, and players get it when they join. Use `/repack reload` or `/repack push` to send it to the ones online.
 5. `/repack give table` and place it.
 
-Repack writes `plugins/Repack/blocks/table.yml` for every model, with every option listed at its default. Edit it to change the block (the bundled `table.yml` shows a real one, with a crafting recipe, a glowing item and a scaled model), or copy it (`table2.yml`, same `model:`) for a second block that shares the model. `_example.yml` in the same folder explains each option and is rewritten on every start.
+The builder writes `plugins/Repack/blocks/<id>.yml` for a block, with every option listed. Edit it to change the block (the bundled `table.yml` shows a real one, with a crafting recipe, a glowing item and a scaled model), or copy it (`table2.yml`, same `model:`) for a second block that shares the model. `_example.yml` in the same folder explains each option and is rewritten on every start.
 
 ## Commands
 

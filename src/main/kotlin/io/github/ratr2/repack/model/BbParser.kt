@@ -38,11 +38,19 @@ object BbParser {
         val rotatedGroups = rotatedGroupsOf(root, groupRotations)
 
         val cubes = ArrayList<BbCube>()
+        val meshes = ArrayList<BbMesh>()
+        val vanillaWarnings = ArrayList<String>()
+        val paths = groupPaths(root, groupRotations)
         val elements = root.array("elements") ?: JsonArray()
         for (element in elements) {
             val obj = element.asJsonObject
             val type = obj.string("type") ?: "cube"
             val label = obj.string("name") ?: obj.string("uuid") ?: type
+            if (type == "mesh") {
+                if (obj.bool("export", true).not() || obj.bool("visibility", true).not()) continue
+                meshes += parseMesh(obj, label, textures.size, paths[obj.string("uuid")].orEmpty(), warnings)
+                continue
+            }
             if (type != "cube") {
                 warnings += "Element '$label' is a $type, which is not supported yet and was skipped."
                 continue
@@ -50,13 +58,15 @@ object BbParser {
             if (obj.bool("export", true).not() || obj.bool("visibility", true).not()) continue
             val uuid = obj.string("uuid")
             if (uuid != null && uuid in rotatedGroups) {
-                warnings += "Cube '$label' sits in a rotated group (${rotatedGroups[uuid]}); group rotation is ignored."
+                vanillaWarnings += "Cube '$label' sits in a rotated group (${rotatedGroups[uuid]}); group rotation is ignored."
             }
-            cubes += parseCube(obj, label, textures.size, warnings)
+            cubes += parseCube(obj, label, textures.size, warnings).let {
+                BbCube(it.name, it.from, it.to, it.inflate, it.origin, it.rotation, it.shade, it.lightEmission, it.faces, paths[uuid].orEmpty())
+            }
         }
 
-        if (cubes.isEmpty()) warnings += "The model has no cubes."
-        return BbModel(name, textures, cubes, parseDisplay(root), warnings)
+        if (cubes.isEmpty() && meshes.isEmpty()) warnings += "The model has no cubes."
+        return BbModel(name, textures, cubes, parseDisplay(root), warnings, meshes, parseAnimations(root, warnings), vanillaWarnings)
     }
 
     /**
@@ -185,10 +195,7 @@ object BbParser {
             val obj = node.asJsonObject
             val uuid = obj.string("uuid")
             val rotation = if (obj.has("rotation")) obj.vec3("rotation") else uuid?.let(rotations::get) ?: Vec3.ZERO
-            // Blockbench 5 keeps a group's name and pivot in the top-level groups list, older files on the outliner node.
-            val known = uuid?.let(data::get)
-            val origin = if (obj.has("origin")) obj.vec3("origin") else known?.vec3("origin") ?: Vec3.ZERO
-            val here = path + GroupTransform(origin, rotation, uuid, obj.string("name") ?: known?.string("name") ?: "")
+            val here = path + GroupTransform(obj.vec3("origin"), rotation, uuid, obj.string("name") ?: "")
             for (child in obj.array("children") ?: JsonArray()) visit(child, here, depth + 1)
         }
 
