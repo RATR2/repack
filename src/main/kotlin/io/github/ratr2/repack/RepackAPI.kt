@@ -159,6 +159,42 @@ object RepackAPI {
     @JvmStatic
     fun setSkybox(player: org.bukkit.entity.Player, id: String?): Boolean = onMain(false) { api -> api.skyboxes?.choose(player, id) ?: false }
 
+    // Custom GUIs. Slot rules (cost, cooldown, permission) belong to the calling plugin: listen for GuiClickEvent and cancel it.
+
+    @JvmStatic
+    fun guiManager(): io.github.ratr2.repack.menu.GuiManager? = plugin?.takeIf { it.isEnabled }?.guis
+
+    @JvmStatic
+    fun guiIds(): List<String> = onMain(emptyList()) { it.guis.ids }
+
+    @JvmStatic
+    fun openGui(player: org.bukkit.entity.Player, id: String): String? = onMain("Repack is not running.") { it.guis.open(player, id) }
+
+    @JvmStatic
+    fun openGui(player: org.bukkit.entity.Player, gui: io.github.ratr2.repack.menu.LiveGui) = onMain(Unit) { it.guis.open(player, gui) }
+
+    @JvmStatic
+    fun closeGui(player: org.bukkit.entity.Player) = onMain(Unit) { it.guis.close(player) }
+
+    @JvmStatic
+    fun guiOf(player: org.bukkit.entity.Player): io.github.ratr2.repack.menu.LiveGui? = onMain(null) { player.openInventory.topInventory.holder as? io.github.ratr2.repack.menu.LiveGui }
+
+    @JvmStatic
+    fun createGui(rows: Int, title: String): io.github.ratr2.repack.menu.LiveGui? = onMain(null) { it.guis.create(io.github.ratr2.repack.menu.GuiKind.CHEST, rows, title) }
+
+    /** A new GUI of another kind: "hopper", "dispenser" or "dropper". */
+    @JvmStatic
+    fun createGui(kind: String, title: String): io.github.ratr2.repack.menu.LiveGui? = onMain(null) { api ->
+        io.github.ratr2.repack.menu.GuiKind.of(kind)?.takeIf { it.hasSlots }?.let { api.guis.create(it, 3, title) }
+    }
+
+    /** Holds a player's GUI handlers and slot actions, to switch screens without them firing. Always resume. */
+    @JvmStatic
+    fun pauseGui(player: org.bukkit.entity.Player) = onMain(Unit) { it.guis.pause(player) }
+
+    @JvmStatic
+    fun resumeGui(player: org.bukkit.entity.Player) = onMain(Unit) { it.guis.resume(player) }
+
     @JvmStatic
     fun skyboxOf(player: org.bukkit.entity.Player): String? = onMain(null) { api -> api.skyboxes?.skyboxOf(player)?.id }
 }

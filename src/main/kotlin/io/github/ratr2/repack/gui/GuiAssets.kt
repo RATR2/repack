@@ -26,7 +26,6 @@ object GuiAssets {
 
     val FONT: Key = Key.key("repack", "gui")
 
-    /** How many pixels a background extends beyond the screen on the left, right and top. */
     const val PAD = 8
 
     /** Moves the cursor 8 pixels left: titles start 8 pixels in, the pictures start at the edge. */

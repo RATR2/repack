@@ -84,6 +84,12 @@ class Repack : JavaPlugin() {
     var skyboxes: io.github.ratr2.repack.sky.SkyboxManager? = null
         private set
 
+    lateinit var guis: io.github.ratr2.repack.menu.GuiManager
+        private set
+
+    lateinit var clientVersions: ClientVersions
+        private set
+
     var shakes: io.github.ratr2.repack.distortion.ShakeManager? = null
         private set
     val players: PlayerSettings by lazy { PlayerSettings(this) }
@@ -95,11 +101,13 @@ class Repack : JavaPlugin() {
         migrateConfig()
         saveResource("blocks/_example.yml", true)
         saveResource("skyboxes/_example.yml", true)
+        saveResource("guis/_example.yml", true)
         installDefaults()
         store = PackStore(dataFolder)
         sending = config.getBoolean("resource-pack.send", true)
         host = SharedHost(this, "repack", 8086) { name -> store.file(name.removeSuffix(".zip"))?.readBytes() }.also { if (sending) it.start() }
         val versions = ClientVersions(this)
+        clientVersions = versions
         hold = LoadingHold(this)
         sender = PackSender(this, store, host, versions, hold, sending)
         if (versions.hasViaBackwards) logger.warning("ViaBackwards found: clients older than 1.21.4 will not be able to see Repack blocks.")
@@ -111,6 +119,10 @@ class Repack : JavaPlugin() {
         io.github.ratr2.repack.text.Colors.effects = TextEffects.rules(config.getConfigurationSection("text-effects")).first.associate { it.name to it.triggerHex }
         gui = Gui(this)
         server.pluginManager.registerEvents(gui, this)
+        guis = io.github.ratr2.repack.menu.GuiManager(this)
+        server.pluginManager.registerEvents(guis, this)
+        guis.start()
+        reloadGuis()
 
         blocks = PlacedBlocks(this)
         items = BlockItems(this)
@@ -161,6 +173,7 @@ class Repack : JavaPlugin() {
         ripples?.clear()
         shakes?.clear()
         skyboxes?.close()
+        if (::guis.isInitialized) guis.stop()
         recipeKeys.values.forEach { server.removeRecipe(it) }
         if (::hold.isInitialized) hold.endAll()
         if (::host.isInitialized) host.stop()
@@ -220,6 +233,16 @@ class Repack : JavaPlugin() {
 
     val skyboxesFolder: File
         get() = File(dataFolder, "skyboxes").apply { mkdirs() }
+
+    val guisFolder: File
+        get() = File(dataFolder, "guis").apply { mkdirs() }
+
+    /** Reads the GUI files again. A screen that is open keeps what it had; the next time it opens it uses the new files. */
+    fun reloadGuis(): List<String> {
+        val loaded = io.github.ratr2.repack.menu.GuiLoader.load(guisFolder)
+        guis.load(loaded)
+        return loaded.errors
+    }
 
     private val backupsFolder: File
         get() = File(dataFolder, "backups")
@@ -488,6 +511,8 @@ class Repack : JavaPlugin() {
         server.scheduler.runTaskAsynchronously(this, Runnable {
             var library: LibraryResult? = null
             var skies: io.github.ratr2.repack.sky.LoadedSkyboxes? = null
+            var guiFiles: io.github.ratr2.repack.menu.LoadedGuis? = null
+            val guiPictureErrors = ArrayList<String>()
             var zips: Map<PackEra, ByteArray>? = null
             var universal: ByteArray? = null
             var failure: String? = null
@@ -501,7 +526,8 @@ class Repack : JavaPlugin() {
                     ruleErrors.forEach { logger.warning(it) }
                     val effects = TextEffects.snippet(rules)
                     val shaders = config.getBoolean("distortion.enabled", true) || effects != null
-                    val gui = GuiPack.files()
+                    val loadedGuis = io.github.ratr2.repack.menu.GuiLoader.load(guisFolder).also { guiFiles = it }
+                    val gui = GuiPack.files() + io.github.ratr2.repack.menu.GuiBackgrounds.files(loadedGuis.definitions.values, guisFolder, guiPictureErrors)
                     val loadedSkies = io.github.ratr2.repack.sky.SkyboxDefinitions.load(skyboxesFolder).also { skies = it }
                     val skyAssets = io.github.ratr2.repack.sky.SkyboxShaders.assets(loadedSkies.definitions)
                     val eraShaders = PackEra.entries.associateWith { era ->
@@ -547,6 +573,13 @@ class Repack : JavaPlugin() {
                     return@Runnable
                 }
                 progress.update(ZIP_SHARE, "loading the block files")
+                guiFiles?.let { loaded ->
+                    guiPictureErrors.forEach { logger.warning(it) }
+                    if (zips != null) {
+                        guis.load(loaded, log = false)
+                        guis.built(io.github.ratr2.repack.menu.GuiBackgrounds.glyphs(loaded.definitions.values).keys)
+                    }
+                }
                 skies?.let { loaded ->
                     loaded.errors.forEach { logger.warning(it) }
                     if (zips != null) skyboxes?.load(loaded.definitions)

@@ -5,6 +5,8 @@ import ch.njol.skript.aliases.ItemType;
 import io.github.ratr2.repack.Repack;
 import io.github.ratr2.repack.block.CustomBlockEvent;
 import io.github.ratr2.repack.block.CustomBlockInteractEvent;
+import io.github.ratr2.repack.menu.GuiActionEvent;
+import io.github.ratr2.repack.menu.LiveGui;
 import org.skriptlang.skript.addon.SkriptAddon;
 import org.skriptlang.skript.bukkit.registration.BukkitSyntaxInfos;
 import org.skriptlang.skript.registration.SyntaxInfo;
@@ -45,6 +47,30 @@ final class ModernSyntax {
                 .supplier(ExprCustomBlockIds::new).addPatterns(ExprCustomBlockIds.PATTERNS).build());
         registry.register(SyntaxRegistry.EXPRESSION, SyntaxInfo.Expression.builder(ExprCustomBlockItem.class, ItemType.class)
                 .supplier(ExprCustomBlockItem::new).addPatterns(ExprCustomBlockItem.PATTERNS).build());
+
+        registry.register(SyntaxRegistry.SECTION, SyntaxInfo.builder(SecCreateGui.class)
+                .supplier(SecCreateGui::new).addPatterns(SecCreateGui.PATTERNS).build());
+        registry.register(SyntaxRegistry.SECTION, SyntaxInfo.builder(SecMakeSlot.class)
+                .supplier(SecMakeSlot::new).addPatterns(SecMakeSlot.PATTERNS).build());
+        registry.register(SyntaxRegistry.SECTION, SyntaxInfo.builder(SecGuiRun.class)
+                .supplier(SecGuiRun::new).addPatterns(SecGuiRun.PATTERNS).build());
+        registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffGui.class)
+                .supplier(EffGui::new).addPatterns(EffGui.PATTERNS).build());
+        registry.register(SyntaxRegistry.EXPRESSION, SyntaxInfo.Expression.builder(ExprGui.class, LiveGui.class)
+                .supplier(ExprGui::new).addPatterns(ExprGui.PATTERNS).build());
+        registry.register(SyntaxRegistry.EXPRESSION, SyntaxInfo.Expression.builder(ExprGuiIds.class, String.class)
+                .supplier(ExprGuiIds::new).addPatterns(ExprGuiIds.PATTERNS).build());
+        registry.register(SyntaxRegistry.EXPRESSION, SyntaxInfo.Expression.builder(ExprGuiLayout.class, String.class)
+                .supplier(ExprGuiLayout::new).addPatterns(ExprGuiLayout.PATTERNS).build());
+        registry.register(SyntaxRegistry.EXPRESSION, SyntaxInfo.Expression.builder(ExprGuiEvent.class, Object.class)
+                .supplier(ExprGuiEvent::new).addPatterns(ExprGuiEvent.PATTERNS).build());
+        registry.register(BukkitSyntaxInfos.Event.KEY, BukkitSyntaxInfos.Event.builder(EvtGuiAction.class, "Custom GUI Action")
+                .supplier(EvtGuiAction::new)
+                .addEvent(GuiActionEvent.class)
+                .addDescription("Fires when an `event: name` action of a GUI file runs.")
+                .addExample("on custom gui action of \"buy\":")
+                .addPatterns(EvtGuiAction.PATTERNS)
+                .build());
 
         registry.register(BukkitSyntaxInfos.Event.KEY, BukkitSyntaxInfos.Event.builder(EvtCustomBlockInteract.class, "Custom Block Interact")
                 .supplier(EvtCustomBlockInteract::new)

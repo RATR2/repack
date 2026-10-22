@@ -5,6 +5,8 @@ import ch.njol.skript.lang.ExpressionType;
 import io.github.ratr2.repack.Repack;
 import io.github.ratr2.repack.block.CustomBlockEvent;
 import io.github.ratr2.repack.block.CustomBlockInteractEvent;
+import io.github.ratr2.repack.menu.GuiActionEvent;
+import io.github.ratr2.repack.menu.LiveGui;
 
 @SuppressWarnings({"deprecation", "removal"})
 final class LegacySyntax {
@@ -29,6 +31,18 @@ final class LegacySyntax {
         Skript.registerExpression(ExprCustomBlockId.class, String.class, ExpressionType.PROPERTY, ExprCustomBlockId.PATTERNS);
         Skript.registerExpression(ExprCustomBlockIds.class, String.class, ExpressionType.SIMPLE, ExprCustomBlockIds.PATTERNS);
         Skript.registerExpression(ExprCustomBlockItem.class, ch.njol.skript.aliases.ItemType.class, ExpressionType.COMBINED, ExprCustomBlockItem.PATTERNS);
+
+        Skript.registerSection(SecCreateGui.class, SecCreateGui.PATTERNS);
+        Skript.registerSection(SecMakeSlot.class, SecMakeSlot.PATTERNS);
+        Skript.registerSection(SecGuiRun.class, SecGuiRun.PATTERNS);
+        Skript.registerEffect(EffGui.class, EffGui.PATTERNS);
+        Skript.registerExpression(ExprGui.class, LiveGui.class, ExpressionType.COMBINED, ExprGui.PATTERNS);
+        Skript.registerExpression(ExprGuiIds.class, String.class, ExpressionType.SIMPLE, ExprGuiIds.PATTERNS);
+        Skript.registerExpression(ExprGuiLayout.class, String.class, ExpressionType.PROPERTY, ExprGuiLayout.PATTERNS);
+        Skript.registerExpression(ExprGuiEvent.class, Object.class, ExpressionType.SIMPLE, ExprGuiEvent.PATTERNS);
+        Skript.registerEvent("Custom GUI Action", EvtGuiAction.class, GuiActionEvent.class, EvtGuiAction.PATTERNS)
+                .description("Fires when an `event: name` action of a GUI file runs.")
+                .examples("on custom gui action of \"buy\":");
 
         Skript.registerEvent("Custom Block Interact", EvtCustomBlockInteract.class, CustomBlockInteractEvent.class, EvtCustomBlockInteract.PATTERNS)
                 .description("Fires when a player clicks a custom block.")

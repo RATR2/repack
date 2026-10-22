@@ -77,6 +77,7 @@ If another plugin that uses the same scheme is installed too, both send their pa
 | `/repack distortion spawn <hex> <radius> <ticks> [pos]` | A ripple of that color growing to that radius in blocks over that many ticks. Also `/distortion ...`. |
 | `/repack shake <players> <strength> <ticks> [rate balance roll]` | Shakes the screen of those players, fading out. 1.21.6 and newer clients with the pack. |
 | `/repack skybox set\|off\|clear <players> [id]`, `/repack skybox list` | Choose the skybox of players, or list the skyboxes (see [Skyboxes](#skyboxes)). |
+| `/repack gui open <id> [players]`, `list`, `reload`, `close <players>`, `template <id>` | Open a custom GUI (see [Custom GUIs](#custom-guis)), list them, read the files again, close players' screens, or write a numbered picture to paint a GUI's screen on. |
 | `/repack distortion debug [on\|off]` | Shows outlines and the raw data of the ripples. 26.3 and newer clients only. |
 
 ## Block files
@@ -243,6 +244,48 @@ Make someone see a particular one with `/repack skybox set <players> <id>`, `off
 
 How it works: each player gets a display that only they see (nothing is spawned on the server), scaled inside out around them and sent as a passenger of their own entity, so it moves with them exactly. The pack replaces the game's item shader with the same one plus a branch that draws a sprite whose alpha is a sky code as a sky; it changes nothing for any other item, but another pack that replaces that same shader would clash with it. The time of day and the height reach the sky through the color of the item. The idea is [SkyboxEngine](https://github.com/Dragoncraft000/SkyboxEngine)'s (MIT, in NOTICE).
 
+## Custom GUIs
+
+A custom GUI is a screen you design: a chest, hopper, dispenser or dropper full of buttons, a text prompt, or one of the game's own dialog windows. Each file in `plugins/Repack/guis/` is one GUI, named after the file (`shop.yml` is `shop`). `_example.yml` in that folder (rewritten on every start) lists every option; this is the short version.
+
+```yaml
+title: "&6Shop"
+rows: 3
+layout:                    # a character for each slot
+  - "#########"
+  - "#  a b  #"
+  - "####c####"
+slots:
+  "#": { item: black_stained_glass_pane, name: " " }
+  a:
+    item: diamond
+    name: "&bBuy a diamond"
+    on-click: [ "console: give {player} diamond", "message: &aThanks!" ]
+  c: { item: barrier, name: Close, on-click: [ close ] }
+```
+
+Open it with `/repack gui open shop`, from another GUI's `open: shop` action, from Skript, or from a plugin (see [dev.md](dev.md)). Items are vanilla names or the id of a Repack item or block. `{player}` works in text, and so do PlaceholderAPI's `%placeholders%` when it is installed.
+
+- **Actions** run in order when a slot is clicked, or when the GUI opens (`on-open`) or closes (`on-close`): `command` (as the player), `console`, `message`, `open`, `close`, `back` (to the GUI before), `refresh`, `sound` and `event` (tells a script or plugin). A slot can say what each kind of click does (`on-left-click`, `on-right-click`, `on-shift-click`, `on-middle-click`, `on-drop`), and `on-click` covers the rest.
+- **Layouts and slots are separate.** Every character you define a slot for stays defined, even if the layout does not use it yet, so changing the layout (from a script, say) can bring a slot into view. `indexes:` defines slots by number instead.
+- **Templates.** A file with `template: true` cannot be opened, only copied: another file says `from: border` and starts as a copy of it, changing only what it writes. A new GUI per player is made from the file each time it opens, unless it says `shared: true`.
+- **Live and animated.** `update: 20` redraws names and lore every second, for placeholders that change. A slot with `frames: [emerald, diamond]` and `frame-ticks: 10` cycles through its items.
+- **Taking items.** Slots are locked by default. `removable: true` on a slot, or on the GUI (for the slots with no actions), lets players take or put items.
+- **Switching screens.** Opening another GUI from an action never runs the first one's `on-close`. Plugins and scripts can also pause a player's GUI handlers while they swap screens (see dev.md).
+- **Other kinds.** `type: anvil` asks for a line of text (`on-submit` gets it as `{input}`), and `type: dialog` is the game's own window with text, number, checkbox and choice inputs and buttons (their values are `{input.<name>}`). Dialogs need a 1.21.6 or newer client and no pack; older players get the GUI named in `fallback`.
+
+### Pictures as screens
+
+Put a PNG in the guis folder and name it, and it becomes the GUI's screen:
+
+```yaml
+background:
+  image: shop.png
+  holes: off
+```
+
+Repack makes the font, sizes and positions it for you at the next `/repack build`. The picture is fitted to the screen, so any size works, and one drawn at 2x or 4x stays sharp. `/repack gui template shop` writes a numbered guide picture to paint over. The game draws the picture on top of the items, so slots need see-through squares. If your picture already has them, leave `holes: off`. Otherwise `holes: container` cuts them over this GUI's slots, and `holes: all` over the player's inventory too.
+
 ## Troubleshooting
 
 - **A player did not get the pack.** `/repack status` should list a published pack. Check `public-host`, the port, and the console for "Could not open the pack server". The player's client must be 1.21.4 or newer.
@@ -251,4 +294,5 @@ How it works: each player gets a display that only they see (nothing is spawned 
 - **A model looks wrong.** Warnings on build list what was dropped, such as an unsupported rotation. Textures must be embedded in the `.bbmodel`.
 - **The block takes too long or too short to mine.** `breaking.time` only applies with `proxy.mode: custom`. In `vanilla` mode the proxy block's speed is used.
 - **Clicking the block does the proxy's job (a menu opens).** Set `proxy.vanilla-interaction: false`, which is the default.
+- **A GUI does not open or shows an error.** `/repack gui reload` prints what is wrong with each file, with the file's name. A new or changed picture needs `/repack build` before its screen shows; until then the GUI shows its title as plain text.
 - **Something else is wrong.** Set `debug: true`, repeat the action, and read the console.

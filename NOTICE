@@ -51,3 +51,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Repack's custom GUI syntax for Skript is modelled on skript-gui (https://github.com/APickledWalrus/skript-gui): the idea of a layout of
+characters with slots defined separately, and the shape of its `create`, `make slot` and `run on open` sections. No code was taken from it.

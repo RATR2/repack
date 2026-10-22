@@ -30,7 +30,6 @@ class Gui(val plugin: Repack) : Listener {
 
     private val drafts = HashMap<UUID, MutableMap<String, Draft>>()
 
-    /** Players in the middle of moving from one screen to the next, whose old screen closing is not them leaving. */
     private val navigating = HashSet<UUID>()
 
     val itemEditor get() = plugin.itemEditor

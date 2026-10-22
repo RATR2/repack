@@ -4,9 +4,9 @@ import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 
 /**
- * One client era: the clients that share one pack. The pack is the family build of the blocks plus the shaders of the era
- * (`packs/<id>/assets` in the jar, for Distortion's ripples, which differ with every game version's shader code). The protocol
- * numbers are the ones ViaVersion lists for each release; format is what pack.mcmeta says for it.
+ * One client era: the clients that share one pack. The pack is the family build of the blocks plus the era's shaders
+ * (`packs/<id>/assets` in the jar, which differ with every game version's shader code). The protocol numbers are the ones
+ * ViaVersion lists for each release; format is what pack.mcmeta says for it.
  */
 enum class PackEra(
     val id: String,

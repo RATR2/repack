@@ -5,7 +5,7 @@ main: io.github.ratr2.repack.Repack
 api-version: '1.21'
 load: POSTWORLD
 depend: [packetevents]
-softdepend: [WorldGuard, ViaVersion, ViaBackwards, Skript]
+softdepend: [WorldGuard, ViaVersion, ViaBackwards, Skript, PlaceholderAPI]
 
 # /repack itself is registered with Brigadier in Repack.onEnable.
 permissions:

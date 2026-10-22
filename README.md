@@ -27,6 +27,7 @@ Repack is a customization kit for what players see and use: custom blocks and it
 - **Ripples.** A shockwave that spreads out from a spot in the world and bends the screen.
 - **Screen shake.** Shake a player's screen for explosions, hits or anything else, and let it fade out.
 - **Skyboxes.** Replace the sky with a panorama picture or a small shader (stars, clouds and a gradient come with Repack). Choose where each one shows: by world, dimension or biome.
+- **Custom GUIs.** Chest, hopper and dispenser screens with buttons, anvil text prompts and the game's own dialog windows, from simple files. A picture can become a GUI's screen with no extra work.
 - **Animated text.** Text in certain colors shines, pulses, waves or turns rainbow, in chat, signs and item names.
 
 **Custom blocks and items**

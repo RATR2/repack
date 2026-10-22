@@ -53,6 +53,40 @@ A block whose model has animations (see the guide) plays the one named in its fi
 
 `RepackAPI.skyboxIds()` lists them, `setSkybox(player, "stars")` makes a player see one whatever fits where they are (`"none"` for no sky, `null` to go back to the one that fits; false for an unknown id), and `skyboxOf(player)` says which one they see. Not saved. In Skript: `set player's skybox to "stars"`, `hide player's skybox`, `reset player's skybox`.
 
+### Custom GUIs
+
+The syntax follows [skript-gui](https://github.com/APickledWalrus/skript-gui)'s, with "custom" in front so the two never clash. A GUI is made in a `create` section, filled with slot sections, and opened:
+
+```applescript
+command /shop:
+	trigger:
+		create a custom gui with id "shop" with a chest with 3 rows named "&6Shop" with layout "#########", "#  a b  #" and "####c####":
+			make custom gui slot "#" with gray stained glass pane named " "
+			make custom gui slot "a" with diamond named "&bBuy a diamond":
+				give player a diamond
+				send "slot %gui slot index%, character %gui slot id%" to player
+			make next custom gui slot with emerald
+			run on custom gui close:
+				send "Come back soon!" to player
+		open the last created custom gui to player
+```
+
+| Syntax | |
+|---|---|
+| `create [a] custom gui [with id %string%] with a chest\|hopper\|dispenser\|dropper [with %number% rows] [named %string%] [with layout %strings%] [with removable items]` | Section. The code inside runs at once. |
+| `create [a] custom gui [with id %string%] from [template] %string% [named %string%]` | Section. A copy of a GUI file or template. |
+| `make custom gui slot[s] %integers/strings% [in %customgui%] with [removable] %itemtype%`, `make next custom gui slot ...` | Section, or just a line. With a colon, the code inside runs when the slot is clicked. A text names the slots of those layout characters, a number is a slot. |
+| `unmake custom gui slot[s] %integers/strings%`, `unmake all custom gui slots` | Effect. |
+| `run on custom gui open`, `run on custom gui close` | Section inside `create`. `cancel custom gui closing` keeps it open. |
+| `open [custom gui] %customgui% to %players%`, `close custom gui of %players%`, `refresh custom gui %customgui%` | Effects. |
+| `pause custom gui events of %players%`, `resume custom gui events of %players%` | Hold a player's open and close code and slot actions while you switch screens, then resume. |
+| `the last created custom gui`, `the custom gui with id %string%`, `the custom gui of %player%`, `all custom gui ids` | Expressions. The second one works for the files in the guis folder too. |
+| `custom gui layout of %customgui%`, `custom gui title of %customgui%` | Expressions you can read and set. A new title applies the next time it opens. |
+| `the gui slot index`, `the gui slot id`, `the gui slot tag %string%` | In a slot's code: which slot was clicked, and the slot's `tags:`. |
+| `on custom gui action [of %strings%]` | Event for a file's `event: name` action. `event-string` is the name and `the gui input "amount"` is what a dialog or anvil collected. |
+
+Slots of a GUI made in Skript keep their code when the layout changes: `set custom gui layout of {_gui} to ...` brings slots into view that the first layout did not use.
+
 ### Events
 
 `on custom block interact [of %strings%]` (or `click`) fires when a player clicks a custom block, with right or left click. Event values: `event-block`, `event-player`, `event-location`, `event-string` (the id).
@@ -155,6 +189,14 @@ public void onCustomBlock(CustomBlockEvent event) {
     }
 }
 ```
+
+### Custom GUIs
+
+`RepackAPI.guiIds()`, `openGui(player, "shop")` (returns why not, or null), `closeGui(player)` and `guiOf(player)` work with the GUIs of the guis folder. To build one in code: `LiveGui gui = RepackAPI.createGui(3, "Shop")` (or `createGui("hopper", "Menu")`), then `gui.layout(List.of("#########", "#   a   #", "#########"))`, `gui.slot('a', itemStack, click -> ...)` (or `slot(13, ...)` by number), and `gui.register("shop")` to make it open by that id. Every change redraws an open screen.
+
+Slot rules are yours to decide. Cost, cooldowns and permissions are not built in: listen for `GuiClickEvent` (player, gui, slot, key, click, the slot's `tags`) and cancel it, and the slot's actions never run. The other events are `GuiOpenEvent`, `GuiCloseEvent` (cancel it to keep the screen open) and `GuiActionEvent` for a file's `event: name` actions, with what a dialog or anvil collected in `getInputs()` (`input.<name>`, or `input`).
+
+`RepackAPI.pauseGui(player)` holds a player's GUI handlers and slot actions, and `resumeGui(player)` lets them run again. Opening one GUI from another already skips the first one's close handler, so pause only matters when you switch screens in your own code.
 
 ## The block builder from code
 

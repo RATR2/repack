@@ -138,6 +138,7 @@ class RepackCommand(private val plugin: Repack) {
                 .then(Commands.literal("all").executes { reloadPack(it, config = true, host = true) })
         )
         .then(skyboxTree())
+        .then(guiTree())
         .then(io.github.ratr2.repack.distortion.DistortionCommand(plugin).shakeTree())
         .then(io.github.ratr2.repack.distortion.DistortionCommand(plugin).tree("distortion"))
         .build()
@@ -187,6 +188,83 @@ class RepackCommand(private val plugin: Repack) {
         }
         targets.forEach { manager.choose(it, id) }
         reply(context, "${targets.size} player${if (targets.size == 1) "" else "s"} ${when (id) { null -> "see the skybox that fits where they are"; io.github.ratr2.repack.sky.SkyboxManager.HIDDEN -> "see no skybox"; else -> "see the skybox $id" }}. Only clients with the pack on 1.21.6 or newer show it.", NamedTextColor.GREEN)
+        return Command.SINGLE_SUCCESS
+    }
+
+    private fun suggestGuis(context: CommandContext<CommandSourceStack>, builder: SuggestionsBuilder): CompletableFuture<Suggestions> {
+        val typed = builder.remainingLowerCase
+        plugin.guis.ids.filter { it.startsWith(typed) }.forEach(builder::suggest)
+        return builder.buildFuture()
+    }
+
+    private fun guiTree() = admin("gui")
+        .then(
+            Commands.literal("open").then(
+                Commands.argument("id", StringArgumentType.word()).suggests(::suggestGuis)
+                    .executes { openGui(it, null) }
+                    .then(Commands.argument("players", ArgumentTypes.players()).executes { openGui(it, it.getArgument("players", PlayerSelectorArgumentResolver::class.java).resolve(it.source)) })
+            )
+        )
+        .then(
+            Commands.literal("close").then(
+                Commands.argument("players", ArgumentTypes.players()).executes {
+                    val targets = it.getArgument("players", PlayerSelectorArgumentResolver::class.java).resolve(it.source)
+                    targets.forEach(plugin.guis::close)
+                    reply(it, "Closed the screen of ${targets.size} player${if (targets.size == 1) "" else "s"}.", NamedTextColor.GREEN)
+                    Command.SINGLE_SUCCESS
+                }
+            )
+        )
+        .then(
+            Commands.literal("list").executes {
+                val ids = plugin.guis.ids
+                reply(it, if (ids.isEmpty()) "There are no GUIs. Add files to the guis folder and run /repack gui reload." else "GUIs: ${ids.joinToString()}", NamedTextColor.YELLOW)
+                Command.SINGLE_SUCCESS
+            }
+        )
+        .then(
+            Commands.literal("reload").executes {
+                val errors = plugin.reloadGuis()
+                errors.take(MAX_LINES).forEach { error -> reply(it, error, NamedTextColor.RED) }
+                reply(it, "Loaded ${plugin.guis.ids.size} GUI(s)${if (errors.isEmpty()) "" else ", ${errors.size} with errors"}. A new or changed picture needs /repack build.", NamedTextColor.GREEN)
+                Command.SINGLE_SUCCESS
+            }
+        )
+        .then(
+            Commands.literal("template").then(
+                Commands.argument("id", StringArgumentType.word()).suggests(::suggestGuis).executes {
+                    val id = StringArgumentType.getString(it, "id").lowercase()
+                    val def = plugin.guis.definitions[id]
+                    val png = def?.let { d -> io.github.ratr2.repack.menu.GuiBackgrounds.templatePng(d.kind, d.rows) }
+                    if (def == null || png == null) {
+                        reply(it, "There is no GUI '$id' with a screen to draw on.", NamedTextColor.RED)
+                        return@executes 0
+                    }
+                    val file = java.io.File(plugin.guisFolder, "$id.template.png")
+                    file.writeBytes(png)
+                    reply(it, "Wrote ${file.name}: paint over it (the numbers are the slot indexes), save it as a new name and name that in `background:`.", NamedTextColor.GREEN)
+                    Command.SINGLE_SUCCESS
+                }
+            )
+        )
+
+    private fun openGui(context: CommandContext<CommandSourceStack>, players: Collection<Player>?): Int {
+        val id = StringArgumentType.getString(context, "id")
+        val targets = players ?: listOfNotNull(context.source.sender as? Player)
+        if (targets.isEmpty()) {
+            reply(context, "From the console, name the players: /repack gui open <id> <players>.", NamedTextColor.RED)
+            return 0
+        }
+        var opened = 0
+        for (player in targets) {
+            val problem = plugin.guis.open(player, id, checkPermission = false)
+            if (problem != null) {
+                reply(context, problem, NamedTextColor.RED)
+                return 0
+            }
+            opened++
+        }
+        if (players != null) reply(context, "Opened '$id' for $opened player${if (opened == 1) "" else "s"}.", NamedTextColor.GREEN)
         return Command.SINGLE_SUCCESS
     }
 

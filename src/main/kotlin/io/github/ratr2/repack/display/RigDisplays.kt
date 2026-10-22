@@ -60,7 +60,6 @@ object RigDisplays {
 
     fun spawn(player: Player, model: String, rig: Rig, ids: IntArray, location: PacketLocation, look: RigLook, displays: List<BoneDisplay>) {
         val players = PacketEvents.getAPI().playerManager
-        // One bundle, so the client applies every piece in the same tick and never draws half of a model.
         players.sendPacket(player, WrapperPlayServerBundle())
         for ((index, id) in ids.withIndex()) {
             if (id < 0) continue

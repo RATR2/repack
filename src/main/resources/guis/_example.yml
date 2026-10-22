@@ -1,0 +1,113 @@
+# Custom GUIs. Every .yml file in this folder (not starting with _) is one GUI, named after the file: shop.yml is "shop".
+# Open one with /repack gui open <id> [players], with the `open:` action, from Skript or from the Java API.
+# This file is rewritten on every start; copy it to try things.
+
+# type: chest (default), hopper, dispenser, dropper, anvil or dialog.
+type: chest
+# Chests only: 1 to 6.
+rows: 3
+# The title. Color codes work (&6, <#ff8800>), and so do {player} and PlaceholderAPI's %placeholders%.
+title: "&6Shop"
+
+# One string per row, one character per slot (9 per chest row, 5 for a hopper, 3 for a dispenser or dropper).
+# Every character a slot below defines stays defined, even when the layout does not use it yet.
+# Do not use y, n, on or off as a layout character: YAML reads them as yes and no.
+layout:
+  - "#########"
+  - "#  a b  #"
+  - "####c####"
+
+# A picture that becomes the screen: a PNG in this folder. It is fitted to the screen and put in the pack at the next /repack build.
+# A picture drawn at 2x or 4x size stays sharp. /repack gui template <id> writes a numbered guide to paint on.
+# holes: the picture is drawn over the items, so slots need see-through squares. off (default): your picture already has them,
+# container: cut them over this GUI's slots, all: over the player's inventory too.
+background:
+  image: shop.png
+  holes: off
+
+# Slots, by layout character. A slot is an item and what clicking it does. Items are vanilla names (diamond), or the id of a Repack
+# item or block. Actions run in order: command, console, message, open, close, back, refresh, sound, event.
+slots:
+  "#":
+    item: black_stained_glass_pane
+    name: " "
+  a:
+    item: diamond
+    name: "&bBuy a diamond"
+    lore:
+      - "&7Costs nothing, this is an example."
+    amount: 1
+    glow: false
+    model: null          # an item model, namespace:path
+    on-click:            # any click; the ones below win for their kind of click
+      - "console: give {player} diamond"
+      - "message: &aThanks, {player}!"
+      - "sound: entity.experience_orb.pickup 1 1"
+    on-left-click: []
+    on-right-click: []
+    on-shift-click: []
+    on-middle-click: []
+    on-drop: []
+    removable: false     # true lets players take or put items here
+    tags:                # anything a plugin wants to know when it hears of a click (GuiClickEvent)
+      price: "10"
+  b:
+    frames: [emerald, diamond, gold_ingot]   # an animated icon: each frame is an item name or a section like the one above
+    frame-ticks: 10
+    name: "&aShiny"
+    on-click:
+      - "open: gems"
+  c:
+    item: barrier
+    name: "&cClose"
+    on-click: [ "close" ]
+
+# Slots by number instead (0 is the top left). A number beats a layout character.
+indexes:
+  13:
+    item: nether_star
+    on-click:
+      - "event: star"     # a plugin or script hears GuiActionEvent("star")
+
+# Run when it opens and closes. The same actions as a slot.
+on-open: []
+on-close: []
+
+# update: redraw the names and lore every this many ticks, for PlaceholderAPI values that change (0 is off).
+update: 0
+# removable: true lets players move items in the slots that do nothing; slots with actions stay locked.
+removable: false
+# shared: everyone who opens it sees one inventory. The default is a copy for each player.
+shared: false
+# permission: needed to open it from `open:` actions. /repack gui open by an admin ignores it.
+permission: null
+# template: true makes a GUI that cannot be opened and is only copied from. Another file says `from: shop` to start as a copy
+# of it: it changes only what it writes (layout, a slot, the title...).
+template: false
+# from: shop
+
+# Anvil (type: anvil): asks for a line of text.
+#   title: "Name your pet"
+#   initial: "Rex"
+#   on-submit: [ "console: petname {player} {input}" ]
+#   on-cancel: [ "message: &7Never mind." ]
+#
+# Dialog (type: dialog): the game's own screen, 1.21.6 and newer, no picture needed. Older players get `fallback`, a GUI id.
+#   title: "Buy"
+#   fallback: shop
+#   escape: true         # Esc closes it
+#   columns: 1
+#   body:
+#     - "How many would you like?"
+#   inputs:              # their values are {input.<name>} in the actions below
+#     amount: { type: number, label: "Amount", min: 1, max: 64, initial: 1, step: 1, width: 200 }
+#     note:   { type: text, label: "Note", initial: "", max-length: 64, lines: 1 }
+#     gift:   { type: boolean, label: "Gift", initial: false }
+#     color:  { type: options, label: "Color", options: [red, green, blue], initial: red }
+#   buttons:
+#     - label: "Buy"
+#       tooltip: "Takes the money"
+#       width: 150
+#       on-click: [ "console: give {player} diamond {input.amount}" ]
+#   exit:
+#     label: "Cancel"

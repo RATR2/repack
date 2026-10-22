@@ -25,7 +25,6 @@ class BuildProgress(private val plugin: Repack) {
         current.name(Component.text("Repack: $text (${(clamped * 100).toInt()}%)"))
     }
 
-    /** Fills the bar in green or red, leaves it up for two seconds and takes it away. Call on the main thread. */
     fun finish(success: Boolean, text: String) {
         val current = bar ?: return
         bar = null

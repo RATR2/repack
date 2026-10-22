@@ -17,6 +17,7 @@ public final class SkriptHook {
 
     public static void register(Repack plugin) {
         boolean modern = Skript.getVersion().compareTo(MODERN_API) >= 0;
+        GuiSkriptTypes.register();
         if (modern) {
             ModernSyntax.register(plugin);
         } else {

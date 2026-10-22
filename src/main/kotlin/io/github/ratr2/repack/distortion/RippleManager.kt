@@ -69,8 +69,8 @@ class RippleManager(private val plugin: Repack, private val pack: PackSender) : 
             it.transformation = transformation(strength = 1f, radius = MIN_RADIUS)
         }
         slots[slot] = display
-        // Visible by default so pack users get plain entity tracking (hidden-by-default plus showEntity kept respawning client-
-        // side as players moved); only players without the pack get it hidden.
+        // Visible by default so pack users get plain entity tracking (hide-by-default plus showEntity kept respawning the entity
+        // client-side as players moved); only players without the pack get it hidden.
         plugin.server.onlinePlayers.forEach {
             if (pack.hasLoaded(it)) {
                 applyEffect(it)

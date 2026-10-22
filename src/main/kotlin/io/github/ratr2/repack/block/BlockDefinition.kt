@@ -95,7 +95,6 @@ class DisplayOptions(
     val scaleZ: Float,
     /** Multiplier on the client's display entity view distance (1.0 is 64 blocks). */
     val viewRange: Float,
-    /** Fixed light level 0 to 15 for the model, or null to light it like the world around it. */
     val brightness: Int?,
     val rotateToPlacer: Boolean,
     val context: DisplayContext,

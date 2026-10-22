@@ -69,7 +69,6 @@ class BlockBuilder internal constructor(private val draft: Draft?, private val f
 
     fun viewRange(range: Double) = edit { it.set("display.view-range", range) }
 
-    /** A light level from 0 to 15, or null to light the model like the world. */
     fun brightness(level: Int?) = edit { it.set("display.brightness", level) }
 
     fun rotateToPlacer(on: Boolean) = edit { it.set("display.rotate-to-placer", on) }
