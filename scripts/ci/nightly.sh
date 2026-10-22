@@ -81,7 +81,19 @@ fi
 
 # The commits since the last release, newest first, without the version bumps the release workflow makes.
 LAST_RELEASE=$(git describe --tags --abbrev=0 --match '[0-9]*' 2>/dev/null || true)
-if [ -n "$LAST_RELEASE" ]; then RANGE="${LAST_RELEASE}..HEAD"; else RANGE="HEAD"; fi
+if [ -n "$LAST_RELEASE" ]; then
+    RANGE="${LAST_RELEASE}..HEAD"
+else
+    # A rewritten history leaves the release tags behind on commits that are no longer in it: go by the commit that carries the
+    # `release` tag line instead, and read the version from its `version="X"` line.
+    RELEASE_SHA=$(git log --grep='^release$' --format=%H -1 || true)
+    if [ -n "$RELEASE_SHA" ]; then
+        LAST_RELEASE=$(git log -1 --format=%B "$RELEASE_SHA" | sed -nE 's/^version="([^"]+)"[[:space:]]*$/\1/p' | head -1)
+        RANGE="${RELEASE_SHA}..HEAD"
+    else
+        RANGE="HEAD"
+    fi
+fi
 CHANGES=$(git log --no-merges --max-count=50 --format='%H%x09%s' "$RANGE" | grep -v '\[skip ci\]' | while IFS=$'\t' read -r full subject; do
     subject=${subject//</&lt;}
     echo "- [\`${full:0:7}\`](${SOURCE_WEB}/commit/${full}) ${subject//>/&gt;}"
