@@ -26,8 +26,9 @@ class CustomItems(private val plugin: Repack) {
         val saved = definition.stack?.let { ItemStack.deserializeBytes(it) }
         val item = saved ?: ItemStack(definition.base)
         item.amount = amount.coerceIn(1, 99)
-        if (definition.model != null && (saved == null || definition.overrideModel)) {
-            item.setData(DataComponentTypes.ITEM_MODEL, Key.key(ItemModelGenerator.NAMESPACE, definition.model))
+        val modelKey = definition.modelKey
+        if (modelKey != null && (saved == null || definition.overrideModel)) {
+            item.setData(DataComponentTypes.ITEM_MODEL, Key.key(ItemModelGenerator.NAMESPACE, modelKey))
         }
         if (saved == null) {
             val name = definition.name ?: definition.id.split('_', '-').joinToString(" ") { part -> part.replaceFirstChar { it.uppercase() } }

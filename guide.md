@@ -212,6 +212,22 @@ Limits: the scale of the block is applied on top of the bones, which is exact fo
 
 An item is a file in `items/` (`items/ruby.yml`), made like a block: `base` (the vanilla item), `model` (a `.bbmodel` in `models/`, optional), `name` and `lore` (with `&c` codes and `<#rrggbb>` colors), `glint`, and for developers `components` (raw item components as in `/give`, like `[minecraft:custom_data={a:1}]`). A saved exact item can also be the item: it decides everything but the model. A model that only items use does not turn into a block. Players get items the way they get blocks: `/repack give ruby`, `/give @s repack:ruby`, the `/repack menu` screen, Skript and the Java API.
 
+An item can be a flat picture instead of a model: put `ruby.png` in the `items/` folder next to `ruby.yml` (it is found by the item's name, or name another file with `texture: other.png`), and the item is that picture in the world, in hands and in inventories. Do not give it a `model` as well. `parent: handheld` holds it like a tool instead of an item. An animated picture works the way it does in vanilla: a tall strip with a `ruby.png.mcmeta` file beside it.
+
+`display:` changes how an item is drawn, for a picture or for a model (on top of the display settings the .bbmodel already has). Each place takes `rotation`, `translation` and `scale`, three numbers each, and any of them can be left out:
+
+```yaml
+texture: ruby.png
+display:
+  gui:                    # in inventories
+    rotation: [30, 225, 0]
+    scale: [0.9, 0.9, 0.9]
+  firstperson_righthand:
+    translation: [1, 2, 0]
+```
+
+The places are `gui`, `ground`, `fixed` (item frames), `head`, `thirdperson_righthand`, `thirdperson_lefthand`, `firstperson_righthand` and `firstperson_lefthand`. The game limits moving to 80 and scale to 4, so bigger numbers are cut down with a warning when you build. Pictures and display changes go into the pack at the next build, like models.
+
 Edit them in the game with `/repack` > Item builder: pick an item or make a new one, then set the base item (click an item in your inventory), name, lore, shine, model, exact item and components, and press Save. In the block builder, right click the Item button of a block to make the block use a registered item (`item.registered: ruby` in the block file); the block then places itself from that item. Or leave it alone and use the block's own item settings, or an exact item.
 
 Text typed into the anvil keeps the `&` and `<#rrggbb>` color codes.

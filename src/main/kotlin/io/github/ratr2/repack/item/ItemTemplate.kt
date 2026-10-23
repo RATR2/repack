@@ -14,6 +14,10 @@ object ItemTemplate {
 
         base: PAPER                     # the vanilla item it is made from
         # model: chair                  # a .bbmodel in models/ the item shows (a model used only by items does not become a block)
+        # texture: ruby.png              # a PNG next to this file (ruby.png is found by itself): the item is a flat picture. Not with a model. An animation file ruby.png.mcmeta beside it works
+        # parent: generated             # how a picture is held: generated (an item) or handheld (a tool)
+        # display:                      # how it is drawn: gui, ground, fixed, head, thirdperson_righthand, thirdperson_lefthand, firstperson_righthand, firstperson_lefthand
+        #   gui: { rotation: [30, 225, 0], translation: [0, 0, 0], scale: [0.9, 0.9, 0.9] }   # each of the three is optional
         # name: "&aGreen <#ff8800>orange"   # & codes and <#rrggbb> colors; empty: made from the id
         lore: []                        # one line each, with the same colors
         glint: false                    # looks enchanted

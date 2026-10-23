@@ -506,6 +506,8 @@ class Repack : JavaPlugin() {
         val progress = BuildProgress(this)
         progress.start()
         val folder = modelsFolder
+        val itemsNow = customItems.definitions.values.toList()
+        val itemWarnings = ArrayList<String>()
         // The jar's own time is part of the version, so a new build of the plugin never reads what an older one converted.
         val cache = ModelCache(File(dataFolder, "cache/models"), "${description.version}-${file.lastModified()}")
         server.scheduler.runTaskAsynchronously(this, Runnable {
@@ -527,7 +529,8 @@ class Repack : JavaPlugin() {
                     val effects = TextEffects.snippet(rules)
                     val shaders = config.getBoolean("distortion.enabled", true) || effects != null
                     val loadedGuis = io.github.ratr2.repack.menu.GuiLoader.load(guisFolder).also { guiFiles = it }
-                    val gui = GuiPack.files() + io.github.ratr2.repack.menu.GuiBackgrounds.files(loadedGuis.definitions.values, guisFolder, guiPictureErrors)
+                    val gui = GuiPack.files() + io.github.ratr2.repack.menu.GuiBackgrounds.files(loadedGuis.definitions.values, guisFolder, guiPictureErrors) +
+                        io.github.ratr2.repack.item.ItemAssets.files(itemsNow, itemsFolder, itemWarnings)
                     val loadedSkies = io.github.ratr2.repack.sky.SkyboxDefinitions.load(skyboxesFolder).also { skies = it }
                     val skyAssets = io.github.ratr2.repack.sky.SkyboxShaders.assets(loadedSkies.definitions)
                     val eraShaders = PackEra.entries.associateWith { era ->
@@ -573,6 +576,7 @@ class Repack : JavaPlugin() {
                     return@Runnable
                 }
                 progress.update(ZIP_SHARE, "loading the block files")
+                itemWarnings.forEach { logger.warning(it) }
                 guiFiles?.let { loaded ->
                     guiPictureErrors.forEach { logger.warning(it) }
                     if (zips != null) {

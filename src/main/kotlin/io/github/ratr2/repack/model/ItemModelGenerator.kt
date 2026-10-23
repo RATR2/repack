@@ -82,7 +82,7 @@ object ItemModelGenerator {
     }
 
     /** Vanilla accepts translation between -80 and 80 and scale between -4 and 4 in a display transform. */
-    private fun displayOf(display: Map<String, DisplayTransform>, warnings: MutableList<String>, shelf: Boolean): JsonObject? {
+    internal fun displayOf(display: Map<String, DisplayTransform>, warnings: MutableList<String>, shelf: Boolean): JsonObject? {
         if (display.isEmpty()) return null
         val result = JsonObject()
         for ((context, transform) in display) {
