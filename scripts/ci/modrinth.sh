@@ -47,6 +47,12 @@ data=$(jq -n \
         primary_file: "file"
     }')
 
-"${CURL[@]}" -X POST "$API/version" -H "Authorization: $MODRINTH_TOKEN" \
-    -F "data=$data;type=application/json" -F "file=@$JAR;type=application/java-archive;filename=$(basename "$JAR")" >/dev/null
+# Without -f for this call, so a rejection shows Modrinth's own reason instead of only the status code.
+response=$(curl -sS -A "RATR2/repack (github.com/RATR2/repack)" -w '\n%{http_code}' -X POST "$API/version" -H "Authorization: $MODRINTH_TOKEN" \
+    -F "data=$data;type=application/json" -F "file=@$JAR;type=application/java-archive;filename=$(basename "$JAR")")
+status=${response##*$'\n'}
+if [ "$status" != 200 ]; then
+    echo "Modrinth refused $VERSION (HTTP $status): ${response%$'\n'*}" >&2
+    exit 1
+fi
 echo "Published $VERSION to Modrinth for ${MIN_GAME_VERSION} and newer."
