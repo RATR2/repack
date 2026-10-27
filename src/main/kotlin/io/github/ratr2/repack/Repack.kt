@@ -25,6 +25,7 @@ import io.github.ratr2.repack.pack.EraAssets
 import io.github.ratr2.repack.pack.PackExport
 import io.github.ratr2.repack.pack.PackVariant
 import io.github.ratr2.repack.pack.TextEffects
+import io.github.ratr2.repack.pack.TextRules
 import io.github.ratr2.repack.pack.PackEra
 import io.github.ratr2.repack.pack.PackEntry
 import io.github.ratr2.repack.pack.PackSender
@@ -527,14 +528,15 @@ class Repack : JavaPlugin() {
                     val (rules, ruleErrors) = TextEffects.rules(config.getConfigurationSection("text-effects"))
                     ruleErrors.forEach { logger.warning(it) }
                     val effects = TextEffects.snippet(rules)
-                    val shaders = config.getBoolean("distortion.enabled", true) || effects != null
+                    val textRules = TextRules.snippet()
+                    val shaders = config.getBoolean("distortion.enabled", true) || effects != null || textRules != null
                     val loadedGuis = io.github.ratr2.repack.menu.GuiLoader.load(guisFolder).also { guiFiles = it }
                     val gui = GuiPack.files() + io.github.ratr2.repack.menu.GuiBackgrounds.files(loadedGuis.definitions.values, guisFolder, guiPictureErrors) +
                         io.github.ratr2.repack.item.ItemAssets.files(itemsNow, itemsFolder, itemWarnings)
                     val loadedSkies = io.github.ratr2.repack.sky.SkyboxDefinitions.load(skyboxesFolder).also { skies = it }
                     val skyAssets = io.github.ratr2.repack.sky.SkyboxShaders.assets(loadedSkies.definitions)
                     val eraShaders = PackEra.entries.associateWith { era ->
-                        (if (shaders) EraAssets.files(file, era, effects) else emptyMap()) + io.github.ratr2.repack.sky.SkyboxShaders.files(era, loadedSkies.definitions)
+                        (if (shaders) EraAssets.files(file, era, effects, textRules) else emptyMap()) + io.github.ratr2.repack.sky.SkyboxShaders.files(era, loadedSkies.definitions)
                     }
                     zips = PackEra.entries.associateWith { era ->
                         progress.update(PARSE_SHARE + (ZIP_SHARE - PARSE_SHARE) * era.ordinal / PackEra.entries.size, "zipping the ${era.id} pack")

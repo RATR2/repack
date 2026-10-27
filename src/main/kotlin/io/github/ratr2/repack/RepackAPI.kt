@@ -1,5 +1,6 @@
 package io.github.ratr2.repack
 
+import io.github.ratr2.repack.pack.TextRules
 import org.bukkit.Bukkit
 import io.github.ratr2.repack.edit.BlockBuilder
 import org.bukkit.Location
@@ -197,4 +198,31 @@ object RepackAPI {
 
     @JvmStatic
     fun skyboxOf(player: org.bukkit.entity.Player): String? = onMain(null) { api -> api.skyboxes?.skyboxOf(player)?.id }
+
+    /**
+     * Registers a shared text shader rule and returns its marker color, or null when the id is malformed or all markers are taken.
+     * Text drawn in the marker (as a GUI text: boss bar title, action bar, scoreboard, chat) is moved by the pack's text shader to
+     * [anchor] plus [offsetX]/[offsetY] GUI pixels and drawn in [color]. [source] is where vanilla draws that kind of text, which the
+     * offset is measured from. Registering an id again replaces the rule and keeps its marker. Takes effect at the next build and push.
+     * Ids should start with the plugin's name (`ethereal:mana`), and a plugin should call [unregisterTextRules] when it disables.
+     */
+    @JvmOverloads
+    fun registerTextRule(
+        id: String, anchor: TextRules.Anchor, offsetX: Double, offsetY: Double,
+        source: TextRules.Anchor = TextRules.Anchor.TOP_CENTER, sourceX: Double = 0.0, sourceY: Double = 0.0,
+        scale: Double = 1.0, color: Int = 0xFFFFFF,
+    ): net.kyori.adventure.text.format.TextColor? =
+        TextRules.register(id, anchor, offsetX, offsetY, source, sourceX, sourceY, scale, color)?.let { net.kyori.adventure.text.format.TextColor.color(it.marker) }
+
+    /** Removes a text rule. Text still drawn in its marker shows the marker color after the next build. */
+    fun unregisterTextRule(id: String): Boolean = TextRules.unregister(id)
+
+    /** Removes every text rule whose id starts with [prefix], such as `ethereal:`. Returns how many. */
+    fun unregisterTextRules(prefix: String): Int = TextRules.unregisterAll(prefix)
+
+    /** The marker color of a registered text rule, or null. */
+    fun textRuleMarker(id: String): net.kyori.adventure.text.format.TextColor? = TextRules.markerOf(id)?.let { net.kyori.adventure.text.format.TextColor.color(it) }
+
+    /** The ids of all registered text rules. */
+    fun textRuleIds(): List<String> = TextRules.all().map { it.id }
 }

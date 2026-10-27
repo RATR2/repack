@@ -127,14 +127,14 @@ object TextEffects {
         return Snippet(resource("text_effects_head.glsl") + "\n" + table + "\n" + resource("text_effects_body.glsl"), resource("text_effects_loop.glsl").trimEnd())
     }
 
-    private val NORMAL = Regex("^([ \\t]*)vertexColor = Color \\* (.+);$", RegexOption.MULTILINE)
+    private val NORMAL = Regex("^([ \\t]*)vertexColor = (Color|textColor) \\* (.+);$", RegexOption.MULTILINE)
 
     fun inject(vsh: String, snippet: Snippet): String? {
         val main = vsh.indexOf("void main() {")
         val line = NORMAL.find(vsh) ?: return null
         if (main < 0 || line.range.first < main) return null
         val indent = line.groupValues[1]
-        val replacement = "${indent}vec4 c = Color;\n${snippet.loop}\n${indent}vertexColor = c * ${line.groupValues[2]};"
+        val replacement = "${indent}vec4 c = ${line.groupValues[2]};\n${snippet.loop}\n${indent}vertexColor = c * ${line.groupValues[3]};"
         return vsh.substring(0, main) + snippet.definitions + "\n\n" + vsh.substring(main, line.range.first) + replacement + vsh.substring(line.range.last + 1)
     }
 }
