@@ -13,6 +13,7 @@ class HubScreen(gui: Gui, player: Player) : Screen(gui, player, 3, "hub", "Repac
         if (player.hasPermission(RepackCommand.ADMIN)) button(13, "builder", Material.CRAFTING_TABLE, "Block builder", "Edit custom blocks")
         if (player.hasPermission(RepackCommand.ADMIN)) button(14, "item_builder", Material.DIAMOND, "Item builder", "Edit custom items")
         if (player.hasPermission(RepackCommand.SETTINGS)) button(15, "settings_admin", Material.REPEATER, "Server settings", "The plugin's config.yml")
+        if (player.hasPermission(RepackCommand.SETTINGS)) button(16, "mode", Material.GLOW_INK_SAC, "Text effects", "Edit and test the animated text")
         button(22, "close", Material.BARRIER, "Close")
     }
 
@@ -22,6 +23,7 @@ class HubScreen(gui: Gui, player: Player) : Screen(gui, player, 3, "hub", "Repac
             slot == 13 && player.hasPermission(RepackCommand.ADMIN) -> gui.openLater(player, ListScreen(gui, player))
             slot == 14 && player.hasPermission(RepackCommand.ADMIN) -> gui.openLater(player, ItemListScreen(gui, player))
             slot == 15 && player.hasPermission(RepackCommand.SETTINGS) -> gui.openLater(player, ServerScreen(gui, player))
+            slot == 16 && player.hasPermission(RepackCommand.SETTINGS) -> gui.openLater(player, EffectsScreen(gui, player))
             slot == 22 -> player.closeInventory()
         }
     }

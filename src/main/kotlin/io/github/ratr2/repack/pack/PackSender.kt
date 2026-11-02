@@ -71,13 +71,28 @@ class PackSender(
 
     private fun variantOf(player: Player) = PackEra.forProtocol(versions.protocolOf(player))
 
-    private fun sendNow(player: Player) {
+    /**
+     * Sends one player the pack that was built, without publishing it, so an editor can try a change before everyone gets it.
+     * [result] is told once the client has loaded it (true) or has not (false: it failed, or the player declined). False when nothing was sent.
+     */
+    fun sendBuilt(player: Player, result: (Boolean) -> Unit): Boolean {
+        if (!sending) return false
+        val variant = variantOf(player) ?: return false
+        val pack = store.built[variant] ?: return false
+        testing[player.uniqueId] = result
+        host.enqueue(player.uniqueId) { if (player.isOnline) sendNow(player, pack) else testing.remove(player.uniqueId) }
+        return true
+    }
+
+    private val testing = HashMap<UUID, (Boolean) -> Unit>()
+
+    private fun sendNow(player: Player, chosen: PackEntry? = null) {
         val variant = variantOf(player)
         if (variant == null) {
             notice(player, "Repack custom blocks are not available on your client version: they need Minecraft 1.21.4 or newer.")
             return
         }
-        val pack = store.published[variant] ?: return
+        val pack = chosen ?: store.published[variant] ?: return
         val config = plugin.config
         markSent(player)
         val request = ResourcePackRequest.resourcePackRequest()
@@ -111,6 +126,7 @@ class PackSender(
             Status.SUCCESSFULLY_LOADED -> {
                 sentAt.remove(playerId)
                 if (own) hold.end(playerId)
+                if (own) testing.remove(playerId)?.invoke(true)
                 val era = variantOf(event.player)
                 if (era != null && loaded.put(playerId, era) == null) {
                     onLoaded(event.player)
@@ -120,13 +136,26 @@ class PackSender(
                 sentAt.remove(playerId)
                 if (own) hold.end(playerId)
                 loaded.remove(playerId)?.let { onLost(event.player, it.usesPostEffects) }
+                // A discard is the client dropping a pack, not a failure to load one.
+                if (own && event.status != Status.DISCARDED) {
+                    val test = testing.remove(playerId)
+                    if (test != null) test(false) else if (event.status == Status.FAILED_RELOAD) reloadFailed(event.player)
+                }
             }
             else -> {}
         }
     }
 
+    /** The client got the pack but could not use it, which is what a shader that does not compile looks like. The reason is only in that player's own log. */
+    private fun reloadFailed(player: Player) {
+        plugin.logger.warning("${player.name}'s client could not load the Repack pack (FAILED_RELOAD): a shader or a resource in it is broken. Their client log says which.")
+        val message = Component.text("${player.name}'s client could not load the Repack pack. A shader or resource in it is broken; their client log says which.", NamedTextColor.RED)
+        plugin.server.onlinePlayers.filter { it.hasPermission(io.github.ratr2.repack.RepackCommand.ADMIN) }.forEach { it.sendMessage(message) }
+    }
+
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
+        testing.remove(event.player.uniqueId)
         sentAt.remove(event.player.uniqueId)
         loaded.remove(event.player.uniqueId)
     }
