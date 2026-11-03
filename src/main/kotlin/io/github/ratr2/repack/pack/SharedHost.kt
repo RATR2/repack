@@ -22,12 +22,16 @@ import java.util.function.Supplier
 
 /**
  * A resource pack web server that several plugins share. Whichever plugin starts first hosts it and the others serve their
- * packs under it. This file is identical in Distortion and Repack (only the package line differs); the two talk through a
+ * packs under it. This file is shared with Repack (only the package line differs); the copies talk through a
  * service of JDK types only, since each plugin has its own copy of every class.
  *
- * Files are served at `/<source>/<file>`. The host decides the address and port, so a guest's `public-host` and `port` are
- * ignored. enqueue spaces out pack sends to the same player, and joined sends every plugin's pack in one request after
- * `resource-pack.join-delay-ticks`.
+ * Which plugin hosts does not decide how: every plugin hands the host its resource-pack settings (bind, port, public-host,
+ * public-url, join-delay-ticks, send-gap-ticks), and for each one the host uses a value some plugin changed from its own
+ * default, the first such plugin by source name when they disagree (with a warning), or the first plugin's default when none
+ * changed it. So the outcome is the same whichever plugin happened to load first, and the host moves its server when it changes.
+ *
+ * Files are served at `/<source>/<file>`. enqueue spaces out pack sends to the same player, and joined sends every plugin's
+ * pack in one request after the join delay. An offer may name further packs under "more", which go in the same request.
  */
 class SharedHost(
     private val plugin: JavaPlugin,
@@ -58,6 +62,12 @@ class SharedHost(
 
     private val nextSlot = ConcurrentHashMap<UUID, Int>()
 
+    /** While hosting: each source's settings (see [ownSettings]), its own included, to work out the ones in use. */
+    private val settingsBy = ConcurrentHashMap<String, Map<String, Any>>()
+
+    /** The disagreement last warned about, so the same one is not logged on every reload. */
+    private var warned: String? = null
+
     val baseUrl: String
         get() = when (mode) {
             Mode.HOST -> ownBase
@@ -77,7 +87,10 @@ class SharedHost(
     }
 
     fun restart(): String? {
-        if (mode == Mode.HOST && plugin.config.getBoolean(SHARE, true) && findRemote() == null) return rebind()
+        if (mode == Mode.HOST && plugin.config.getBoolean(SHARE, true) && findRemote() == null) {
+            settingsBy[source] = ownSettings()
+            return rebind()
+        }
         leave()
         elect()
         return if (mode == Mode.NONE) "Could not start the pack server, see the console." else null
@@ -90,6 +103,16 @@ class SharedHost(
     fun urlOf(file: String): URI {
         ensure()
         return URI("$baseUrl/$source/$file")
+    }
+
+    /** Whether a join offer's "more" packs reach the player: always when this plugin hosts, and with a host that says so. */
+    val sendsMore: Boolean get() {
+        ensure()
+        return when (mode) {
+            Mode.HOST -> true
+            Mode.GUEST -> remote?.get("more") == true
+            Mode.NONE -> false
+        }
     }
 
     fun offer(provider: (UUID) -> Map<String, String>?) {
@@ -119,19 +142,28 @@ class SharedHost(
 
     private fun dispatchJoin(player: UUID) {
         if (!pendingJoins.add(player)) return
-        val delay = plugin.config.getInt("resource-pack.join-delay-ticks", 40).coerceAtLeast(0).toLong()
+        val delay = number(JOIN_DELAY).coerceAtLeast(0).toLong()
         plugin.server.scheduler.runTaskLater(plugin, Runnable {
             pendingJoins.remove(player)
             val online = Bukkit.getPlayer(player) ?: return@Runnable
             val offers = providers.toSortedMap().values.mapNotNull { runCatching { it.apply(player) }.getOrNull() }
             if (offers.isEmpty()) return@Runnable
             val prompt = offers.map { it["prompt"].orEmpty() }.firstOrNull { it.isNotBlank() }.orEmpty()
+            // An offer can carry further packs under "more", one "id url sha1" per line, so a plugin with several packs has them
+            // all downloaded and loaded together with everyone else's.
+            val packs = offers.flatMap { offer ->
+                listOf(ResourcePackInfo.resourcePackInfo(UUID.fromString(offer["id"]), URI(offer["url"]!!), offer["sha1"]!!)) +
+                    offer["more"].orEmpty().lines().mapNotNull { line ->
+                        val parts = line.trim().split(' ')
+                        if (parts.size != 3) null else runCatching { ResourcePackInfo.resourcePackInfo(UUID.fromString(parts[0]), URI(parts[1]), parts[2]) }.getOrNull()
+                    }
+            }
             val request = ResourcePackRequest.resourcePackRequest()
-                .packs(offers.map { ResourcePackInfo.resourcePackInfo(UUID.fromString(it["id"]), URI(it["url"]!!), it["sha1"]!!) })
+                .packs(packs)
                 .required(offers.any { it["required"] == "true" })
                 .prompt(Component.text(prompt))
                 .build()
-            nextSlot[player] = Bukkit.getCurrentTick() + plugin.config.getInt(GAP_KEY, 20).coerceAtLeast(0)
+            nextSlot[player] = Bukkit.getCurrentTick() + number(GAP).coerceAtLeast(0)
             online.sendResourcePacks(request)
         }, delay)
     }
@@ -149,7 +181,7 @@ class SharedHost(
 
     private fun schedule(player: UUID, task: Runnable) {
         val now = Bukkit.getCurrentTick()
-        val gap = plugin.config.getInt(GAP_KEY, 20).coerceAtLeast(0)
+        val gap = number(GAP).coerceAtLeast(0)
         val at = maxOf(now, nextSlot[player] ?: 0)
         nextSlot[player] = at + gap
         if (nextSlot.size > 200) nextSlot.values.removeIf { it < now }
@@ -192,6 +224,7 @@ class SharedHost(
 
     @Suppress("UNCHECKED_CAST")
     private fun register(host: Map<*, *>) {
+        (host["settings"] as? BiConsumer<String, Map<String, Any>>)?.accept(source, ownSettings())
         (host["register"] as BiConsumer<String, Function<String, ByteArray?>>).accept(source, Function { resolver(it) })
         ownProvider?.let { (host["offer"] as BiConsumer<String, Function<UUID, Map<String, String>?>>).accept(source, it) }
     }
@@ -204,6 +237,8 @@ class SharedHost(
     }
 
     private fun becomeHost() {
+        settingsBy.clear()
+        settingsBy[source] = ownSettings()
         val server = bind() ?: return
         http = server
         sources[source] = Function { resolver(it) }
@@ -221,9 +256,20 @@ class SharedHost(
         map["register"] = BiConsumer<String, Function<String, ByteArray?>> { name, provider -> sources[name] = provider }
         map["offer"] = BiConsumer<String, Function<UUID, Map<String, String>?>> { name, provider -> providers[name] = provider }
         map["join"] = Consumer<UUID> { dispatchJoin(it) }
-        map["unregister"] = Consumer<String> { sources.remove(it); providers.remove(it) }
+        map["unregister"] = Consumer<String> {
+            sources.remove(it)
+            providers.remove(it)
+            if (settingsBy.remove(it) != null) settle()
+        }
+        // A guest's settings, which may change the ones in use (and move the server).
+        map["settings"] = BiConsumer<String, Map<String, Any>> { name, settings ->
+            settingsBy[name] = settings
+            settle()
+        }
         map["sources"] = Supplier<Set<String>> { sources.keys.toSet() }
         map["queue"] = BiConsumer<UUID, Runnable> { player, task -> schedule(player, task) }
+        // Tells guests this host sends an offer's "more" packs; an older host would leave them out.
+        map["more"] = true
         service = map
         @Suppress("UNCHECKED_CAST")
         Bukkit.getServicesManager().register(Map::class.java as Class<Map<String, Any>>, map, plugin, ServicePriority.Normal)
@@ -239,6 +285,7 @@ class SharedHost(
                 service = null
                 sources.clear()
                 providers.clear()
+                settingsBy.clear()
             }
             Mode.GUEST -> (remote?.get("unregister") as? Consumer<*>)?.let {
                 @Suppress("UNCHECKED_CAST")
@@ -277,11 +324,59 @@ class SharedHost(
         (server.executor as? ExecutorService)?.shutdownNow()
     }
 
-    private fun bindTarget(): Pair<String, Int> =
-        plugin.config.getString("resource-pack.bind", "0.0.0.0")!! to plugin.config.getInt("resource-pack.port", defaultPort)
+    /**
+     * This plugin's resource-pack settings, with defaults for those it leaves out, and under "changed" the ones it set to something
+     * other than its own default (what the host prefers).
+     */
+    private fun ownSettings(): Map<String, Any> {
+        val values = mapOf<String, Any>(
+            BIND to plugin.config.getString("resource-pack.$BIND", "0.0.0.0")!!,
+            PORT to plugin.config.getInt("resource-pack.$PORT", defaultPort),
+            PUBLIC_HOST to plugin.config.getString("resource-pack.$PUBLIC_HOST", "")!!,
+            PUBLIC_URL to plugin.config.getString("resource-pack.$PUBLIC_URL", "")!!,
+            JOIN_DELAY to plugin.config.getInt("resource-pack.$JOIN_DELAY", 40),
+            GAP to plugin.config.getInt("resource-pack.$GAP", 20),
+        )
+        val defaults = plugin.config.defaults
+        val changed = values.filter { (key, value) ->
+            val default = defaults?.get("resource-pack.$key") ?: if (key == PORT) defaultPort else null
+            default != null && default.toString() != value.toString()
+        }.keys
+        return values + mapOf(CHANGED to changed.toSet())
+    }
+
+    /** A setting in use: changed by some plugin (the first by source name), else the first plugin's own. */
+    private fun setting(key: String): Any? {
+        val all = settingsBy.toSortedMap().values.ifEmpty { listOf(ownSettings()) }
+        return all.firstOrNull { (it[CHANGED] as? Set<*>)?.contains(key) == true }?.get(key) ?: all.first()[key]
+    }
+
+    private fun number(key: String): Int = (setting(key) as? Number)?.toInt() ?: 0
+
+    private fun text(key: String): String = setting(key)?.toString().orEmpty()
+
+    // The settings in use changed (a guest arrived, left or reloaded): warn about plugins that disagree, and move the server if
+    // its address or port is no longer the one in use.
+    private fun settle() {
+        if (mode != Mode.HOST) return
+        val clashes = SETTINGS.mapNotNull { key ->
+            val set = settingsBy.toSortedMap().filterValues { (it[CHANGED] as? Set<*>)?.contains(key) == true }.mapValues { it.value[key].toString() }
+            if (set.values.distinct().size > 1) "resource-pack.$key (" + set.entries.joinToString(", ") { (name, value) -> "$name: $value" } + ")" else null
+        }
+        val warning = clashes.joinToString("; ")
+        if (warning.isNotEmpty() && warning != warned) {
+            plugin.logger.warning("Plugins sharing the pack server set it up differently: $warning. Using the first by name; set them the same to be sure.")
+        }
+        warned = warning.ifEmpty { null }
+        if (rebind() != null) plugin.logger.warning("The pack server could not move to the settings in use; still serving at $ownBase.")
+    }
+
+    private fun bindTarget(): Pair<String, Int> = text(BIND).ifBlank { "0.0.0.0" } to number(PORT)
 
     private fun publicBase(port: Int): String {
-        val configured = plugin.config.getString("resource-pack.public-host").orEmpty().ifBlank { plugin.server.ip }
+        // A full address wins: the pack server behind a reverse proxy or a host's own port forwarding, on any port or https.
+        text(PUBLIC_URL).trim().trimEnd('/').takeIf { it.startsWith("http://") || it.startsWith("https://") }?.let { return it }
+        val configured = text(PUBLIC_HOST).ifBlank { plugin.server.ip }
         if (configured.isBlank()) {
             plugin.logger.warning(
                 "resource-pack.public-host and server-ip are both empty, so players are told to download the pack from localhost, " +
@@ -326,8 +421,17 @@ class SharedHost(
 
     companion object {
         const val SHARE = "resource-pack.share-host"
-        const val GAP_KEY = "resource-pack.send-gap-ticks"
-        private const val VERSION = 2
+        // The settings handed to the host, under resource-pack in each plugin's config.
+        private const val BIND = "bind"
+        private const val PORT = "port"
+        private const val PUBLIC_HOST = "public-host"
+        private const val PUBLIC_URL = "public-url"
+        private const val JOIN_DELAY = "join-delay-ticks"
+        private const val GAP = "send-gap-ticks"
+        private const val CHANGED = "changed"
+        private val SETTINGS = listOf(BIND, PORT, PUBLIC_HOST, PUBLIC_URL, JOIN_DELAY, GAP)
+        // 3: guests hand the host their settings; older copies do not, so they are not mixed.
+        private const val VERSION = 3
         private const val DOWNLOAD_THREADS = 4
     }
 }

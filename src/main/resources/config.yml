@@ -31,8 +31,9 @@ resource-pack:
   # Change it and run /repack reload host, no restart needed.
   port: 8086
   bind: 0.0.0.0
-  # Share one pack server with other plugins using this scheme. Whichever plugin starts first hosts it and
-  # decides the address and port; the others serve under it and ignore their own public-host and port while they do.
+  # Share one pack server with other plugins using this scheme (Clocktower). It runs with whatever any of them changed from its
+  # own defaults (address, port, delays), whichever starts first; if two set the same thing differently, the first by name wins
+  # and the console says so. Easiest: set the pack server up in one plugin and leave the other's at its defaults.
   share-host: true
   # Wait this long after a player joins before sending the pack, so it does not arrive with everything else (20 ticks = 1 second).
   join-delay-ticks: 40
