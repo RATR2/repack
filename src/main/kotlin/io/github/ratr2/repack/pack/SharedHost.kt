@@ -65,6 +65,9 @@ class SharedHost(
     /** While hosting: each source's settings (see [ownSettings]), its own included, to work out the ones in use. */
     private val settingsBy = ConcurrentHashMap<String, Map<String, Any>>()
 
+    /** A public-url already warned about for not being a full address. */
+    private var warnedUrl: String? = null
+
     /** The disagreement last warned about, so the same one is not logged on every reload. */
     private var warned: String? = null
 
@@ -169,8 +172,18 @@ class SharedHost(
         }, delay)
     }
 
+    /**
+     * Whether a pack server is running, here or under another plugin. Without one nothing is sent: the packs would point at an
+     * address nobody serves (see the console for why it is not running).
+     */
+    val serving: Boolean get() {
+        ensure()
+        return mode != Mode.NONE
+    }
+
     fun enqueue(player: UUID, task: Runnable) {
         ensure()
+        if (mode == Mode.NONE) return
         val queue = (remote?.get("queue") as? BiConsumer<*, *>)?.takeIf { mode == Mode.GUEST }
         if (queue != null) {
             @Suppress("UNCHECKED_CAST")
@@ -340,8 +353,12 @@ class SharedHost(
             // Said once: the retries after it stay quiet unless they get the port.
             if (retries == RETRIES || retries == 0) {
                 val others = mismatched()
+                val sharing = findRemote()?.get("owner")?.takeIf { !plugin.config.getBoolean(SHARE, true) }
                 plugin.logger.severe(
-                    if (others.isNotEmpty()) "Could not open the pack server on port $port (${e.message}). ${others.joinToString(", ")} " +
+                    if (sharing != null) "Could not open the pack server on port $port (${e.message}): $sharing already hosts one, and " +
+                        "resource-pack.share-host is false here, so this plugin does not serve under it. Set share-host to true to " +
+                        "share it, or give this plugin a port of its own. Until then no packs are sent."
+                    else if (others.isNotEmpty()) "Could not open the pack server on port $port (${e.message}). ${others.joinToString(", ")} " +
                         "runs a pack server this plugin cannot share (this one is sharing version $VERSION), and probably holds the port: " +
                         "update both plugins to builds of the same time."
                     else "Could not open the pack server on port $port (${e.message}). No other plugin on this server hosts one, so " +
@@ -409,7 +426,13 @@ class SharedHost(
 
     private fun publicBase(port: Int): String {
         // A full address wins: the pack server behind a reverse proxy or a host's own port forwarding, on any port or https.
-        text(PUBLIC_URL).trim().trimEnd('/').takeIf { it.startsWith("http://") || it.startsWith("https://") }?.let { return it }
+        val url = text(PUBLIC_URL).trim().trimEnd('/')
+        if (url.startsWith("http://") || url.startsWith("https://")) return url
+        if (url.isNotEmpty() && warnedUrl != url) {
+            warnedUrl = url
+            plugin.logger.warning("resource-pack.public-url is \"$url\", which is not a full address (http://... or https://...), so it is " +
+                "left out and public-host is used. For just a host name, set public-host instead and leave public-url empty.")
+        }
         val configured = text(PUBLIC_HOST).ifBlank { plugin.server.ip }
         if (configured.isBlank()) {
             plugin.logger.warning(
