@@ -87,6 +87,7 @@ class SharedHost(
     }
 
     fun restart(): String? {
+        retries = RETRIES
         if (mode == Mode.HOST && plugin.config.getBoolean(SHARE, true) && findRemote() == null) {
             settingsBy[source] = ownSettings()
             return rebind()
@@ -239,7 +240,7 @@ class SharedHost(
     private fun becomeHost() {
         settingsBy.clear()
         settingsBy[source] = ownSettings()
-        val server = bind() ?: return
+        val server = bind() ?: return retryLater()
         http = server
         sources[source] = Function { resolver(it) }
         ownProvider?.let { providers[source] = it }
@@ -297,6 +298,31 @@ class SharedHost(
         mode = Mode.NONE
     }
 
+    /** How many more times a busy port is tried again (see [retryLater]), and whether that was already said. */
+    private var retries = RETRIES
+    private var retrying = false
+
+    /**
+     * The port was busy and no other plugin here hosts: often the server that ran before has not let go of it yet, so it is
+     * tried again every [RETRY_TICKS] for a while, quietly, before giving up.
+     */
+    private fun retryLater() {
+        if (retrying || retries <= 0) return
+        retrying = true
+        retries--
+        plugin.server.scheduler.runTaskLater(plugin, Runnable {
+            retrying = false
+            if (mode != Mode.NONE) return@Runnable
+            elect()
+            if (mode == Mode.HOST) plugin.logger.info("The pack server's port is free now: hosting at $ownBase.")
+        }, RETRY_TICKS)
+    }
+
+    /** The other plugins offering a pack server under another sharing version, which this copy cannot join, as "name (version)". */
+    private fun mismatched(): List<String> = Bukkit.getServicesManager().getRegistrations(Map::class.java)
+        .filter { it.plugin !== plugin && it.plugin.isEnabled && it.provider["owner"] != null && it.provider["version"] != VERSION }
+        .map { "${it.plugin.name} (sharing version ${it.provider["version"]})" }
+
     /** Opens a server on the configured port. The old one, if any, keeps running when the new one cannot start. */
     private fun bind(): HttpServer? {
         val (address, port) = bindTarget()
@@ -311,10 +337,18 @@ class SharedHost(
                 boundTo = address to port
             }
         } catch (e: IOException) {
-            plugin.logger.severe(
-                "Could not open the pack server on port $port (${e.message}). Another program may be using it: set " +
-                    "resource-pack.port to a free port and reload, or leave sharing on so another plugin hosts it."
-            )
+            // Said once: the retries after it stay quiet unless they get the port.
+            if (retries == RETRIES || retries == 0) {
+                val others = mismatched()
+                plugin.logger.severe(
+                    if (others.isNotEmpty()) "Could not open the pack server on port $port (${e.message}). ${others.joinToString(", ")} " +
+                        "runs a pack server this plugin cannot share (this one is sharing version $VERSION), and probably holds the port: " +
+                        "update both plugins to builds of the same time."
+                    else "Could not open the pack server on port $port (${e.message}). No other plugin on this server hosts one, so " +
+                        "something outside it holds the port (or the server that ran before has not let go of it yet). " +
+                        if (retries > 0) "Trying again every ${RETRY_TICKS / 20} seconds for a while." else "Set resource-pack.port to a free port and reload."
+                )
+            }
             null
         }
     }
@@ -430,6 +464,9 @@ class SharedHost(
         private const val GAP = "send-gap-ticks"
         private const val CHANGED = "changed"
         private val SETTINGS = listOf(BIND, PORT, PUBLIC_HOST, PUBLIC_URL, JOIN_DELAY, GAP)
+        // A busy port is tried this many more times, this far apart (two minutes in all).
+        private const val RETRIES = 6
+        private const val RETRY_TICKS = 400L
         // 3: guests hand the host their settings; older copies do not, so they are not mixed.
         private const val VERSION = 3
         private const val DOWNLOAD_THREADS = 4
