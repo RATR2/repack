@@ -48,3 +48,82 @@ command /customblocks:
     permission: example.table.give
     trigger:
         send "Custom blocks: %all custom block ids%" to player
+
+# ---- Screen effects ----
+# Shake, impact frames and ripples need the pack loaded on a 1.21.6 or newer client (Fabulous! graphics before 26.3); the condition tells.
+
+# A heavy hit: for three ticks the screen becomes a black and white impact frame, then a shake that fades out. Hitting with a stick as an example.
+# A focus point has to be in front of the camera, so a scene is built around the victim's own view: the attacker's spot, with a slash pointing across it.
+on damage of player:
+    attacker is a player
+    if attacker's tool is a stick:
+        if victim can see screen effects:
+            clear the impact scene "hit"
+            add a "explosion" focus point of size 5 at attacker's location to the impact scene "hit"
+            add a "slash" focus point of size 6 angled 35 degrees at attacker's location to the impact scene "hit"
+            play the impact scene "hit" for victim lasting 3 ticks
+            wait 3 ticks
+            shake victim's screen with strength 0.6 for 12 ticks at rate 0.8 with balance 0.3 with roll 0.5
+        spawn a ripple at victim's location with color "55CCFF" radius 6 lasting 30 ticks
+
+# /impact lightning 6 shows one eight blocks ahead of you. Types: radial, explosion, lightning, splotch, slash, lines, shatter, stretched. A second focus point of
+# another type can be added to the frame that is running. /impactscene plays the scene in plugins/Repack/impacts/_example.yml if you copied it to example.yml.
+command /impact <string=explosion> <number=6> [<string=ffffff>]:
+    permission: example.effects
+    trigger:
+        if player does not have the repack pack:
+            send "&cYou have not loaded the Repack pack." to player
+            stop
+        set {_spot} to location 8 meters in front of player's head
+        play an impact frame for player lasting 20 ticks in color arg-3 with a arg-1 focus point of size arg-2 angled 30 degrees at {_spot}
+        add a "radial" focus point of size 3 at location 5 meters in front of player's head to the impact frame of player
+        send "%the number of active ripples% of %the maximum number of ripples% ripples are in use." to player
+
+command /impactscene [<string=example>]:
+    permission: example.effects
+    trigger:
+        send "Scenes: %all impact scene ids%" to player
+        play the impact scene arg-1 for player lasting 20 ticks
+
+command /stopeffects:
+    permission: example.effects
+    trigger:
+        stop the impact frame of player
+        stop shaking player's screen
+
+# Skyboxes.
+command /sky [<string>]:
+    permission: example.effects
+    trigger:
+        if arg-1 is not set:
+            send "Skies: %all skybox ids%" to player
+        else if arg-1 is "reset":
+            reset player's skybox
+        else:
+            set player's skybox to arg-1
+
+# ---- Custom items ----
+# Writes plugins/Repack/items/ruby.yml (or changes it). Run it once; the item is then in /repack give and the item screens.
+command /makeruby:
+    permission: example.items
+    trigger:
+        create custom item "ruby" with base "EMERALD"
+        set custom item "ruby"'s name to "&cRuby"
+        set custom item "ruby"'s lore to "&7A shiny stone", "&7found deep down"
+        set custom item "ruby"'s glint to true
+        give player custom item "ruby" x 3
+        send "Items: %all custom item ids%" to player
+
+# ---- Text rules ----
+# Other plugins' text goes through Repack's text shader: register a rule and text drawn in its marker color is moved to the anchor
+# (here the middle bottom, near the hotbar), in the color you give. A boss bar title is drawn at the top center in vanilla.
+on load:
+    register a text rule "myscript:mana" at "bottom center" offset -91, -40 from "top center" colored "55AAFF"
+
+on unload:
+    unregister the text rules "myscript:mana"
+
+command /mana:
+    trigger:
+        # The marker only does something once the pack with the rule is built and pushed: /repack build, then /repack push.
+        send "%the text rule marker of ""myscript:mana""%Mana 20/20" to player

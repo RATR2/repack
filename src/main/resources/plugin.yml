@@ -24,3 +24,6 @@ permissions:
   repack.distortion.shake:
     description: Allows /repack shake.
     default: op
+  repack.distortion.impact:
+    description: Allows /repack impact.
+    default: op

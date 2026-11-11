@@ -23,6 +23,8 @@ final class ModernSyntax {
 
         registry.register(SyntaxRegistry.CONDITION, SyntaxInfo.builder(CondIsCustomBlock.class)
                 .supplier(CondIsCustomBlock::new).addPatterns(CondIsCustomBlock.PATTERNS).build());
+        registry.register(SyntaxRegistry.CONDITION, SyntaxInfo.builder(CondPlayerEffects.class)
+                .supplier(CondPlayerEffects::new).addPatterns(CondPlayerEffects.PATTERNS).build());
 
         registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffSpawnRipple.class)
                 .supplier(EffSpawnRipple::new).addPatterns(EffSpawnRipple.PATTERNS).build());
@@ -36,6 +38,14 @@ final class ModernSyntax {
                 .supplier(EffBlockAnimation::new).addPatterns(EffBlockAnimation.PATTERNS).build());
         registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffShake.class)
                 .supplier(EffShake::new).addPatterns(EffShake.PATTERNS).build());
+        registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffImpactScene.class)
+                .supplier(EffImpactScene::new).addPatterns(EffImpactScene.PATTERNS).build());
+        registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffImpact.class)
+                .supplier(EffImpact::new).addPatterns(EffImpact.PATTERNS).build());
+        registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffEditCustomItem.class)
+                .supplier(EffEditCustomItem::new).addPatterns(EffEditCustomItem.PATTERNS).build());
+        registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffTextRule.class)
+                .supplier(EffTextRule::new).addPatterns(EffTextRule.PATTERNS).build());
         registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffSkybox.class)
                 .supplier(EffSkybox::new).addPatterns(EffSkybox.PATTERNS).build());
         registry.register(SyntaxRegistry.EFFECT, SyntaxInfo.builder(EffRegisterCustomBlock.class)
@@ -45,6 +55,12 @@ final class ModernSyntax {
                 .supplier(ExprCustomBlockId::new).addPatterns(ExprCustomBlockId.PATTERNS).build());
         registry.register(SyntaxRegistry.EXPRESSION, SyntaxInfo.Expression.builder(ExprCustomBlockIds.class, String.class)
                 .supplier(ExprCustomBlockIds::new).addPatterns(ExprCustomBlockIds.PATTERNS).build());
+        registry.register(SyntaxRegistry.EXPRESSION, SyntaxInfo.Expression.builder(ExprRepackIds.class, String.class)
+                .supplier(ExprRepackIds::new).addPatterns(ExprRepackIds.PATTERNS).build());
+        registry.register(SyntaxRegistry.EXPRESSION, SyntaxInfo.Expression.builder(ExprRipples.class, Long.class)
+                .supplier(ExprRipples::new).addPatterns(ExprRipples.PATTERNS).build());
+        registry.register(SyntaxRegistry.EXPRESSION, SyntaxInfo.Expression.builder(ExprTextRuleMarker.class, String.class)
+                .supplier(ExprTextRuleMarker::new).addPatterns(ExprTextRuleMarker.PATTERNS).build());
         registry.register(SyntaxRegistry.EXPRESSION, SyntaxInfo.Expression.builder(ExprCustomBlockItem.class, ItemType.class)
                 .supplier(ExprCustomBlockItem::new).addPatterns(ExprCustomBlockItem.PATTERNS).build());
 

@@ -140,6 +140,7 @@ class RepackCommand(private val plugin: Repack) {
         .then(skyboxTree())
         .then(guiTree())
         .then(io.github.ratr2.repack.distortion.DistortionCommand(plugin).shakeTree())
+        .then(io.github.ratr2.repack.distortion.DistortionCommand(plugin).impactTree())
         .then(io.github.ratr2.repack.distortion.DistortionCommand(plugin).tree("distortion"))
         .build()
 

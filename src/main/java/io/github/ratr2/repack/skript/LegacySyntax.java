@@ -18,6 +18,7 @@ final class LegacySyntax {
         Skript.registerAddon(plugin);
 
         Skript.registerCondition(CondIsCustomBlock.class, CondIsCustomBlock.PATTERNS);
+        Skript.registerCondition(CondPlayerEffects.class, CondPlayerEffects.PATTERNS);
 
         Skript.registerEffect(EffSpawnRipple.class, EffSpawnRipple.PATTERNS);
         Skript.registerEffect(EffPlaceCustomBlock.class, EffPlaceCustomBlock.PATTERNS);
@@ -27,9 +28,16 @@ final class LegacySyntax {
         Skript.registerEffect(EffBlockAnimation.class, EffBlockAnimation.PATTERNS);
         Skript.registerEffect(EffShake.class, EffShake.PATTERNS);
         Skript.registerEffect(EffSkybox.class, EffSkybox.PATTERNS);
+        Skript.registerEffect(EffImpact.class, EffImpact.PATTERNS);
+        Skript.registerEffect(EffImpactScene.class, EffImpactScene.PATTERNS);
+        Skript.registerEffect(EffEditCustomItem.class, EffEditCustomItem.PATTERNS);
+        Skript.registerEffect(EffTextRule.class, EffTextRule.PATTERNS);
 
         Skript.registerExpression(ExprCustomBlockId.class, String.class, ExpressionType.PROPERTY, ExprCustomBlockId.PATTERNS);
         Skript.registerExpression(ExprCustomBlockIds.class, String.class, ExpressionType.SIMPLE, ExprCustomBlockIds.PATTERNS);
+        Skript.registerExpression(ExprRepackIds.class, String.class, ExpressionType.SIMPLE, ExprRepackIds.PATTERNS);
+        Skript.registerExpression(ExprRipples.class, Long.class, ExpressionType.SIMPLE, ExprRipples.PATTERNS);
+        Skript.registerExpression(ExprTextRuleMarker.class, String.class, ExpressionType.SIMPLE, ExprTextRuleMarker.PATTERNS);
         Skript.registerExpression(ExprCustomBlockItem.class, ch.njol.skript.aliases.ItemType.class, ExpressionType.COMBINED, ExprCustomBlockItem.PATTERNS);
 
         Skript.registerSection(SecCreateGui.class, SecCreateGui.PATTERNS);

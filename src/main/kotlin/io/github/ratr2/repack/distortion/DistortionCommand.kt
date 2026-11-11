@@ -30,8 +30,9 @@ class DistortionCommand(private val plugin: Repack) {
         source.sender.hasPermission(permission) || source.sender.hasPermission(RepackCommand.ADMIN)
 
     fun tree(name: String): LiteralArgumentBuilder<CommandSourceStack> = Commands.literal(name)
-        .requires { allowed(it, SPAWN) || allowed(it, DEBUG) || allowed(it, SHAKE) }
+        .requires { allowed(it, SPAWN) || allowed(it, DEBUG) || allowed(it, SHAKE) || allowed(it, IMPACT) }
         .then(shakeTree())
+        .then(impactTree())
         .then(
             Commands.literal("spawn")
                 .requires { allowed(it, SPAWN) }
@@ -85,6 +86,131 @@ class DistortionCommand(private val plugin: Repack) {
                         )
                 )
         )
+
+    fun impactTree(): LiteralArgumentBuilder<CommandSourceStack> = Commands.literal("impact")
+        .requires { allowed(it, IMPACT) }
+        .then(
+            Commands.literal("scene")
+                .then(Commands.literal("list").executes {
+                    val ids = ImpactScenes.ids
+                    it.source.sender.sendMessage(Component.text(if (ids.isEmpty()) "No impact frame scenes. Put files in plugins/Repack/impacts/." else "Scenes: ${ids.joinToString()}", NamedTextColor.YELLOW))
+                    Command.SINGLE_SUCCESS
+                })
+                .then(Commands.literal("reload").executes {
+                    val errors = plugin.reloadImpactScenes()
+                    errors.take(8).forEach { error -> it.source.sender.sendMessage(Component.text(error, NamedTextColor.RED)) }
+                    it.source.sender.sendMessage(Component.text("Loaded ${ImpactScenes.ids.size} scene(s)${if (errors.isEmpty()) "" else ", ${errors.size} problem(s)"}.", NamedTextColor.GREEN))
+                    Command.SINGLE_SUCCESS
+                })
+                .then(
+                    Commands.argument("players", ArgumentTypes.players())
+                        .then(
+                            Commands.argument("name", StringArgumentType.word())
+                                .suggests { _, builder ->
+                                    ImpactScenes.ids.filter { it.startsWith(builder.remainingLowerCase) }.forEach(builder::suggest)
+                                    builder.buildFuture()
+                                }
+                                .executes { scene(it, null, null) }
+                                .then(
+                                    Commands.argument("ticks", IntegerArgumentType.integer(1, ImpactManager.MAX_TICKS))
+                                        .executes { scene(it, IntegerArgumentType.getInteger(it, "ticks"), null) }
+                                        .then(
+                                            Commands.argument("hex", StringArgumentType.word())
+                                                .executes { scene(it, IntegerArgumentType.getInteger(it, "ticks"), StringArgumentType.getString(it, "hex")) }
+                                        )
+                                )
+                        )
+                )
+        )
+        .then(
+            Commands.argument("players", ArgumentTypes.players())
+                .then(
+                    Commands.argument("ticks", IntegerArgumentType.integer(1, ImpactManager.MAX_TICKS))
+                        .then(
+                            Commands.argument("type", StringArgumentType.word())
+                                .suggests { _, builder ->
+                                    ImpactManager.Type.entries.map { it.id }.filter { it.startsWith(builder.remainingLowerCase) }.forEach(builder::suggest)
+                                    builder.buildFuture()
+                                }
+                                .then(
+                                    Commands.argument("size", DoubleArgumentType.doubleArg(ImpactManager.MIN_SIZE, ImpactManager.MAX_SIZE))
+                                        .executes { impact(it, null, "ffffff") }
+                                        .then(
+                                            Commands.argument("pos", ArgumentTypes.finePosition(false))
+                                                .executes { impact(it, it.getArgument("pos", FinePositionResolver::class.java).resolve(it.source), "ffffff") }
+                                                .then(
+                                                    Commands.argument("hex", StringArgumentType.word())
+                                                        .executes {
+                                                            impact(it, it.getArgument("pos", FinePositionResolver::class.java).resolve(it.source), StringArgumentType.getString(it, "hex"))
+                                                        }
+                                                        .then(
+                                                            Commands.argument("angle", DoubleArgumentType.doubleArg(-360.0, 360.0))
+                                                                .executes {
+                                                                    impact(
+                                                                        it, it.getArgument("pos", FinePositionResolver::class.java).resolve(it.source), StringArgumentType.getString(it, "hex"),
+                                                                        DoubleArgumentType.getDouble(it, "angle"),
+                                                                    )
+                                                                }
+                                                        )
+                                                )
+                                        )
+                                )
+                        )
+                )
+        )
+
+    private fun scene(context: CommandContext<CommandSourceStack>, ticks: Int?, hex: String?): Int {
+        val sender = context.source.sender
+        if (DistortionAPI.impacts == null) {
+            sender.sendMessage(Component.text("Impact frames are switched off (distortion.enabled in config.yml).", NamedTextColor.RED))
+            return 0
+        }
+        val name = StringArgumentType.getString(context, "name")
+        val scene = ImpactScenes.get(name)
+        if (scene == null || scene.entries.isEmpty()) {
+            sender.sendMessage(Component.text("There is no scene '$name' with focus points. /repack impact scene list names them.", NamedTextColor.RED))
+            return 0
+        }
+        val rgb = if (hex == null) scene.rgb else hex.removePrefix("#").takeIf { it.length == 6 }?.toIntOrNull(16)
+        if (rgb == null) {
+            sender.sendMessage(Component.text("Color must be 6 hex digits, e.g. ffffff.", NamedTextColor.RED))
+            return 0
+        }
+        val targets = context.getArgument("players", io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver::class.java).resolve(context.source)
+        val shown = targets.count { scene.play(it, ticks ?: scene.ticks, rgb) }
+        sender.sendMessage(Component.text("Scene $name for $shown player${if (shown == 1) "" else "s"}." + if (targets.size > shown) " ${targets.size - shown} could not show it." else "", if (shown > 0) NamedTextColor.GREEN else NamedTextColor.YELLOW))
+        return if (shown > 0) Command.SINGLE_SUCCESS else 0
+    }
+
+    /** Without a position the focus point is eight blocks ahead of each player's eyes. */
+    private fun impact(context: CommandContext<CommandSourceStack>, position: io.papermc.paper.math.Position?, hex: String, angle: Double? = null): Int {
+        val sender = context.source.sender
+        val manager = DistortionAPI.impacts
+        if (manager == null) {
+            sender.sendMessage(Component.text("Impact frames are switched off (distortion.enabled in config.yml).", NamedTextColor.RED))
+            return 0
+        }
+        val type = ImpactManager.Type.of(StringArgumentType.getString(context, "type"))
+        if (type == null) {
+            sender.sendMessage(Component.text("The type is one of ${ImpactManager.Type.entries.joinToString { it.id }}.", NamedTextColor.RED))
+            return 0
+        }
+        val rgb = hex.removePrefix("#").takeIf { it.length == 6 }?.toIntOrNull(16)
+        if (rgb == null) {
+            sender.sendMessage(Component.text("Color must be 6 hex digits, e.g. ffffff.", NamedTextColor.RED))
+            return 0
+        }
+        val targets = context.getArgument("players", io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver::class.java).resolve(context.source)
+        val ticks = IntegerArgumentType.getInteger(context, "ticks")
+        val size = DoubleArgumentType.getDouble(context, "size")
+        val shown = targets.count { player ->
+            val at = position?.let { Location(player.world, it.x(), it.y(), it.z()) } ?: player.eyeLocation.add(player.eyeLocation.direction.multiply(AHEAD))
+            manager.start(player, ticks, rgb, listOf(ImpactManager.Focus(at, type, size, screenAngle = angle)))
+        }
+        val skipped = targets.size - shown
+        sender.sendMessage(Component.text("Impact frame for $shown player${if (shown == 1) "" else "s"}." + if (skipped > 0) " $skipped could not show it (they need the pack and a 1.21.6 or newer client)." else "", if (shown > 0) NamedTextColor.GREEN else NamedTextColor.YELLOW))
+        return if (shown > 0) Command.SINGLE_SUCCESS else 0
+    }
 
     private fun shake(context: CommandContext<CommandSourceStack>, rate: Double, balance: Double, roll: Double): Int {
         val sender = context.source.sender
@@ -142,5 +268,7 @@ class DistortionCommand(private val plugin: Repack) {
         const val SPAWN = "repack.distortion.spawn"
         const val DEBUG = "repack.distortion.debug"
         const val SHAKE = "repack.distortion.shake"
+        const val IMPACT = "repack.distortion.impact"
+        private const val AHEAD = 8.0
     }
 }

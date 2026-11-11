@@ -21,6 +21,27 @@ Needs Skript 2.13 or newer. Repack adds its syntax when it starts, using the new
 | `register custom block %string% [using model %string%]` | Effect. Adds a block type with the default settings until the next reload. |
 | `unregister custom block %string%` | Effect. Removes a block type until the next reload. Placed blocks stay in the world and show nothing. |
 | `reload custom blocks` | Effect. Reads the block files again, which also undoes `register` and `unregister`. |
+| `play an impact frame for %players% lasting %number% ticks [in color %string%] with a %string% focus point [of size %number%] [angled %number% degrees] at %locations%` | Effect. The whole screen becomes a hard black and white picture with spikes and outlines, and each location draws a shape: `"radial"`, `"explosion"`, `"lightning"`, `"splotch"`, `"slash"`, `"lines"`, `"shatter"` or `"stretched"` (size in blocks, 4 by default; the last four take an angle on the screen). The color is the light tone (white by default, a hex like `"FF2030"`). `show` works too. |
+| `add a %string% focus point [of size %number%] [angled %number% degrees] at %locations% to the impact frame of %players%` | Effect. Adds more shapes, of other types, to the frame that is running. |
+| `add a %string% focus point [of size %number%] [angled %number% degrees] at %locations% to the impact scene %string%` | Effect. Collects a focus point in a scene without showing anything. |
+| `play the impact scene %string% for %players% [lasting %number% ticks] [in color %string%]` | Effect. Shows everything in the scene at once, where a scene from a file is placed from the player's eyes. `clear the impact scene %string%` empties one. |
+| `all impact scene ids` | Expression: the names of the scenes. |
+| `stop the impact frame of %players%` | Effect. |
+| `shake %players%'s screen with strength %number% for %number% ticks [at rate %number%] [with balance %number%] [with roll %number%]` | Effect. The three optional numbers are 0 to 1. |
+| `spawn a ripple at %locations% with color %string% radius %number% lasting %number% ticks` | Effect. |
+| `the number of active ripples`, `the maximum number of ripples` | Expressions. |
+| `%players% have the repack pack` | Condition: their client has loaded the pack. Also `has`, `have not`, `hasn't`, `haven't`. |
+| `%players% can see screen effects` | Condition: the pack is loaded and the client can show shake and impact frames. Also `can't`, `cannot`. |
+| `set %players%'s skybox to %string%`, `hide %players%'s skybox`, `reset %players%'s skybox` | Effects. |
+| `all skybox ids`, `all custom item ids`, `all animations of custom block %string%`, `all text rule ids` | Expressions: lists of texts. |
+| `custom item %string% [x %number%]` | Expression: the item, as an item. |
+| `create custom item %string% [with base %string%] [and model %string%]` | Effect. Writes `items/<id>.yml`. |
+| `register custom item %string% with base %string% [and model %string%]` | Effect. Until the next reload. `unregister custom item %string%` removes it. |
+| `set custom item %string%'s name to %string%` | Effect. Also `lore to %strings%`, `glint to %boolean%`, `base to %string%`, `model to %string%` and `option %string% to %objects%` for any key of the item file. |
+| `clear custom item %string%'s name`, `lore` or `model` | Effect. |
+| `register a text rule %string% at %string% [offset %number%, %number%] [from %string%] [scaled %number%] [colored %string%]` | Effect. Moves GUI text drawn in the rule's marker color, see the text rules in the guide. The anchors are `top`, `center` or `bottom` with `left`, `center` or `right` (like `bottom center`); `from` is where vanilla draws that text (`top center` by default). |
+| `unregister the text rules %strings%` | Effect. |
+| `the text rule marker of %string%` | Expression: the marker color as `<#rrggbb>`, to put before the text. Empty when there is no such rule. |
 
 ```
 command /table:
@@ -47,7 +68,15 @@ A block whose model has animations (see the guide) plays the one named in its fi
 
 ### Screen shake
 
-`RepackAPI.shake(player, 0.5, 40)` shakes one player's screen (strength 0 to 1, ticks) and returns false when their client cannot show it (it needs the pack and a 1.21.6 or newer client); `shake(player, strength, ticks, rate, balance, roll)` sets how fast it jitters, how much is up and down and how much it turns the picture, each 0 to 1; `stopShake(player)` ends it. In Skript: `shake player's screen with strength 0.5 for 40 ticks` and `stop shaking player's screen`.
+`RepackAPI.shake(player, 0.5, 40)` shakes one player's screen (strength 0 to 1, ticks) and returns false when their client cannot show it (it needs the pack and a 1.21.6 or newer client); `shake(player, strength, ticks, rate, balance, roll)` sets how fast it jitters, how much is up and down and how much it turns the picture, each 0 to 1; `stopShake(player)` ends it. In Skript: `shake player's screen with strength 0.5 for 40 ticks [at rate 0.8] [with balance 0.5] [with roll 0.3]` and `stop shaking player's screen`.
+
+### Impact frames
+
+`RepackAPI.impact(player, 4, location, "explosion", 6.0)` holds an impact frame on one player's screen for 4 ticks: the whole picture is drawn as hard black and white, smeared outward in jagged spikes from the focus point, with outlines where one shape stands in front of another, and the focus point draws an explosion of 6 blocks over it. The types are `radial`, `explosion`, `lightning`, `splotch` (round) and `slash`, `lines`, `shatter`, `stretched` (they follow a direction); the size is 0.1 to 64 blocks and the ticks 1 to 200. `impact(player, ticks, 0xFF2030, location, type, size)` makes red the light tone instead of white (the dark tone is always black). For several focus points pass a list (up to 15): `impact(player, ticks, rgb, List.of(new DistortionAPI.ImpactFocus(a, "radial", 5.0), new DistortionAPI.ImpactFocus(b, "slash", 8.0, direction, null)))`, where a direction is a world vector (the player sees it as the angle it makes on their screen) or the last argument is an angle on the screen in degrees (0 to the right, 90 up). `addImpactFocus(player, location, type, size)` adds one to the running frame. They return false when the client cannot show it (the same clients as the shake), a type is unknown or no focus point is in the player's world. A focus point has to be in front of the camera. `stopImpact(player)` ends it, and `canShowScreenEffects(player)` says whether a client can show the shake and impact frames.
+
+A scene collects focus points to show together. `RepackAPI.impactScene("hit")` returns the scene by that name (a new empty one when there is none): `scene.add(location, "explosion", 6.0)` puts a focus point at a place, `scene.addRelative(right, up, forward, "slash", 5.0, 30.0)` puts one that many blocks right of, above and ahead of where it is played from, `scene.ticks` and `scene.rgb` set the length and the light tone, and `scene.play(player)` (or `play(player, ticks, rgb, origin)`) shows all of it at once. `playImpactScene(player, "hit")` plays one by name, `impactSceneIds()` lists them and `clearImpactScene(name, remove)` empties or removes one. Scenes are also read from `plugins/Repack/impacts/<name>.yml` (see the guide); a scene built from code is not saved, and reading the files again drops the scenes that came from files.
+
+In Skript: `play an impact frame for player lasting 4 ticks [in color "FF2030"] with a "slash" focus point [of size 6] [angled 30 degrees] at %locations%` shows a frame at once, and `add a "lightning" focus point of size 8 at %locations% to the impact frame of player` adds to the running one. To collect first and show later: `add a "radial" focus point of size 4 at {_spot} to the impact scene "boom"` (as many as you like, `angled` works here too), then `play the impact scene "boom" for player [lasting 4 ticks] [in color "FFFFFF"]`, and `clear the impact scene "boom"` to start over. `all impact scene ids` lists them. Command: `/repack impact <players> <ticks> <type> <size> [pos [hex [angle]]]` and `/repack impact scene <players> <name> [ticks [hex]]`, permission `repack.distortion.impact`.
 
 ### Skyboxes
 

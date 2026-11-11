@@ -80,7 +80,12 @@
                     {
                         "name": "ColorModulate",
                         "type": "vec4",
-                        "value": [ 1.0, 1.0, 1.0, 1.0 ]
+                        "value": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
                     }
                 ]
             },
@@ -108,6 +113,11 @@
                 {
                     "sampler_name": "Mask",
                     "target": "mask"
+                },
+                {
+                    "sampler_name": "SceneDepth",
+                    "target": "minecraft:main",
+                    "use_depth_buffer": true
                 }
             ],
             "output": "swap",
@@ -145,7 +155,12 @@
                     {
                         "name": "ColorModulate",
                         "type": "vec4",
-                        "value": [ 1.0, 1.0, 1.0, 1.0 ]
+                        "value": [
+                            1.0,
+                            1.0,
+                            1.0,
+                            1.0
+                        ]
                     }
                 ]
             },

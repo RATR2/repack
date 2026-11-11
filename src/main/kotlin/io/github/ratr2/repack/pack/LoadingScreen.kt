@@ -3,6 +3,7 @@ package io.github.ratr2.repack.pack
 import com.github.retrooper.packetevents.PacketEvents
 import com.github.retrooper.packetevents.protocol.world.states.type.StateTypes
 import com.github.retrooper.packetevents.util.Vector3i
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerBundle
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerMultiBlockChange
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerMultiBlockChange.EncodedBlock
 import io.github.ratr2.repack.Repack
@@ -46,19 +47,36 @@ class LoadingScreen(private val plugin: Repack) {
         if (found.isEmpty()) return
         val black = StateTypes.BLACK_CONCRETE.createBlockState()
         send(player, found) { black }
+        debug("blacked out ${found.size} block(s) around ${player.name}")
         shown[player.uniqueId] = Shown(world, found, tiles)
     }
 
     fun hide(player: Player) {
-        val before = shown.remove(player.uniqueId) ?: return
-        restore(player, before)
-        plugin.server.scheduler.runTaskLater(plugin, Runnable { restore(player, before) }, RESEND_DELAY_TICKS)
+        val before = shown.remove(player.uniqueId) ?: run {
+            debug("nothing to put back for ${player.name}")
+            return
+        }
+        restore(player, before, kick = false)
+        // A client that reloads its pack rebuilds every chunk picture while the blocks arrive, and can keep a stale one (the black box stays until a block in
+        // that chunk changes). A block sent again with the state it already has changes nothing for the client, so the later passes send a different state
+        // first and the real one right after in the same bundle, which always makes it redraw the chunk section.
+        for (delay in KICK_DELAYS_TICKS) plugin.server.scheduler.runTaskLater(plugin, Runnable { restore(player, before, kick = true) }, delay)
     }
 
-    private fun restore(player: Player, before: Shown) {
+    private fun restore(player: Player, before: Shown, kick: Boolean) {
         if (!player.isOnline || player.world != before.world) return
-        send(player, before.blocks) { (x, y, z) ->
-            SpigotConversionUtil.fromBukkitBlockData(before.world.getBlockAt(x, y, z).blockData)
+        debug("putting back ${before.blocks.size} block(s) for ${player.name}${if (kick) " (redraw)" else ""}")
+        val real = { (x, y, z): IntArray -> SpigotConversionUtil.fromBukkitBlockData(before.world.getBlockAt(x, y, z).blockData) }
+        if (kick) {
+            val black = StateTypes.BLACK_CONCRETE.createBlockState()
+            val white = StateTypes.WHITE_CONCRETE.createBlockState()
+            val bundle = PacketEvents.getAPI().playerManager
+            bundle.sendPacket(player, WrapperPlayServerBundle())
+            send(player, before.blocks) { if (real(it).type == StateTypes.BLACK_CONCRETE) white else black }
+            send(player, before.blocks, real)
+            bundle.sendPacket(player, WrapperPlayServerBundle())
+        } else {
+            send(player, before.blocks, real)
         }
         for ((x, y, z) in before.tiles) {
             val block = before.world.getBlockAt(x, y, z)
@@ -68,6 +86,10 @@ class LoadingScreen(private val plugin: Repack) {
 
     fun forget(player: Player) {
         shown.remove(player.uniqueId)
+    }
+
+    private fun debug(message: String) {
+        if (plugin.config.getBoolean("debug", false)) plugin.logger.info("Loading screen: $message")
     }
 
     private fun send(player: Player, blocks: List<IntArray>, stateOf: (IntArray) -> com.github.retrooper.packetevents.protocol.world.states.WrappedBlockState) {
@@ -96,7 +118,8 @@ class LoadingScreen(private val plugin: Repack) {
 
         const val MAX_RADIUS = 16
 
-        const val RESEND_DELAY_TICKS = 20L
+        /** When the blocks are sent again as a redraw: a second after the pack is loaded, and again at five seconds for a slow client. */
+        val KICK_DELAYS_TICKS = listOf(20L, 100L)
     }
 }
 

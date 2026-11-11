@@ -32,6 +32,9 @@ out vec3 markerView;
 const float MARKER_OPACITY = 123.0;
 // text_opacity that turns a text display into a screen shake marker; its slot is its block light, 0 to 15.
 const float SHAKE_OPACITY = 122.0;
+// text_opacity that turns a text display into an impact frame focus marker; it shares the shake rows, so the sign and 64 tell it apart.
+const float IMPACT_OPACITY = 121.0;
+const float IMPACT_SLOT_OFFSET = 64.0;
 const int MARKER_SLOTS = 256;
 // Side of the data block at framebuffer texel (0,0); must match text.fsh.
 const float MARKER_BLOCK_PX = 96.0;
@@ -44,14 +47,15 @@ void main() {
 
 #if !defined(IS_GUI) && !defined(IS_SEE_THROUGH)
     bool shakeMarker = abs(Color.a * 255.0 - SHAKE_OPACITY) < 0.5;
-    if (abs(Color.a * 255.0 - MARKER_OPACITY) < 0.5 || shakeMarker) {
+    bool impactMarker = abs(Color.a * 255.0 - IMPACT_OPACITY) < 0.5;
+    if (abs(Color.a * 255.0 - MARKER_OPACITY) < 0.5 || shakeMarker || impactMarker) {
         vec4 viewPos = ModelViewMat * vec4(Position, 1.0);
         vec4 clip = ProjMat * viewPos;
 
         // Slot = brightness block + 16 * sky (UV2 is light * 16).
         float slot = float(clamp(UV2.x / 16 + 16 * (UV2.y / 16), 0, MARKER_SLOTS - 1) + 1);
         // A shake marker is told apart by the sign.
-        vMarker = shakeMarker ? -slot : slot;
+        vMarker = impactMarker ? -(slot + IMPACT_SLOT_OFFSET) : shakeMarker ? -slot : slot;
         markerScreen = clip.xy / clip.w * 0.5 + 0.5;
         markerView = viewPos.xyz;
         vertexColor = Color;

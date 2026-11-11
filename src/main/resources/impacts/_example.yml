@@ -1,0 +1,12 @@
+# An impact frame scene: focus points that are shown together. Copy this file to plugins/Repack/impacts/<name>.yml (a name that does not start with _),
+# then /repack impact scene reload and /repack impact scene @s <name>. From Skript: play the impact scene "<name>" for player. From Java: RepackAPI.playImpactScene.
+# Positions are relative to where the scene is played from (the player's eyes): right, up and forward in blocks, forward being 8 when left out.
+ticks: 4          # how long it holds, 1 to 200
+color: "ffffff"   # the light tone; the dark tone is always black
+focus:
+  # type: radial, explosion, lightning, splotch, or with a direction: slash, lines, shatter, stretched
+  # size: in blocks, 0.1 to 64
+  # angle: the direction on the screen in degrees for slash, lines and stretched (0 to the right, 90 up)
+  - {type: explosion, size: 6, forward: 10}
+  - {type: slash, size: 5, right: 2, up: 1, forward: 8, angle: 30}
+  - {type: lines, size: 5, right: -3, forward: 9, angle: 150}

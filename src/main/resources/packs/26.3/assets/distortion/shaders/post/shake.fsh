@@ -4,6 +4,7 @@
 #include <minecraft:globals.glsl>
 
 uniform sampler2D InSampler;
+uniform sampler2D SceneDepthSampler;
 
 layout(location = 0) in vec2 texCoord;
 
@@ -65,16 +66,217 @@ vec2 shakeUv(vec2 uv, vec2 size) {
     return (p + clamp(move, -1.0, 1.0) * SHAKE_MAX_MOVE) / aspect + 0.5;
 }
 
-// The shake marker data covers pixels in the corner; the row above them stands in for those.
+const vec3 IMPACT_SIGNATURE = vec3(123.0, 3.0, 122.0) / 255.0;
+
+// The shake and impact marker data covers pixels in the corner (columns 1 to 3 of a shake row, 1 to 6 of an impact row, when its signature is there); the row above stands in for those.
 vec2 shakeCover(vec2 px) {
-    if (px.x < 96.0 && px.y >= float(SHAKE_FIRST_ROW) && px.y < float(SHAKE_FIRST_ROW + SHAKE_SLOTS)) {
-        px.y = float(SHAKE_FIRST_ROW + SHAKE_SLOTS) + 0.5;
+    ivec2 p = ivec2(px);
+    if (p.x >= 1 && p.x < 7 && p.y >= SHAKE_FIRST_ROW && p.y < SHAKE_FIRST_ROW + SHAKE_SLOTS) {
+        vec3 signature = texelFetch(InSampler, ivec2(1, p.y), 0).rgb;
+        bool shake = all(lessThan(abs(signature - SHAKE_SIGNATURE), vec3(1.5 / 255.0)));
+        bool impact = all(lessThan(abs(signature - IMPACT_SIGNATURE), vec3(1.5 / 255.0)));
+        if ((shake && p.x < 5) || impact) {
+            px.y = float(SHAKE_FIRST_ROW + SHAKE_SLOTS) + 0.5;
+        }
     }
     return px;
 }
 
+// ---- Impact frames ----
+// An impact focus marker (a text display at a point in the world with text_opacity 121, see the text shader) uses a row of the shake rows (slot 1 to 15) with a
+// signature of its own and five pixels after it: (the point on the screen x, the type), (the point y, the direction), (the color), (the size in screen heights) and
+// (the depth value of a point very far away, in 3 bytes).
+const int IMPACT_MAX_FOCI = 15;
+// How many pixels from an edge the outline reaches.
+const float IMPACT_OUTLINE_PX = 3.0;
+const float IMPACT_SPIKES = 96.0;
+
+struct ImpactFocus {
+    vec2 center;
+    int type;
+    float radius;
+    float angle;
+    vec3 color;
+};
+
+ImpactFocus impactFoci[IMPACT_MAX_FOCI];
+int impactCount = 0;
+float impactFar = 0.0;
+
+float impactDecode16(float hi, float lo) {
+    return (round(hi * 255.0) + lo) / 255.0;
+}
+
+void readImpact() {
+    impactCount = 0;
+    for (int slot = 0; slot < SHAKE_SLOTS; slot++) {
+        int row = SHAKE_FIRST_ROW + slot;
+        vec3 signature = texelFetch(InSampler, ivec2(1, row), 0).rgb;
+        if (any(greaterThan(abs(signature - IMPACT_SIGNATURE), vec3(1.5 / 255.0))) || impactCount >= IMPACT_MAX_FOCI) {
+            continue;
+        }
+        vec3 a = texelFetch(InSampler, ivec2(2, row), 0).rgb;
+        vec3 b = texelFetch(InSampler, ivec2(3, row), 0).rgb;
+        vec3 color = texelFetch(InSampler, ivec2(4, row), 0).rgb;
+        vec3 d = texelFetch(InSampler, ivec2(5, row), 0).rgb;
+        vec3 far = texelFetch(InSampler, ivec2(6, row), 0).rgb;
+        impactFoci[impactCount] = ImpactFocus(vec2(impactDecode16(a.r, a.g), impactDecode16(b.r, b.g)) * 3.0 - 1.0, int(round(a.b * 255.0)), max(impactDecode16(d.r, d.g) * 4.0, 0.02), round(b.b * 255.0) / 255.0 * 6.2831853, color);
+        impactFar = (round(far.r * 255.0) + (round(far.g * 255.0) + far.b) / 255.0) / 255.0;
+        impactCount++;
+    }
+}
+
+float impactAngleDiff(float a, float b) {
+    return mod(a - b + 3.14159265, 6.2831853) - 3.14159265;
+}
+
+// A jagged blast with spikes around it.
+bool impactBlast(vec2 p, float r, float seed) {
+    float tau = 6.2831853;
+    float len = length(p);
+    float a = atan(p.y, p.x);
+    float body = shakeHash(floor(a / tau * 36.0) * 1.7 + seed * 5.3);
+    float spike = shakeHash(floor(a / tau * 90.0) + seed * 2.9);
+    return len < r * (0.55 + 0.3 * body) || (spike > 0.72 && len < r * (0.9 + 0.7 * spike));
+}
+
+// Whether a point p (in screen heights from the focus point, y up the screen) is inside the shape of a type, of size r, along the direction angle (the types
+// that have a direction). The shapes change every other tick. Types: 0 radial, 1 explosion, 2 lightning, 3 splotch, 4 slash, 5 speed lines, 6 shatter, 7 stretched.
+bool impactShape(vec2 p, int type, float r, float angle) {
+    float tau = 6.2831853;
+    float len = length(p);
+    float a = atan(p.y, p.x);
+    float seed = floor(GameTime * 12000.0);
+    // p in a frame whose x axis points along the direction.
+    vec2 q = vec2(cos(angle) * p.x + sin(angle) * p.y, -sin(angle) * p.x + cos(angle) * p.y);
+    if (type == 0) {
+        // Radial: a burst of wedges of different lengths.
+        float h = shakeHash(floor(a / tau * 72.0) + seed * 3.17);
+        return h > 0.4 && len < r * (0.3 + 1.4 * h) && len > r * 0.05;
+    }
+    if (type == 1) {
+        return impactBlast(p, r, seed);
+    }
+    if (type == 2) {
+        // Lightning: thin branches that zigzag away from the point.
+        for (int i = 0; i < 6; i++) {
+            float base = (float(i) + shakeHash(float(i) * 9.1 + seed)) / 6.0 * tau;
+            float zigzag = shakeNoise(len / r * 9.0 + float(i) * 13.0 + seed) * 0.35;
+            float reach = r * (0.6 + 0.8 * shakeHash(float(i) + 4.0 + seed));
+            if (abs(impactAngleDiff(a, base + zigzag)) * len < r * 0.035 && len < reach) {
+                return true;
+            }
+        }
+        return false;
+    }
+    if (type == 4) {
+        // Slash: one long streak through the point along the direction, tapered at both ends.
+        float reach = r * 1.8;
+        float taper = 1.0 - abs(q.x) / reach;
+        float jag = 0.75 + 0.5 * shakeHash(floor(q.x / r * 40.0) + seed);
+        return abs(q.x) < reach && abs(q.y) < r * 0.07 * taper * jag + r * 0.004;
+    }
+    if (type == 5) {
+        // Speed lines: parallel lines along the direction, thick near the point and thinning away from it.
+        float band = r * 0.1;
+        float h = shakeHash(floor(q.y / band) * 1.3 + seed * 2.1);
+        float reach = r * (0.5 + 3.0 * h);
+        float thick = 0.5 * (1.0 - abs(q.x) / reach);
+        return h > 0.45 && abs(q.x) < reach && abs(q.x) > r * 0.12 && fract(q.y / band) < thick;
+    }
+    if (type == 6) {
+        // Shatter: straight cracks with a fork half way along each.
+        for (int i = 0; i < 7; i++) {
+            float crack = (float(i) + shakeHash(float(i) * 6.3 + seed)) / 7.0 * tau;
+            vec2 direction = vec2(cos(crack), sin(crack));
+            float reach = r * (0.7 + 0.8 * shakeHash(float(i) * 2.9 + 3.0 + seed));
+            float along = dot(p, direction);
+            if (along > 0.0 && along < reach && abs(dot(p, vec2(-direction.y, direction.x))) < r * 0.025 * (1.0 - 0.7 * along / reach)) {
+                return true;
+            }
+            float fork = crack + (shakeHash(float(i) * 4.1 + 8.0 + seed) - 0.5) * 1.6;
+            vec2 forkDirection = vec2(cos(fork), sin(fork));
+            vec2 fromFork = p - direction * reach * 0.5;
+            float forkAlong = dot(fromFork, forkDirection);
+            if (forkAlong > 0.0 && forkAlong < reach * 0.6 && abs(dot(fromFork, vec2(-forkDirection.y, forkDirection.x))) < r * 0.018 * (1.0 - 0.7 * forkAlong / (reach * 0.6))) {
+                return true;
+            }
+        }
+        return false;
+    }
+    if (type == 7) {
+        // Stretched: the blast, long and thin along the direction.
+        return impactBlast(vec2(q.x * 0.4, q.y * 1.5), r, seed);
+    }
+    // Splotch: an irregular blot with drops around it.
+    float lobe = shakeNoise(a * 2.3 + seed * 0.37) * 0.5 + shakeNoise(a * 5.1 + 7.0) * 0.25;
+    if (len < r * (0.6 + 0.4 * lobe)) {
+        return true;
+    }
+    for (int i = 0; i < 6; i++) {
+        float direction = shakeHash(float(i) * 3.7 + 1.0) * tau;
+        float away = r * (1.0 + 0.7 * shakeHash(float(i) * 5.1 + 2.0));
+        if (length(p - away * vec2(cos(direction), sin(direction))) < r * 0.13 * (0.5 + shakeHash(float(i) * 7.7))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// The look of an impact frame: the whole picture is drawn in two tones only, the color of the first focus point for the light parts and black for the dark ones,
+// smeared outward from the nearest focus point by a different amount in each thin slice of the screen so shapes end in jagged spikes, with an outline in the light
+// tone where a shape stands in front of something farther away. Then the shapes of the focus points are drawn over it, with a black edge.
+vec3 impactColor(vec3 color, vec2 uv, vec2 size) {
+    readImpact();
+    if (impactCount == 0) {
+        return color;
+    }
+    vec2 aspect = vec2(size.x / size.y, 1.0);
+    for (int i = 0; i < impactCount; i++) {
+        if (impactShape((uv - impactFoci[i].center) * aspect, impactFoci[i].type, impactFoci[i].radius, impactFoci[i].angle)) {
+            return impactFoci[i].color;
+        }
+    }
+    for (int i = 0; i < impactCount; i++) {
+        if (impactShape((uv - impactFoci[i].center) * aspect, impactFoci[i].type, impactFoci[i].radius * 1.12 + 0.004, impactFoci[i].angle)) {
+            return vec3(0.0);
+        }
+    }
+    int nearest = 0;
+    float nearestDistance = 1000.0;
+    for (int i = 0; i < impactCount; i++) {
+        float d = length((uv - impactFoci[i].center) * aspect);
+        if (d < nearestDistance) {
+            nearestDistance = d;
+            nearest = i;
+        }
+    }
+    vec3 light = impactFoci[0].color;
+    // The outline: this pixel is farther than one a few pixels away, so it is next to the edge of something nearer. Depths are compared as distances from the
+    // far value, which are in proportion to 1 over the distance in blocks whatever the depth convention.
+    float depth = texture(SceneDepthSampler, uv).r;
+    float distance = abs(depth - impactFar);
+    vec2 texel = 1.0 / size;
+    vec2 steps[4] = vec2[](vec2(1.0, 0.0), vec2(-1.0, 0.0), vec2(0.0, 1.0), vec2(0.0, -1.0));
+    for (int i = 0; i < 4; i++) {
+        float other = abs(texture(SceneDepthSampler, uv + steps[i] * texel * IMPACT_OUTLINE_PX).r - impactFar);
+        if (other > distance * 1.15 + 0.000002) {
+            return light;
+        }
+    }
+    vec2 p = (uv - impactFoci[nearest].center) * aspect;
+    float slice = floor(atan(p.y, p.x) * (IMPACT_SPIKES / 6.2831853));
+    float pull = pow(shakeHash(slice + floor(GameTime * 12000.0) * 7.13), 2.0) * 0.5;
+    vec2 smearUv = p * (1.0 - pull) / aspect + impactFoci[nearest].center;
+    vec3 smeared = texture(InSampler, shakeCover(smearUv * size) / size).rgb;
+    float ink = step(0.45, dot(smeared, vec3(0.299, 0.587, 0.114)));
+    return mix(vec3(0.0), light, ink);
+}
+
 void main() {
     vec2 size = vec2(textureSize(InSampler, 0));
-    vec2 px = shakeUv(texCoord, size) * size;
-    fragColor = vec4(texture(InSampler, shakeCover(px) / size).rgb, 1.0);
+    vec2 sceneUv = shakeUv(texCoord, size);
+    vec2 px = sceneUv * size;
+    vec3 color = texture(InSampler, shakeCover(px) / size).rgb;
+    fragColor = vec4(impactColor(color, sceneUv, size), 1.0);
 }

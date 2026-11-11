@@ -92,6 +92,8 @@ class Repack : JavaPlugin() {
         private set
 
     var shakes: io.github.ratr2.repack.distortion.ShakeManager? = null
+
+    var impacts: io.github.ratr2.repack.distortion.ImpactManager? = null
         private set
     val players: PlayerSettings by lazy { PlayerSettings(this) }
     lateinit var display: DisplayManager
@@ -103,6 +105,7 @@ class Repack : JavaPlugin() {
         saveResource("blocks/_example.yml", true)
         saveResource("skyboxes/_example.yml", true)
         saveResource("guis/_example.yml", true)
+        saveResource("impacts/_example.yml", true)
         installDefaults()
         store = PackStore(dataFolder)
         sending = config.getBoolean("resource-pack.send", true)
@@ -124,6 +127,7 @@ class Repack : JavaPlugin() {
         server.pluginManager.registerEvents(guis, this)
         guis.start()
         reloadGuis()
+        reloadImpactScenes().forEach { logger.warning(it) }
 
         blocks = PlacedBlocks(this)
         items = BlockItems(this)
@@ -173,6 +177,7 @@ class Repack : JavaPlugin() {
         io.github.ratr2.repack.distortion.DistortionAPI.manager = null
         ripples?.clear()
         shakes?.clear()
+        impacts?.clear()
         skyboxes?.close()
         if (::guis.isInitialized) guis.stop()
         recipeKeys.values.forEach { server.removeRecipe(it) }
@@ -184,17 +189,22 @@ class Repack : JavaPlugin() {
         if (!config.getBoolean("distortion.enabled", true)) return
         val manager = io.github.ratr2.repack.distortion.RippleManager(this, sender)
         val shakes = io.github.ratr2.repack.distortion.ShakeManager(this, sender)
+        val impacts = io.github.ratr2.repack.distortion.ImpactManager(this, sender)
         sender.onLoaded = manager::onPackLoaded
         sender.onLost = { player, usedPostEffects ->
             manager.onPackLost(player, usedPostEffects)
             shakes.onPackLost(player)
+            impacts.onPackLost(player)
         }
         server.pluginManager.registerEvents(manager, this)
         server.pluginManager.registerEvents(shakes, this)
+        server.pluginManager.registerEvents(impacts, this)
         io.github.ratr2.repack.distortion.DistortionAPI.manager = manager
         io.github.ratr2.repack.distortion.DistortionAPI.shakes = shakes
+        io.github.ratr2.repack.distortion.DistortionAPI.impacts = impacts
         ripples = manager
         this.shakes = shakes
+        this.impacts = impacts
     }
 
     private fun startSkyboxes() {
@@ -237,6 +247,12 @@ class Repack : JavaPlugin() {
 
     val guisFolder: File
         get() = File(dataFolder, "guis").apply { mkdirs() }
+
+    val impactsFolder: File
+        get() = File(dataFolder, "impacts").apply { mkdirs() }
+
+    /** Reads the impact frame scenes of `impacts/` again. Returns what is wrong with a file. */
+    fun reloadImpactScenes(): List<String> = io.github.ratr2.repack.distortion.ImpactScenes.load(impactsFolder)
 
     /** Reads the GUI files again. A screen that is open keeps what it had; the next time it opens it uses the new files. */
     fun reloadGuis(): List<String> {

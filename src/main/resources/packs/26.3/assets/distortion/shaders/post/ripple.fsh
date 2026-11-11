@@ -55,10 +55,23 @@ int groupMask(int group) {
     return int(round(bytes.r * 255.0)) | (int(round(bytes.g * 255.0)) << 8);
 }
 
+// The ripple signature of the text shader: a slot is live when this is in the first pixel of its row.
+const vec3 RIPPLE_SIGNATURE = vec3(127.0, 1.0, 126.0) / 255.0;
+
+// Whether this pixel of the ripple strip holds data of a live slot, so it is the only kind that needs covering.
+bool markerPixelLive(ivec2 p) {
+    if (p.x < 1) {
+        return false;
+    }
+    int field = (p.x - 1) % MARKER_GROUP_STRIDE;
+    vec3 signature = texelFetch(InSampler, ivec2(p.x - field, p.y), 0).rgb;
+    return field <= 4 && all(lessThan(abs(signature - RIPPLE_SIGNATURE), vec3(1.5 / 255.0)));
+}
+
 // Marker data pixels overwrite the scene in the corner; cover them with the row just above the strip.
 vec3 sceneAt(vec2 uv, vec2 size) {
     vec2 px = uv * size;
-    if (px.x < MARKER_STRIP_PX.x && px.y >= float(MARKER_FIRST_ROW) && px.y < float(MARKER_FIRST_ROW) + MARKER_STRIP_PX.y) {
+    if (px.x < MARKER_STRIP_PX.x && px.y >= float(MARKER_FIRST_ROW) && px.y < float(MARKER_FIRST_ROW) + MARKER_STRIP_PX.y && markerPixelLive(ivec2(px))) {
         px.y = float(MARKER_FIRST_ROW) + MARKER_STRIP_PX.y + 0.5;
     }
     return texture(InSampler, px / size).rgb;

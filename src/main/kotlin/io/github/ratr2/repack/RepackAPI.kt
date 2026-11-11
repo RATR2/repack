@@ -150,6 +150,75 @@ object RepackAPI {
     @JvmStatic
     fun stopShake(player: org.bukkit.entity.Player) = io.github.ratr2.repack.distortion.DistortionAPI.stopShake(player)
 
+    /**
+     * Holds an impact frame on the player's screen for [ticks] (1 to 200), like the frame an anime holds on a hit: the whole picture is drawn as hard black and
+     * white, smeared outward in jagged spikes from the focus point, with outlines where one shape stands in front of another, and the focus point draws a shape
+     * over it. [type] is `radial` (a burst of wedges), `explosion`, `lightning`, `splotch` or, with a direction, `slash`, `lines`, `shatter` or `stretched` (see the
+     * focus point class); [size] is in blocks (0.1 to 64). The focus point has to be in front
+     * of the camera. False if the client can't show it (needs the pack and 1.21.6 or newer; Fabulous! graphics before 26.3) or the type is unknown. A new one
+     * replaces the running one.
+     */
+    @JvmStatic
+    fun impact(player: org.bukkit.entity.Player, ticks: Int, location: org.bukkit.Location, type: String, size: Double): Boolean =
+        io.github.ratr2.repack.distortion.DistortionAPI.impact(player, ticks, location, type, size)
+
+    /** As above, with [rgb] (like 0xFF2030 for red) as the light tone instead of white; the dark tone is always black. */
+    @JvmStatic
+    fun impact(player: org.bukkit.entity.Player, ticks: Int, rgb: Int, location: org.bukkit.Location, type: String, size: Double): Boolean =
+        io.github.ratr2.repack.distortion.DistortionAPI.impact(player, ticks, rgb, location, type, size)
+
+    /** An impact frame with several focus points (up to 15), each its own location, type and size. */
+    @JvmStatic
+    fun impact(player: org.bukkit.entity.Player, ticks: Int, rgb: Int, foci: List<io.github.ratr2.repack.distortion.DistortionAPI.ImpactFocus>): Boolean =
+        io.github.ratr2.repack.distortion.DistortionAPI.impact(player, ticks, rgb, foci)
+
+    /** Adds a focus point to the impact frame the player is in; false when there is none running. */
+    @JvmStatic
+    fun addImpactFocus(player: org.bukkit.entity.Player, location: org.bukkit.Location, type: String, size: Double): Boolean =
+        io.github.ratr2.repack.distortion.DistortionAPI.addImpactFocus(player, location, type, size)
+
+    /** As above, for a type with a direction: [screenAngle] is degrees on the screen, 0 to the right and 90 up. */
+    @JvmStatic
+    fun addImpactFocus(player: org.bukkit.entity.Player, location: org.bukkit.Location, type: String, size: Double, screenAngle: Double?): Boolean =
+        io.github.ratr2.repack.distortion.DistortionAPI.addImpactFocus(player, location, type, size, screenAngle)
+
+    /**
+     * The impact frame scene by that name, a new empty one when there is none. Add focus points to it (`add`, `addRelative`), then show it to players in one go
+     * with `play(player)`. Scenes are also read from `plugins/Repack/impacts/<name>.yml` (see the guide); a scene built here is not saved.
+     */
+    @JvmStatic
+    fun impactScene(name: String): io.github.ratr2.repack.distortion.ImpactScene = io.github.ratr2.repack.distortion.ImpactScenes.getOrCreate(name)
+
+    /** The names of all impact frame scenes, from files and built at run time. */
+    @JvmStatic
+    fun impactSceneIds(): List<String> = io.github.ratr2.repack.distortion.ImpactScenes.ids
+
+    /** Shows a scene to a player with its own length and color; false when there is no such scene, it is empty, or the client cannot show it. */
+    @JvmStatic
+    fun playImpactScene(player: org.bukkit.entity.Player, name: String): Boolean = io.github.ratr2.repack.distortion.ImpactScenes.get(name)?.play(player) ?: false
+
+    @JvmStatic
+    fun playImpactScene(player: org.bukkit.entity.Player, name: String, ticks: Int, rgb: Int): Boolean = io.github.ratr2.repack.distortion.ImpactScenes.get(name)?.play(player, ticks, rgb) ?: false
+
+    /** Empties a scene, or removes it when [remove] is true. False when there is no such scene. */
+    @JvmStatic
+    fun clearImpactScene(name: String, remove: Boolean): Boolean {
+        val scene = io.github.ratr2.repack.distortion.ImpactScenes.get(name) ?: return false
+        if (remove) io.github.ratr2.repack.distortion.ImpactScenes.remove(name) else scene.clear()
+        return true
+    }
+
+    @JvmStatic
+    fun stopImpact(player: org.bukkit.entity.Player) = io.github.ratr2.repack.distortion.DistortionAPI.stopImpact(player)
+
+    /** Whether the player has loaded Repack's pack and their client can show screen shake and impact frames. */
+    @JvmStatic
+    fun canShowScreenEffects(player: org.bukkit.entity.Player): Boolean = io.github.ratr2.repack.distortion.DistortionAPI.canShowScreenEffects(player)
+
+    /** Whether the player's client has loaded Repack's pack. */
+    @JvmStatic
+    fun hasPack(player: org.bukkit.entity.Player): Boolean = onMain(false) { it.sender.hasLoaded(player) }
+
     @JvmStatic
     fun skyboxIds(): List<String> = onMain(emptyList()) { api -> api.skyboxes?.definitions?.map { it.id }.orEmpty() }
 
@@ -206,6 +275,7 @@ object RepackAPI {
      * offset is measured from. Registering an id again replaces the rule and keeps its marker. Takes effect at the next build and push.
      * Ids should start with the plugin's name (`ethereal:mana`), and a plugin should call [unregisterTextRules] when it disables.
      */
+    @JvmStatic
     @JvmOverloads
     fun registerTextRule(
         id: String, anchor: TextRules.Anchor, offsetX: Double, offsetY: Double,
@@ -215,14 +285,18 @@ object RepackAPI {
         TextRules.register(id, anchor, offsetX, offsetY, source, sourceX, sourceY, scale, color)?.let { net.kyori.adventure.text.format.TextColor.color(it.marker) }
 
     /** Removes a text rule. Text still drawn in its marker shows the marker color after the next build. */
+    @JvmStatic
     fun unregisterTextRule(id: String): Boolean = TextRules.unregister(id)
 
     /** Removes every text rule whose id starts with [prefix], such as `ethereal:`. Returns how many. */
+    @JvmStatic
     fun unregisterTextRules(prefix: String): Int = TextRules.unregisterAll(prefix)
 
     /** The marker color of a registered text rule, or null. */
+    @JvmStatic
     fun textRuleMarker(id: String): net.kyori.adventure.text.format.TextColor? = TextRules.markerOf(id)?.let { net.kyori.adventure.text.format.TextColor.color(it) }
 
     /** The ids of all registered text rules. */
+    @JvmStatic
     fun textRuleIds(): List<String> = TextRules.all().map { it.id }
 }
