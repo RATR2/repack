@@ -17,6 +17,7 @@ import io.papermc.paper.command.brigadier.argument.ArgumentTypes
 import io.papermc.paper.command.brigadier.argument.resolvers.BlockPositionResolver
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.event.ClickEvent
 import net.kyori.adventure.text.format.NamedTextColor
 import org.bukkit.Location
 import org.bukkit.entity.Player
@@ -137,12 +138,147 @@ class RepackCommand(private val plugin: Repack) {
                 .then(Commands.literal("host").executes { reload(it, blocks = false, config = false, host = true) })
                 .then(Commands.literal("all").executes { reloadPack(it, config = true, host = true) })
         )
+        .then(noticesTree())
+        .then(devTree())
+        .then(uploadTree())
+        .then(testTree())
         .then(skyboxTree())
         .then(guiTree())
         .then(io.github.ratr2.repack.distortion.DistortionCommand(plugin).shakeTree())
         .then(io.github.ratr2.repack.distortion.DistortionCommand(plugin).impactTree())
         .then(io.github.ratr2.repack.distortion.DistortionCommand(plugin).tree("distortion"))
         .build()
+
+    /**
+     * `/repack notices` lists the notices and which are on for you; `on` and `off` switch all of them, and `<notice> [on|off]` one. Anyone can use it. The
+     * server's own switches are `client-notices` and `notices.<id>` in config.yml.
+     */
+    private fun noticesTree() = Commands.literal("notices")
+        .executes { notices(it, null, null) }
+        .then(Commands.literal("on").executes { notices(it, null, true) })
+        .then(Commands.literal("off").executes { notices(it, null, false) })
+        .then(
+            Commands.argument("notice", StringArgumentType.word())
+                .suggests { _, builder ->
+                    plugin.notices.all.map { it.id }.filter { it.startsWith(builder.remainingLowerCase) }.forEach(builder::suggest)
+                    builder.buildFuture()
+                }
+                .executes { notices(it, StringArgumentType.getString(it, "notice"), null) }
+                .then(Commands.literal("on").executes { notices(it, StringArgumentType.getString(it, "notice"), true) })
+                .then(Commands.literal("off").executes { notices(it, StringArgumentType.getString(it, "notice"), false) })
+        )
+
+    private fun notices(context: CommandContext<CommandSourceStack>, id: String?, enable: Boolean?): Int {
+        val player = context.source.sender as? Player
+        if (player == null) {
+            reply(context, "Notices are a setting of each player. The server's own switches are client-notices and notices.<id> in config.yml.", NamedTextColor.RED)
+            return 0
+        }
+        val notices = plugin.notices
+        val notice = id?.let { notices.get(it) }
+        if (id != null && notice == null) {
+            reply(context, "There is no notice '$id'. The notices are ${notices.all.joinToString { it.id }}.", NamedTextColor.RED)
+            return 0
+        }
+        if (id == null && enable == null) {
+            // The list: every notice with whether it reaches you.
+            val master = plugin.players.bool(player.uniqueId, PlayerSettings.NOTICES)
+            reply(context, "Notices are ${if (master) "on" else "off"} for you (/repack notices on|off). Each one has its own switch: /repack notices <notice> on|off.", NamedTextColor.YELLOW)
+            for (each in notices.all) {
+                val mine = plugin.players.bool(player.uniqueId, "notice-${each.id}")
+                val server = notices.serverAllows(each)
+                reply(context, "  ${each.id}: ${if (mine) "on" else "off"}${if (!server) " (the server has it off)" else ""}, ${each.note.replaceFirstChar { it.lowercase() }}", if (mine && server) NamedTextColor.GREEN else NamedTextColor.GRAY)
+            }
+            return Command.SINGLE_SUCCESS
+        }
+        val now = enable ?: !(if (notice == null) plugin.players.bool(player.uniqueId, PlayerSettings.NOTICES) else plugin.players.bool(player.uniqueId, "notice-${notice.id}"))
+        notices.set(player.uniqueId, notice, now)
+        val what = notice?.let { "The ${it.label.lowercase()} notice is" } ?: "Notices are"
+        reply(context, "$what ${if (now) "on" else "off"}. ${if (notice == null && !now) "Repack will not chat you any of its notices." else ""}".trim(), NamedTextColor.GREEN)
+        return Command.SINGLE_SUCCESS
+    }
+
+    private fun devTree() = admin("devmode")
+        .executes { devmode(it, null) }
+        .then(Commands.literal("on").executes { devmode(it, true) })
+        .then(Commands.literal("off").executes { devmode(it, false) })
+
+    private fun devmode(context: CommandContext<CommandSourceStack>, enable: Boolean?): Int {
+        val player = context.source.sender as? Player
+        if (player == null) {
+            reply(context, "Dev mode is for players: it gives links for the uploader.", NamedTextColor.RED)
+            return 0
+        }
+        val on = enable ?: !plugin.devMode.isOn(player)
+        val problem = plugin.devMode.set(player, on)
+        if (problem != null) {
+            reply(context, problem, NamedTextColor.RED)
+            return 0
+        }
+        reply(
+            context,
+            if (on) "Dev mode is on. /repack upload <${io.github.ratr2.repack.dev.UploadKind.entries.joinToString("|") { it.id }}> gives a link, /repack test tries a change on you only. It stays on until you turn it off or leave the server."
+            else "Dev mode is off. Your upload links stopped working.",
+            NamedTextColor.GREEN,
+        )
+        return Command.SINGLE_SUCCESS
+    }
+
+    private fun uploadTree() = admin("upload")
+        .executes { upload(it, null) }
+        .then(
+            Commands.argument("kind", StringArgumentType.word())
+                .suggests { _, builder ->
+                    io.github.ratr2.repack.dev.UploadKind.entries.map { it.id }.filter { it.startsWith(builder.remainingLowerCase) }.forEach(builder::suggest)
+                    builder.buildFuture()
+                }
+                .executes { upload(it, StringArgumentType.getString(it, "kind")) }
+        )
+
+    private fun upload(context: CommandContext<CommandSourceStack>, id: String?): Int {
+        val player = context.source.sender as? Player
+        if (player == null) {
+            reply(context, "Upload links are for players in dev mode.", NamedTextColor.RED)
+            return 0
+        }
+        if (!plugin.devMode.isOn(player)) {
+            reply(context, "Turn dev mode on first: /repack devmode.", NamedTextColor.RED)
+            return 0
+        }
+        val kind = io.github.ratr2.repack.dev.UploadKind.of(id)
+        if (kind == null) {
+            reply(context, "What to upload: " + io.github.ratr2.repack.dev.UploadKind.entries.joinToString("; ") { "${it.id} (.${it.extension}, ${it.label})" } + ". /repack upload <kind> gives a link for that kind only.", NamedTextColor.YELLOW)
+            return Command.SINGLE_SUCCESS
+        }
+        val url = plugin.devMode.linkFor(player, kind) ?: return 0
+        player.sendMessage(
+            Component.text("Upload ${kind.label} (.${kind.extension} only): ", NamedTextColor.GREEN)
+                .append(Component.text("[open the upload page]", NamedTextColor.AQUA).clickEvent(ClickEvent.openUrl(url)))
+                .append(Component.text(" The link works for you only, for this kind of file, while dev mode is on.", NamedTextColor.GRAY)),
+        )
+        if (url.contains("localhost")) reply(context, "The link points at localhost, which only works on the machine the server runs on. Set resource-pack.public-host to the server's address.", NamedTextColor.YELLOW)
+        return Command.SINGLE_SUCCESS
+    }
+
+    private fun testTree() = admin("test")
+        .executes { devTest(it, "test") }
+        .then(Commands.literal("revert").executes { devTest(it, "revert") })
+        .then(Commands.literal("push").executes { devTest(it, "push") })
+
+    /** The tests of a change: build and send the pack to this player only, put the published pack back, or send the new one to everyone. */
+    private fun devTest(context: CommandContext<CommandSourceStack>, what: String): Int {
+        val player = context.source.sender as? Player
+        if (player == null) {
+            reply(context, "Test is for players: it sends the pack to you only.", NamedTextColor.RED)
+            return 0
+        }
+        when (what) {
+            "revert" -> io.github.ratr2.repack.gui.EffectTest.revert(plugin.gui, player)
+            "push" -> io.github.ratr2.repack.gui.EffectTest.push(plugin.gui, player)
+            else -> io.github.ratr2.repack.gui.EffectTest.run(plugin.gui, player)
+        }
+        return Command.SINGLE_SUCCESS
+    }
 
     private fun admin(name: String) = Commands.literal(name).requires { it.sender.hasPermission(ADMIN) }
 

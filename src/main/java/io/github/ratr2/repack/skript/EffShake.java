@@ -52,7 +52,7 @@ public class EffShake extends Effect {
         for (Player player : players.getArray(event)) {
             if (strength == null) {
                 RepackAPI.stopShake(player);
-            } else if (s != null && t != null && t.intValue() > 0) {
+            } else if (s != null && t != null && t.intValue() > 0 && Double.isFinite(s.doubleValue()) && Double.isFinite(r) && Double.isFinite(b) && Double.isFinite(l)) {
                 RepackAPI.shake(player, s.doubleValue(), t.intValue(), r, b, l);
             }
         }

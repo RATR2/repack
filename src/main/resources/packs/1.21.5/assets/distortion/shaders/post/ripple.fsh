@@ -98,7 +98,7 @@ void main() {
             vec2 toCenter = (texCoord - ripple.center) * aspect;
             float dist = length(toCenter);
             float thickness = max(Width * ripple.screenPerBlock, 0.0001);
-            float ring = exp(-pow((dist - ripple.radius) / thickness, 2.0)) * ripple.strength;
+            float ring = exp(-(((dist - ripple.radius) / thickness) * ((dist - ripple.radius) / thickness))) * ripple.strength;
             if (dist > 0.0001) {
                 offset += toCenter / dist * ring * Strength * ripple.screenPerBlock;
             }

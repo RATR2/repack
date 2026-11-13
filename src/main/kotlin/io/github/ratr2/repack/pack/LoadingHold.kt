@@ -33,6 +33,10 @@ class LoadingHold(private val plugin: Repack) : Listener {
 
     private class Held(val invulnerable: Boolean, val allowFlight: Boolean, val gravity: Boolean, val hidden: MutableSet<UUID> = HashSet())
 
+    // What a player was before the hold, saved in their own data while it lasts: the hold makes them invulnerable, able to fly and weightless, and a server that stops
+    // during it would save that with them for good. Packed in a byte: 1 invulnerable, 2 may fly, 4 has gravity.
+    private val savedKey = org.bukkit.NamespacedKey(plugin, "hold-before")
+
     private val held = HashMap<UUID, Held>()
     private val timers = HashMap<UUID, BukkitTask>()
     private val lastHeld = HashMap<UUID, Long>()
@@ -46,8 +50,13 @@ class LoadingHold(private val plugin: Repack) : Listener {
         val now = System.currentTimeMillis()
         if (playerId in held || now - (lastHeld[playerId] ?: 0L) < COOLDOWN_MILLIS) return
         lastHeld[playerId] = now
-        val state = Held(player.isInvulnerable, player.allowFlight, player.hasGravity())
+        // A player in login limbo is invulnerable because of limbo: what they were before it is what to give back.
+        val state = Held(plugin.limboOriginalInvulnerable(player) ?: player.isInvulnerable, player.allowFlight, player.hasGravity())
         held[playerId] = state
+        player.persistentDataContainer.set(
+            savedKey, org.bukkit.persistence.PersistentDataType.BYTE,
+            ((if (state.invulnerable) 1 else 0) or (if (state.allowFlight) 2 else 0) or (if (state.gravity) 4 else 0)).toByte(),
+        )
 
         player.isInvulnerable = true
         // Held in the air: no falling, and allowed to hover so the server's flying check does not kick them while their client is frozen.
@@ -64,6 +73,7 @@ class LoadingHold(private val plugin: Repack) : Listener {
         timers.remove(playerId)?.cancel()
         val state = held.remove(playerId) ?: return
         val player = plugin.server.getPlayer(playerId) ?: return
+        player.persistentDataContainer.remove(savedKey)
         screen.hide(player)
         for (entityId in state.hidden) plugin.server.getEntity(entityId)?.let { player.showEntity(plugin, it) }
         plugin.displays()?.showAllFor(player)
@@ -93,6 +103,20 @@ class LoadingHold(private val plugin: Repack) : Listener {
         for ((playerId, state) in held) {
             val player = plugin.server.getPlayer(playerId) ?: continue
             if (player.world == event.entity.world) hide(player, state, event.entity)
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    fun onJoinRestore(event: PlayerJoinEvent) {
+        val player = event.player
+        // A hold that never ended (the server stopped during it): the player gets back what they had.
+        val saved = player.persistentDataContainer.get(savedKey, org.bukkit.persistence.PersistentDataType.BYTE)?.toInt() ?: return
+        player.persistentDataContainer.remove(savedKey)
+        player.isInvulnerable = saved and 1 != 0
+        player.setGravity(saved and 4 != 0)
+        if (saved and 2 == 0) {
+            player.isFlying = false
+            player.allowFlight = false
         }
     }
 

@@ -49,37 +49,44 @@ public class EffGui extends Effect {
     protected void execute(Event event) {
         GuiManager manager = GuiScript.manager();
         if (manager == null) return;
+        // What the effect works on is read here, on the thread the script runs on; the inventories are touched on the main thread (an async chat event cannot open one).
+        Runnable task = null;
         switch (pattern) {
             case 0 -> {
                 LiveGui gui = (LiveGui) first.getSingle(event);
-                if (gui != null) for (Player player : (Player[]) second.getArray(event)) manager.open(player, gui, true);
+                Player[] players = (Player[]) second.getArray(event);
+                if (gui != null) task = () -> { for (Player player : players) manager.open(player, gui, true); };
             }
             case 1 -> {
-                for (Player player : (Player[]) first.getArray(event)) manager.close(player);
+                Player[] players = (Player[]) first.getArray(event);
+                task = () -> { for (Player player : players) manager.close(player); };
             }
             case 2 -> {
-                for (Player player : (Player[]) first.getArray(event)) {
-                    if (resume) manager.resume(player); else manager.pause(player);
-                }
+                Player[] players = (Player[]) first.getArray(event);
+                boolean resuming = resume;
+                task = () -> { for (Player player : players) { if (resuming) manager.resume(player); else manager.pause(player); } };
             }
             case 3 -> {
                 LiveGui gui = (LiveGui) first.getSingle(event);
-                if (gui != null) gui.refresh();
+                if (gui != null) task = gui::refresh;
             }
             case 4, 5 -> {
                 Expression<?> guiExpr = pattern == 4 ? second : first;
                 LiveGui gui = guiExpr != null ? (LiveGui) guiExpr.getSingle(event) : GuiScript.current(event);
                 if (gui == null) return;
                 if (pattern == 5) {
-                    gui.unmakeAll();
+                    task = gui::unmakeAll;
                 } else {
-                    for (SlotKey key : GuiScript.keys(first.getArray(event))) gui.unmakeSlot(key);
+                    java.util.List<SlotKey> keys = new java.util.ArrayList<>();
+                    for (SlotKey key : GuiScript.keys(first.getArray(event))) keys.add(key);
+                    task = () -> { for (SlotKey key : keys) gui.unmakeSlot(key); };
                 }
             }
             default -> {
                 if (event instanceof GuiCloseEvent close) close.setCancelled(!uncancel);
             }
         }
+        if (task != null) io.github.ratr2.repack.RepackAPI.onMainThread(task);
     }
 
     @Override

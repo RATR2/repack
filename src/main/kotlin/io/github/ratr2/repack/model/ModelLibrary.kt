@@ -36,6 +36,10 @@ object ModelLibrary {
         for ((index, source) in sources.withIndex()) {
             onProgress(index, sources.size)
             val id = idOf(source)
+            if (id.isEmpty()) {
+                errors += "${source.name}: the file has no name before .bbmodel, so it has no id."
+                continue
+            }
             if (id in models) {
                 errors += "${source.name}: another file already uses the id '$id'."
                 continue
@@ -57,6 +61,8 @@ object ModelLibrary {
                 }
                 for ((variant, result) in converted.files) files.getValue(variant) += result
                 models += id
+            } catch (e: java.io.IOException) {
+                errors += "${source.name}: the file could not be read (${e.message})."
             } catch (e: BbParseException) {
                 errors += "${source.name}: ${e.message}"
             } catch (e: RuntimeException) {

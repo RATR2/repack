@@ -21,6 +21,11 @@ class BlockEditor(
 
     private fun fileOf(id: String) = File(plugin.blocksFolder, "$id.yml")
 
+    // When each block's file was last changed as far as an open draft knows: a draft saved over a file that changed since would put the old values back, so it is refused.
+    private val seen = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    private fun stamp(id: String) = fileOf(id).let { if (it.isFile) it.lastModified() else 0L }
+
     fun open(id: String): Draft? {
         if (!idPattern.matches(id)) return null
         val file = fileOf(id)
@@ -29,6 +34,7 @@ class BlockEditor(
             id in plugin.blocks.types -> YamlConfiguration().apply { loadFromString(BlockTemplate.render(id)) }
             else -> return null
         }
+        seen[id] = stamp(id)
         return Draft(id, yaml, materials, ::write)
     }
 
@@ -39,6 +45,7 @@ class BlockEditor(
         if (cleaned !in ModelLibrary.ids(plugin.modelsFolder)) return Result.failure(IllegalArgumentException("There is no model file '$cleaned.bbmodel'."))
         val yaml = YamlConfiguration().apply { loadFromString(BlockTemplate.render(id)) }
         yaml.set("model", cleaned)
+        seen[id] = 0L
         return Result.success(Draft(id, yaml, materials, ::write))
     }
 
@@ -49,7 +56,9 @@ class BlockEditor(
     fun delete(id: String): String? {
         if (!idPattern.matches(id) || id !in plugin.blocks.types) return "There is no block '$id'."
         val model = plugin.blocks.definitionOf(id)?.model ?: id
-        val others = plugin.blocks.definitions.values.any { it.id != id && it.model == model }
+        // A model is also in use when another block shows it as its item, or a custom item does.
+        val others = plugin.blocks.definitions.values.any { it.id != id && (it.model == model || it.item.model == model) } ||
+            plugin.customItems.definitions.values.any { it.model == model }
         val modelFiles = plugin.modelsFolder.listFiles { f -> f.isFile && f.extension.equals("bbmodel", ignoreCase = true) && ModelLibrary.idOf(f) == model }.orEmpty()
         if (others && id == model && plugin.config.getBoolean("auto-blocks", false)) {
             return "Other blocks show the model '$model', so '$id' would be made again. Delete those first, or turn off auto-blocks."
@@ -67,13 +76,16 @@ class BlockEditor(
 
     private fun write(id: String, yaml: YamlConfiguration): String? {
         val file = fileOf(id)
+        if (seen[id] != null && seen[id] != stamp(id)) return "${file.name} changed since you opened it, so saving would put the old values back. Throw away your changes and open the block again."
         return try {
             file.parentFile.mkdirs()
             val temp = File(file.parentFile, "${file.name}.tmp")
             temp.writeText(ConfigMigrator.withVersion(yaml, BlockTemplate.version).saveToString())
             Files.move(temp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            seen[id] = stamp(id)
             reload(id)
         } catch (e: java.io.IOException) {
+            runCatching { File(file.parentFile, "${file.name}.tmp").delete() }
             "Could not write ${file.name}: ${e.message}"
         }
     }

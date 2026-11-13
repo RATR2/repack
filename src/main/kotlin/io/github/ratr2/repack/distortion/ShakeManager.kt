@@ -45,8 +45,11 @@ class ShakeManager(private val plugin: Repack, private val pack: PackSender) : L
         val running = active[player.uniqueId]
         if (running != null) {
             if (shake.strength >= running.shake.at(now - running.shake.start)) {
-                running.shake = shake
-                running.lastStrength = -1.0
+                // Rate, balance and roll travel in the text color, which is only set when the marker is made: a new shake gets a marker of its own.
+                ScreenMarker.destroy(player, running.entityId)
+                val fresh = Marker(ScreenMarker.newId(), shake)
+                active[player.uniqueId] = fresh
+                spawn(player, fresh)
             }
             return true
         }

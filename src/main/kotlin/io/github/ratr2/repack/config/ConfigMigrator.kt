@@ -50,7 +50,10 @@ object ConfigMigrator {
         val backup = File(folder, "${file.name}.bak-${(found ?: "unversioned").replace(Regex("[^A-Za-z0-9._-]"), "_").take(40)}")
         if (changed && !backup.exists()) file.copyTo(backup)
         if (changed && backups != null) prune(folder, file.name)
-        withVersion(yaml, current).save(file)
+        // Through a temporary file and a move, so a crash while writing cannot leave half a config; the backup above is kept when the file for this version already had one.
+        val temp = File(file.parentFile, "${file.name}.tmp")
+        withVersion(yaml, current).save(temp)
+        java.nio.file.Files.move(temp.toPath(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
         return if (changed) "${file.name}: updated to version $current (the old file is kept as ${if (backups != null) "${backups.name}/" else ""}${backup.name})." else null
     }
 

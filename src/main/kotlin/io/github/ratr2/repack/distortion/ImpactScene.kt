@@ -69,6 +69,9 @@ class ImpactScene(val name: String) {
     companion object {
         /** Ahead of the origin when a file says nothing: far enough to be in front of the camera. */
         const val DEFAULT_FORWARD = 8.0
+
+        /** The most a scene file's offset or angle can be: past it a value is a mistake, and an infinite or NaN one would reach the client's glyph scale. */
+        const val MAX_OFFSET = 1.0e6
     }
 }
 
@@ -87,6 +90,54 @@ object ImpactScenes {
 
     fun remove(name: String): Boolean = scenes.remove(name.lowercase()) != null
 
+    /** Reads one scene file without adding it to the scenes: the scene, and what is wrong with it. */
+    fun parse(file: File): Pair<ImpactScene, List<String>> {
+        val errors = ArrayList<String>()
+        val scene = ImpactScene(file.nameWithoutExtension.lowercase())
+        val yaml = try {
+            YamlConfiguration().apply { load(file) }
+        } catch (e: org.bukkit.configuration.InvalidConfigurationException) {
+            return scene to listOf("impacts/${file.name}: ${e.message?.lineSequence()?.firstOrNull()}")
+        } catch (e: java.io.IOException) {
+            return scene to listOf("impacts/${file.name}: ${e.message}")
+        }
+        scene.ticks = yaml.getInt("ticks", 4).coerceIn(1, ImpactManager.MAX_TICKS)
+        // The color is read as the text it is: YAML takes 001122 for an octal number and 000000 for 0, so a color that is not in quotes is told to be.
+        val given = yaml.get("color")
+        if (given != null) {
+            // Digits that are not in quotes come out of YAML as a number (001122 as an octal one), so the six digits are taken from the line itself.
+            val written = Regex("(?m)^color:\\s*[\"']?#?([0-9a-fA-F]{6})[\"']?\\s*(?:#.*)?$").find(file.readText())?.groupValues?.get(1)
+            val parsed = (written ?: (given as? String)?.removePrefix("#")?.trim()?.takeIf { it.length == 6 })?.toIntOrNull(16)
+            if (parsed == null) errors += "impacts/${file.name}: color must be 6 hex digits, like ff2030, not '$given'."
+            else scene.rgb = parsed
+        }
+        for ((index, raw) in yaml.getMapList("focus").withIndex()) {
+            val where = "impacts/${file.name} focus ${index + 1}"
+            val type = ImpactManager.Type.of(raw["type"]?.toString())
+            if (type == null) {
+                errors += "$where: the type is one of ${ImpactManager.Type.entries.joinToString { it.id }}."
+                continue
+            }
+            fun number(key: String, fallback: Double) = (raw[key] as? Number)?.toDouble() ?: raw[key]?.toString()?.toDoubleOrNull() ?: fallback
+            val bad = listOf("right", "up", "forward", "angle").firstOrNull { raw.containsKey(it) && number(it, 0.0).let { v -> !v.isFinite() || Math.abs(v) > ImpactScene.MAX_OFFSET } }
+            if (bad != null) {
+                errors += "$where: $bad must be a number between -${ImpactScene.MAX_OFFSET.toInt()} and ${ImpactScene.MAX_OFFSET.toInt()}."
+                continue
+            }
+            val size = number("size", 4.0)
+            if (!size.isFinite() || size < ImpactManager.MIN_SIZE || size > ImpactManager.MAX_SIZE) {
+                errors += "$where: size is ${ImpactManager.MIN_SIZE} to ${ImpactManager.MAX_SIZE} blocks."
+                continue
+            }
+            scene.entries += ImpactScene.Entry(
+                type, size, null, number("right", 0.0), number("up", 0.0), number("forward", ImpactScene.DEFAULT_FORWARD),
+                screenAngle = if (raw.containsKey("angle")) number("angle", 0.0) else null,
+            )
+        }
+        if (scene.entries.isEmpty()) errors += "impacts/${file.name}: no usable focus point."
+        return scene to errors
+    }
+
     /** Reads `<name>.yml` of a folder, replacing the scenes that came from files before. Returns what is wrong with a file; the rest still load. */
     @Synchronized
     fun load(folder: File): List<String> {
@@ -94,32 +145,10 @@ object ImpactScenes {
         fromFiles.clear()
         val errors = ArrayList<String>()
         for (file in folder.listFiles { f -> f.isFile && f.extension == "yml" && !f.name.startsWith("_") }.orEmpty().sortedBy { it.name }) {
-            val name = file.nameWithoutExtension.lowercase()
-            val yaml = YamlConfiguration.loadConfiguration(file)
-            val scene = ImpactScene(name)
-            scene.ticks = yaml.getInt("ticks", 4).coerceIn(1, ImpactManager.MAX_TICKS)
-            scene.rgb = yaml.getString("color")?.removePrefix("#")?.takeIf { it.length == 6 }?.toIntOrNull(16) ?: 0xFFFFFF
-            for ((index, raw) in yaml.getMapList("focus").withIndex()) {
-                val where = "impacts/${file.name} focus ${index + 1}"
-                val type = ImpactManager.Type.of(raw["type"]?.toString())
-                if (type == null) {
-                    errors += "$where: the type is one of ${ImpactManager.Type.entries.joinToString { it.id }}."
-                    continue
-                }
-                fun number(key: String, fallback: Double) = (raw[key] as? Number)?.toDouble() ?: raw[key]?.toString()?.toDoubleOrNull() ?: fallback
-                val size = number("size", 4.0)
-                if (!size.isFinite() || size < ImpactManager.MIN_SIZE || size > ImpactManager.MAX_SIZE) {
-                    errors += "$where: size is ${ImpactManager.MIN_SIZE} to ${ImpactManager.MAX_SIZE} blocks."
-                    continue
-                }
-                scene.entries += ImpactScene.Entry(
-                    type, size, null, number("right", 0.0), number("up", 0.0), number("forward", ImpactScene.DEFAULT_FORWARD),
-                    screenAngle = if (raw.containsKey("angle")) number("angle", 0.0) else null,
-                )
-            }
-            if (scene.entries.isEmpty()) errors += "impacts/${file.name}: no usable focus point."
-            scenes[name] = scene
-            fromFiles += name
+            val (scene, problems) = parse(file)
+            errors += problems
+            scenes[scene.name] = scene
+            fromFiles += scene.name
         }
         return errors
     }

@@ -201,7 +201,8 @@ class GuiManager(val plugin: Repack) : Listener {
     fun text(player: Player?, text: String, context: Map<String, String> = emptyMap()): String {
         var out = text
         if ('{' in out) {
-            if (player != null) out = out.replace("{player}", player.name).replace("{uuid}", player.uniqueId.toString())
+            // With no player (a shared GUI, shown to everyone) there is no name to put in.
+            out = if (player != null) out.replace("{player}", player.name).replace("{uuid}", player.uniqueId.toString()) else out.replace("{player}", "").replace("{uuid}", "")
             for ((key, value) in context) out = out.replace("{$key}", value)
         }
         val api = placeholders

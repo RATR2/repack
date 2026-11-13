@@ -70,6 +70,16 @@ class Repack : JavaPlugin() {
     lateinit var host: SharedHost
         private set
 
+    lateinit var devMode: io.github.ratr2.repack.dev.DevMode
+
+    lateinit var limbo: io.github.ratr2.repack.pack.LoginLimbo
+
+    /** What a player in login limbo was before it (limbo makes them invulnerable), or null when they are not in limbo. */
+    fun limboOriginalInvulnerable(player: org.bukkit.entity.Player): Boolean? = if (::limbo.isInitialized) limbo.originalInvulnerable(player) else null
+
+    /** Whether the loading hold (the freeze while a pack loads) has the player. */
+    fun isLoadingHeld(player: org.bukkit.entity.Player): Boolean = ::hold.isInitialized && hold.isHeld(player)
+
     var sending: Boolean = true
         private set
 
@@ -96,6 +106,15 @@ class Repack : JavaPlugin() {
     var impacts: io.github.ratr2.repack.distortion.ImpactManager? = null
         private set
     val players: PlayerSettings by lazy { PlayerSettings(this) }
+
+    /** The chat notices to players, with their switches; see [Notices]. */
+    val notices: Notices by lazy {
+        Notices(object : NoticeSettings {
+            override fun server(key: String, default: Boolean) = config.getBoolean(key, default)
+            override fun player(player: java.util.UUID, key: String) = players.bool(player, key)
+            override fun setPlayer(player: java.util.UUID, key: String, value: Boolean) = players.set(player, key, value)
+        })
+    }
     lateinit var display: DisplayManager
         private set
 
@@ -116,11 +135,15 @@ class Repack : JavaPlugin() {
         sender = PackSender(this, store, host, versions, hold, sending)
         if (versions.hasViaBackwards) logger.warning("ViaBackwards found: clients older than 1.21.4 will not be able to see Repack blocks.")
         server.pluginManager.registerEvents(sender, this)
+        limbo = io.github.ratr2.repack.pack.LoginLimbo(this) { sender.willSend(it) }
+        server.pluginManager.registerEvents(limbo, this)
         server.pluginManager.registerEvents(hold, this)
         startRipples()
         startSkyboxes()
         serverVersionNotice()
         io.github.ratr2.repack.text.Colors.effects = TextEffects.rules(config.getConfigurationSection("text-effects")).first.associate { it.name to it.triggerHex }
+        devMode = io.github.ratr2.repack.dev.DevMode(this)
+        server.pluginManager.registerEvents(devMode, this)
         gui = Gui(this)
         server.pluginManager.registerEvents(gui, this)
         guis = io.github.ratr2.repack.menu.GuiManager(this)
@@ -182,6 +205,15 @@ class Repack : JavaPlugin() {
         if (::guis.isInitialized) guis.stop()
         recipeKeys.values.forEach { server.removeRecipe(it) }
         if (::hold.isInitialized) hold.endAll()
+        if (::devMode.isInitialized) devMode.stop()
+        if (::limbo.isInitialized) limbo.releaseAll()
+        // Screens that are open when the plugin stops would stay on the players' screens with nothing behind them, and their button items could be taken.
+        server.onlinePlayers.forEach { player ->
+            val holder = player.openInventory.topInventory.holder
+            if (holder is io.github.ratr2.repack.gui.Screen || holder is io.github.ratr2.repack.menu.LiveGui) runCatching { player.closeInventory() }
+        }
+        // The block models are packets only, so they would stay on the clients' screens after a reload, with a second copy shown on top by the next start.
+        if (::display.isInitialized) server.onlinePlayers.forEach { runCatching { display.hideAllFor(it) } }
         if (::host.isInitialized) host.stop()
     }
 
@@ -304,12 +336,18 @@ class Repack : JavaPlugin() {
     private val registeredItems = LinkedHashMap<String, io.github.ratr2.repack.item.ItemDefinition>()
     private val unregisteredItems = HashSet<String>()
 
-    fun reloadItems(): List<String> {
+    /**
+     * Reads the item files again. Items registered or unregistered at run time (Skript, the API) are dropped by a full reload, which is what undoes them, but kept
+     * when only some files changed ([clearRuntime] false): a file watcher refresh or a saved block must not make them vanish.
+     */
+    fun reloadItems(clearRuntime: Boolean = true): List<String> {
         val loaded = io.github.ratr2.repack.item.ItemDefinitions.load(itemsFolder, ModelLibrary.ids(modelsFolder))
         loaded.errors.forEach { logger.severe(it) }
         fileItems = loaded.definitions
-        registeredItems.clear()
-        unregisteredItems.clear()
+        if (clearRuntime) {
+            registeredItems.clear()
+            unregisteredItems.clear()
+        }
         applyItems()
         return loaded.errors
     }
@@ -346,8 +384,11 @@ class Repack : JavaPlugin() {
         return true
     }
 
-    fun stackFor(id: String, amount: Int = 1): ItemStack? =
-        blocks.definitionOf(id)?.let { items.create(it, amount) } ?: customItems.definitionOf(id)?.let { customItems.create(it, amount) }
+    fun stackFor(id: String, amount: Int = 1): ItemStack? {
+        // A stack is 1 to 99 items: a script asking for a million would make one that cannot be saved, and a zero or negative one an empty stack.
+        val count = amount.coerceIn(1, MAX_STACK)
+        return blocks.definitionOf(id)?.let { items.create(it, count) } ?: customItems.definitionOf(id)?.let { customItems.create(it, count) }
+    }
 
     fun giveIds(): List<String> = (blocks.types.sorted() + customItems.ids.sorted()).distinct()
 
@@ -383,7 +424,7 @@ class Repack : JavaPlugin() {
     }
 
     fun reloadDefinitions(only: Set<String>? = null): List<String> {
-        val itemErrors = reloadItems()
+        val itemErrors = reloadItems(clearRuntime = only == null)
         migrateBlockFiles()
         createMissingBlockFiles()
         val loaded = BlockDefinitions.load(blocksFolder, ModelLibrary.ids(modelsFolder), only, modelsInUse(), config.getBoolean("auto-blocks", false))
@@ -457,7 +498,11 @@ class Repack : JavaPlugin() {
         if (!ID.matches(id)) return "Block ids use only a-z, 0-9, _ and -."
         if (model !in ModelLibrary.ids(modelsFolder)) return "There is no model file '$model.bbmodel'."
         if (id in blocks.definitions) return "A block with the id '$id' already exists."
-        registered[id] = BlockDefinitions.parse(id, YamlConfiguration().apply { set("model", model) })
+        registered[id] = try {
+            BlockDefinitions.parse(id, YamlConfiguration().apply { set("model", model) })
+        } catch (e: io.github.ratr2.repack.block.DefinitionException) {
+            return e.message ?: "The block could not be made."
+        }
         unregistered.remove(id)
         applyDefinitions()
         return null
@@ -497,6 +542,11 @@ class Repack : JavaPlugin() {
     /** A file changed and the pack is rebuilt once no more changes come in, so saving a model several times builds it once. */
     private var pendingBuild = false
 
+    /** Asks for a rebuild like a changed file does: soon, and once for several requests in a row. Nothing happens when workflow.build-on-change is off. */
+    fun requestBuild() {
+        if (config.getBoolean("workflow.build-on-change", true)) pendingBuild = true
+    }
+
     private fun watch() {
         if (refreshIfChanged() && config.getBoolean("workflow.build-on-change", true)) {
             pendingBuild = true
@@ -527,6 +577,9 @@ class Repack : JavaPlugin() {
         val itemWarnings = ArrayList<String>()
         // The jar's own time is part of the version, so a new build of the plugin never reads what an older one converted.
         val cache = ModelCache(File(dataFolder, "cache/models"), "${description.version}-${file.lastModified()}")
+        // The async build reads a copy of the config and the export folder, both taken here on the main thread: the config can change while the build runs.
+        val snap = org.bukkit.configuration.file.YamlConfiguration().apply { loadFromString(config.saveToString()) }
+        val exportTo = exportFolder()
         server.scheduler.runTaskAsynchronously(this, Runnable {
             var library: LibraryResult? = null
             var skies: io.github.ratr2.repack.sky.LoadedSkyboxes? = null
@@ -541,11 +594,11 @@ class Repack : JavaPlugin() {
                 }
                 // A model that failed to convert is missing from the pack, so a pack built around it could replace a working one.
                 if (library.errors.isEmpty() || force) {
-                    val (rules, ruleErrors) = TextEffects.rules(config.getConfigurationSection("text-effects"))
+                    val (rules, ruleErrors) = TextEffects.rules(snap.getConfigurationSection("text-effects"))
                     ruleErrors.forEach { logger.warning(it) }
                     val effects = TextEffects.snippet(rules)
                     val textRules = TextRules.snippet()
-                    val shaders = config.getBoolean("distortion.enabled", true) || effects != null || textRules != null
+                    val shaders = snap.getBoolean("distortion.enabled", true) || effects != null || textRules != null
                     val loadedGuis = io.github.ratr2.repack.menu.GuiLoader.load(guisFolder).also { guiFiles = it }
                     val gui = GuiPack.files() + io.github.ratr2.repack.menu.GuiBackgrounds.files(loadedGuis.definitions.values, guisFolder, guiPictureErrors) +
                         io.github.ratr2.repack.item.ItemAssets.files(itemsNow, itemsFolder, itemWarnings)
@@ -564,7 +617,7 @@ class Repack : JavaPlugin() {
                         files["pack.png"] = PackBuilder.icon()
                         PackBuilder.zip(files)
                     }
-                    if (exportFolder() != null) {
+                    if (exportTo != null) {
                         universal = PackBuilder.universal(library.files.getValue(PackVariant.LEGACY) + skyAssets, library.files.getValue(PackVariant.MODERN) + skyAssets, gui, eraShaders)
                     }
                 }
@@ -573,12 +626,12 @@ class Repack : JavaPlugin() {
             }
             var exported: String? = null
             if (zips != null) {
-                val folder = exportFolder()
+                val folder = exportTo
                 if (folder != null) {
-                    val main = PackExport.eraOf(config.getString("resource-pack.export-era").orEmpty()) ?: PackEra.newest
+                    val main = PackExport.eraOf(snap.getString("resource-pack.export-era").orEmpty()) ?: PackEra.newest
                     exported = try {
                         PackExport.write(folder, zips, main, universal)
-                    } catch (e: java.io.IOException) {
+                    } catch (e: Exception) {
                         logger.warning("The pack could not be written to $folder: ${e.message}")
                         null
                     }
@@ -587,6 +640,8 @@ class Repack : JavaPlugin() {
             server.scheduler.runTask(this, Runnable {
                 building = false
                 exportedTo = exported
+                // Whatever goes wrong from here (a full disk when a pack is stored, a file that cannot be read) must still end the build and tell the one who asked.
+                try { Runnable {
                 if (failure != null || library == null) {
                     progress.finish(false, "build failed")
                     logger.severe(failure ?: "The build failed.")
@@ -627,6 +682,11 @@ class Repack : JavaPlugin() {
                 for ((era, zip) in zips) entries[era] = store.add(era, zip)
                 progress.finish(true, "pack built")
                 done(BuildReport(entries, library.models, library.warnings, library.errors + definitionErrors))
+                }.run() } catch (e: Throwable) {
+                    logger.severe("The build failed after the packs were made: ${e.javaClass.simpleName}: ${e.message}")
+                    progress.finish(false, "build failed")
+                    done(BuildReport(emptyMap(), emptyList(), emptyList(), listOf("The build failed: ${e.javaClass.simpleName}: ${e.message}"), rejected = true))
+                }
             })
         })
     }
@@ -640,6 +700,8 @@ internal val CONFIG_MIGRATIONS = listOf(ConfigMigration { yaml ->
 })
 
 private const val WATCH_TICKS = 100L // 5 seconds
+
+private const val MAX_STACK = 99
 
 private const val PARSE_SHARE = 0.7f
 private const val ZIP_SHARE = 0.95f

@@ -28,7 +28,8 @@ public class EvtCustomBlockInteract extends SkriptEvent {
     }
 
     static boolean matches(@Nullable Literal<String> ids, String id) {
-        return ids == null || Arrays.asList(ids.getAll()).contains(id);
+        // Block ids are lower case, so `of "Table"` matches the block "table".
+        return ids == null || Arrays.stream(ids.getAll()).anyMatch(wanted -> wanted.equalsIgnoreCase(id));
     }
 
     @Override

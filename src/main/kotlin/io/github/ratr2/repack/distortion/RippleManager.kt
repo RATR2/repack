@@ -120,6 +120,7 @@ class RippleManager(private val plugin: Repack, private val pack: PackSender) : 
     @EventHandler
     fun onQuit(event: org.bukkit.event.player.PlayerQuitEvent) {
         toldAboutFabulous.remove(event.player.uniqueId)
+        debugging.remove(event.player.uniqueId)
     }
 
     @EventHandler

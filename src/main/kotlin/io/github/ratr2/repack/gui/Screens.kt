@@ -442,7 +442,8 @@ class RecipeScreen(gui: Gui, player: Player, private val id: String) : Screen(gu
 
     private val draft = gui.draftOf(player, id)!!
     private val grid: MutableList<ItemStack?> = draft.recipeGrid().toMutableList()
-    private var exactAll = false
+    // An exact recipe stays exact when only its amount or category is changed: it starts as it is in the file.
+    private var exactAll = draft.get("recipe.exact") != null && draft.get("recipe.ingredients") == null
     private var amount = draft.int("recipe.amount", 1)
     private val categories = listOf("none", "building", "redstone", "equipment", "misc")
 

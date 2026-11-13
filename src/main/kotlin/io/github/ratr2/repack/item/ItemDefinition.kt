@@ -70,6 +70,8 @@ object ItemDefinitions {
                 errors += "item $id: ${e.message}"
             } catch (e: InvalidConfigurationException) {
                 errors += "item $id: not valid YAML (${e.message?.lineSequence()?.firstOrNull()})"
+            } catch (e: java.io.IOException) {
+                errors += "item $id: ${e.message}"
             }
         }
         return LoadedItems(definitions, errors)
@@ -102,7 +104,12 @@ object ItemDefinitions {
         if (texture != null && model != null) throw DefinitionException("use either a model or a texture, not both.")
         if (texture != null && folder != null) {
             val file = File(folder, texture)
-            if (file.canonicalFile.parentFile != folder.canonicalFile) throw DefinitionException("texture must be a file in the items folder.")
+            val canonical = try {
+                file.canonicalFile
+            } catch (e: java.io.IOException) {
+                throw DefinitionException("texture '$texture' is not a valid file name.")
+            }
+            if (canonical.parentFile != folder.canonicalFile) throw DefinitionException("texture must be a file in the items folder.")
             if (!texture.endsWith(".png", ignoreCase = true)) throw DefinitionException("texture '$texture' must be a .png file.")
             if (!file.isFile) throw DefinitionException("texture '$texture' is not a file in the items folder.")
         }

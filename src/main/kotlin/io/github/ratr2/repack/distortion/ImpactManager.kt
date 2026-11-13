@@ -82,7 +82,8 @@ class ImpactManager(private val plugin: Repack, private val pack: PackSender) : 
     }
 
     private fun usable(player: Player, focus: Focus) =
-        focus.location.world == player.world && focus.size.isFinite() && focus.size >= MIN_SIZE && focus.location.x.isFinite() && focus.location.y.isFinite() && focus.location.z.isFinite()
+        focus.location.world == player.world && focus.size.isFinite() && focus.size >= MIN_SIZE && focus.location.x.isFinite() && focus.location.y.isFinite() && focus.location.z.isFinite() &&
+            (focus.screenAngle?.isFinite() ?: true) && (focus.direction?.let { it.x.isFinite() && it.y.isFinite() && it.z.isFinite() } ?: true)
 
     private fun addMarkers(player: Player, impact: Active, foci: List<Focus>): Int {
         var added = 0

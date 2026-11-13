@@ -24,7 +24,7 @@ public class EvtGuiAction extends SkriptEvent {
 
     @Override
     public boolean check(Event event) {
-        return event instanceof GuiActionEvent action && (names == null || Arrays.asList(names.getAll()).contains(action.getName()));
+        return event instanceof GuiActionEvent action && (names == null || Arrays.stream(names.getAll()).anyMatch(wanted -> wanted.equalsIgnoreCase(action.getName())));
     }
 
     @Override

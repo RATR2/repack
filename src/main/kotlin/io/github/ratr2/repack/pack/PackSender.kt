@@ -1,6 +1,7 @@
 package io.github.ratr2.repack.pack
 
 import io.github.ratr2.repack.ClientVersions
+import io.github.ratr2.repack.Notices
 import io.github.ratr2.repack.Repack
 import net.kyori.adventure.resource.ResourcePackInfo
 import net.kyori.adventure.resource.ResourcePackRequest
@@ -62,6 +63,13 @@ class PackSender(
     private fun packForJoin(variant: PackEra): PackEntry? =
         if (plugin.config.getBoolean("resource-pack.join-latest-build", true)) store.built[variant] ?: store.published[variant] else store.published[variant]
 
+    /** Whether a pack will be sent to this player when they join: Repack sends, their client can take it, and one is built for it. */
+    fun willSend(player: Player): Boolean {
+        if (!sending) return false
+        val variant = variantOf(player) ?: return false
+        return packForJoin(variant) != null
+    }
+
     fun send(players: Collection<Player>): Int {
         if (!sending || !store.hasPublished) return 0
         val online = players.filter { it.isOnline }
@@ -89,7 +97,7 @@ class PackSender(
     private fun sendNow(player: Player, chosen: PackEntry? = null) {
         val variant = variantOf(player)
         if (variant == null) {
-            notice(player, "Repack custom blocks are not available on your client version: they need Minecraft 1.21.4 or newer.")
+            plugin.notices.send(player, Notices.VERSION)
             return
         }
         val pack = chosen ?: store.published[variant] ?: return
@@ -127,6 +135,7 @@ class PackSender(
                 sentAt.remove(playerId)
                 if (own) hold.end(playerId)
                 if (own) testing.remove(playerId)?.invoke(true)
+                plugin.limbo.release(event.player)
                 val era = variantOf(event.player)
                 if (era != null && loaded.put(playerId, era) == null) {
                     onLoaded(event.player)
@@ -135,7 +144,12 @@ class PackSender(
             Status.DECLINED, Status.FAILED_DOWNLOAD, Status.FAILED_RELOAD, Status.INVALID_URL, Status.DISCARDED -> {
                 sentAt.remove(playerId)
                 if (own) hold.end(playerId)
-                loaded.remove(playerId)?.let { onLost(event.player, it.usesPostEffects) }
+                // onLost runs while the player still has their era: a shake or impact frame that ends then releases the post effect it holds.
+                loaded[playerId]?.let { onLost(event.player, it.usesPostEffects) }
+                loaded.remove(playerId)
+                // A client that refused or could not load the pack never will, so it is let in. With a required pack the server is about to disconnect it
+                // instead, and a join message followed at once by a quit message is no use to anyone: it stays in limbo, and is never announced.
+                if (own && event.status != Status.DISCARDED && !plugin.config.getBoolean("resource-pack.required", false)) plugin.limbo.release(event.player)
                 // A discard is the client dropping a pack, not a failure to load one.
                 if (own && event.status != Status.DISCARDED) {
                     val test = testing.remove(playerId)
@@ -161,18 +175,14 @@ class PackSender(
     }
 
     fun fabulousNotice(player: Player) {
-        notice(player, "On your client version, distortion effects only show with Fabulous! graphics (Video Settings > Graphics).")
-    }
-
-    private fun notice(player: Player, message: String) {
-        if (plugin.config.getBoolean("client-notices", true) && plugin.players.bool(player.uniqueId, io.github.ratr2.repack.PlayerSettings.NOTICES)) player.sendMessage(Component.text(message, NamedTextColor.YELLOW))
+        plugin.notices.send(player, Notices.FABULOUS)
     }
 
     @EventHandler
     fun onJoin(event: PlayerJoinEvent) {
         val player = event.player
         if (variantOf(player) == null) {
-            notice(player, "Repack custom blocks are not available on your client version: they need Minecraft 1.21.4 or newer.")
+            plugin.notices.send(player, Notices.VERSION)
             return
         }
         if (sending) host.joined(player.uniqueId)

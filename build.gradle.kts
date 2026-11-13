@@ -33,6 +33,7 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("com.google.code.gson:gson:2.14.0")
     testImplementation("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
+    testImplementation("com.github.retrooper:packetevents-spigot:2.14.0")
 }
 
 kotlin {

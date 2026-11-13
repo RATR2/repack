@@ -119,7 +119,12 @@ class Gui(val plugin: Repack) : Listener {
         // Screens that take an item from the cursor let the player pick one up in their own inventory (only picking up and putting back).
         if (screen.takesCursor(event) && event.clickedInventory != null && event.clickedInventory != event.view.topInventory && event.action in CURSOR_ACTIONS) return
         event.isCancelled = true
-        if (event.clickedInventory == event.view.topInventory) screen.click(event.slot, event) else if (event.clickedInventory != null) screen.clickBottom(event)
+        try {
+            if (event.clickedInventory == event.view.topInventory) screen.click(event.slot, event) else if (event.clickedInventory != null) screen.clickBottom(event)
+        } catch (e: IllegalStateException) {
+            // A screen for a block or item that is gone (deleted, unregistered, thrown away) cannot be made: the admin is told, not left with nothing and a stack trace.
+            say(player, e.message ?: "That is not there any more.", NamedTextColor.RED)
+        }
     }
 
     @EventHandler

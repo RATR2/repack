@@ -42,7 +42,8 @@ object TextEffects {
         if (section == null || !section.getBoolean("enabled", true)) return emptyList<Rule>() to emptyList()
         val errors = ArrayList<String>()
         val defaults = section.getConfigurationSection("defaults")
-        fun number(from: ConfigurationSection?, key: String, fallback: Double): Double {
+        // The numbers go into GLSL float literals and into pow(): each is held to the range the editor offers, so none is too big for a float, zero for pow, or NaN.
+        fun rawNumber(from: ConfigurationSection?, key: String, fallback: Double): Double {
             val value = from?.get(key)
             return when (value) {
                 null -> fallback
@@ -50,6 +51,8 @@ object TextEffects {
                 else -> value.toString().toDoubleOrNull() ?: fallback
             }.takeIf { it.isFinite() } ?: fallback
         }
+        fun number(from: ConfigurationSection?, key: String, fallback: Double): Double =
+            rawNumber(from, key, fallback).let { value -> RANGES[key]?.let { value.coerceIn(it.first, it.second) } ?: value }
         val rules = ArrayList<Rule>()
         val effects = section.getConfigurationSection("effects")
         for (name in effects?.getKeys(false).orEmpty()) {
@@ -82,8 +85,10 @@ object TextEffects {
             }
             val from = color("from", trigger) ?: continue
             val to = color("to", trigger) ?: continue
-            if (rules.any { it.trigger == trigger }) {
-                errors += "$where: another effect already uses the trigger color #%06x.".format(trigger)
+            // The shader compares colors in steps of 4 per channel, so a color within the same step as another effect's trigger is the same color to it.
+            val same = rules.firstOrNull { bucket(it.trigger) == bucket(trigger) }
+            if (same != null) {
+                errors += "$where: the trigger color #%06x is too close to #%06x of the effect ${same.name}: the shader cannot tell them apart (colors differ by 4 or more in a channel).".format(trigger, same.trigger)
                 continue
             }
             rules += Rule(
@@ -129,12 +134,25 @@ object TextEffects {
 
     private val NORMAL = Regex("^([ \\t]*)vertexColor = (Color|textColor) \\* (.+);$", RegexOption.MULTILINE)
 
+    /** The unlit variants of the 26.2 and newer text shader (chat, tooltips, see-through text) are in the #else branch, as a plain `vertexColor = Color;`. */
+    private val PLAIN = Regex("^([ \\t]*)vertexColor = (Color|textColor);$", RegexOption.MULTILINE)
+
+    private val RANGES = mapOf(
+        "speed" to (0.0 to 5000.0), "frequency" to (0.0 to 2.0), "bias" to (-1.0 to 1.0),
+        "hot-exponent" to (0.5 to 20.0), "hot-strength" to (0.0 to 1.0), "offset" to (0.0 to 10.0),
+    )
+
+    fun bucket(color: Int) = Triple((color shr 16 and 0xFF) shr 2, (color shr 8 and 0xFF) shr 2, (color and 0xFF) shr 2)
+
     fun inject(vsh: String, snippet: Snippet): String? {
         val main = vsh.indexOf("void main() {")
         val line = NORMAL.find(vsh) ?: return null
         if (main < 0 || line.range.first < main) return null
         val indent = line.groupValues[1]
         val replacement = "${indent}vec4 c = ${line.groupValues[2]};\n${snippet.loop}\n${indent}vertexColor = c * ${line.groupValues[3]};"
-        return vsh.substring(0, main) + snippet.definitions + "\n\n" + vsh.substring(main, line.range.first) + replacement + vsh.substring(line.range.last + 1)
+        val rest = vsh.substring(line.range.last + 1)
+        // The same effect in the branch for chat, tooltips and see-through text, where the color is not lit.
+        val plain = PLAIN.replace(rest) { m -> "${m.groupValues[1]}vec4 c = ${m.groupValues[2]};\n${snippet.loop}\n${m.groupValues[1]}vertexColor = c;" }
+        return vsh.substring(0, main) + snippet.definitions + "\n\n" + vsh.substring(main, line.range.first) + replacement + plain
     }
 }

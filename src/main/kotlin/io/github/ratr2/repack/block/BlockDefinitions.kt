@@ -73,6 +73,8 @@ object BlockDefinitions {
 
     fun parse(id: String, section: ConfigurationSection, materials: MaterialRules = BukkitMaterials): BlockDefinition {
         val proxy = section.getConfigurationSection("proxy")
+        // `proxy: STONE` is a word where a section is wanted; taking it as no proxy at all would turn the block into a barrier without a word.
+        if (proxy == null && section.contains("proxy")) throw DefinitionException("proxy must be a section like 'proxy:' with 'block: STONE' under it.")
         val proxyBlock = material(proxy?.getString("block") ?: "BARRIER", "proxy.block", materials).also {
             if (!materials.isBlock(it)) throw DefinitionException("proxy.block $it is not a block.")
         }
@@ -112,7 +114,7 @@ object BlockDefinitions {
             proxyMode = mode,
             vanillaInteraction = proxy?.getBoolean("vanilla-interaction", false) ?: false,
             breaking = breakingOptions,
-            drops = if (section.contains("drops")) drops(section.getMapList("drops"), materials) else listOf(SelfDrop(AmountRange(1, 1), 1.0)),
+            drops = if (section.contains("drops")) drops(dropEntries(section), materials) else listOf(SelfDrop(AmountRange(1, 1), 1.0)),
             explosionResistant = explosion?.getBoolean("resistant", false) ?: false,
             explosionDrops = explosion?.getBoolean("drops", false) ?: false,
             piston = enumOf(section.getString("piston") ?: "block", PistonBehavior::class.java, "piston"),
@@ -199,14 +201,28 @@ object BlockDefinitions {
         return values
     }
 
+    /** The most one drop gives: a stack is at most 99 items, and one that is more cannot be saved with the world. */
+    const val MAX_DROP_AMOUNT = 99
+
+    /** The `drops` entries. getMapList drops anything that is not a map without a word, so the list is checked first. */
+    private fun dropEntries(section: ConfigurationSection): List<Map<*, *>> {
+        val raw = section.get("drops")
+        if (raw !is List<*>) throw DefinitionException("drops must be a list, each entry like '- item: DIAMOND' or '- block: self'.")
+        raw.forEachIndexed { index, entry -> if (entry !is Map<*, *>) throw DefinitionException("drops[$index] must be an entry like 'item: DIAMOND' or 'block: self', not '$entry'.") }
+        return section.getMapList("drops")
+    }
+
     private fun drops(entries: List<Map<*, *>>, materials: MaterialRules): List<Drop> = entries.mapIndexed { index, entry ->
         val where = "drops[$index]"
         val amount = (entry["amount"]?.toString() ?: "1").let { AmountRange.parse(it) ?: throw DefinitionException("$where.amount '$it' is not a number or a range like 1-3.") }
+        if (amount.max > MAX_DROP_AMOUNT) throw DefinitionException("$where.amount is at most $MAX_DROP_AMOUNT.")
         val chance = (entry["chance"]?.toString() ?: "1").toDoubleOrNull()?.takeIf { it in 0.0..1.0 }
             ?: throw DefinitionException("$where.chance must be between 0 and 1.")
         when {
             entry["block"]?.toString().equals("self", ignoreCase = true) -> SelfDrop(amount, chance)
-            entry["item"] != null -> ItemDrop(material(entry["item"].toString(), "$where.item", materials), amount, chance)
+            entry["item"] != null -> ItemDrop(material(entry["item"].toString(), "$where.item", materials).also {
+                if (!materials.isItem(it)) throw DefinitionException("$where.item $it is not an item.")
+            }, amount, chance)
             else -> throw DefinitionException("$where needs either 'item: <MATERIAL>' or 'block: self'.")
         }
     }

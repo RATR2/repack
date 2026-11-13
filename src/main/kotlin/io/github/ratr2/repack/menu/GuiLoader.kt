@@ -16,6 +16,9 @@ object GuiLoader {
 
     class GuiException(message: String) : Exception(message)
 
+    private val INPUT_NAME = Regex("[a-z0-9_]+")
+    private val RESERVED_INPUTS = setOf("token", "button")
+
     fun load(folder: File): LoadedGuis {
         val errors = ArrayList<String>()
         val raw = LinkedHashMap<String, YamlConfiguration>()
@@ -94,6 +97,9 @@ object GuiLoader {
 
         val update = yaml.getInt("update", parent?.update ?: 0)
         if (update < 0) throw GuiException("update is a number of ticks, 0 or more (0 is off).")
+        val fallbackId = (if (yaml.contains("fallback")) yaml.getString("fallback") else parent?.fallback)?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+        // A dialog that falls back to itself would be opened again by every old client until the stack ends.
+        if (fallbackId == id) throw GuiException("fallback cannot be the GUI itself.")
         return GuiDef(
             id = id,
             template = template,
@@ -238,7 +244,7 @@ object GuiLoader {
             "sound" -> {
                 val parts = argument.split(Regex("\\s+")).filter { it.isNotEmpty() }
                 if (parts.isEmpty()) throw GuiException("$path: `sound` needs a sound name.")
-                GuiAction.Sound(parts[0], parts.getOrNull(1)?.toFloatOrNull() ?: 1f, parts.getOrNull(2)?.toFloatOrNull() ?: 1f)
+                GuiAction.Sound(parts[0], parts.getOrNull(1)?.toFloatOrNull()?.takeIf { it.isFinite() } ?: 1f, parts.getOrNull(2)?.toFloatOrNull()?.takeIf { it.isFinite() } ?: 1f)
             }
             else -> throw GuiException("$path: unknown action '$name'. They are command, console, message, open, close, back, refresh, sound and event.")
         }
@@ -277,16 +283,30 @@ object GuiLoader {
     }
 
     private fun parseInput(key: String, section: ConfigurationSection): DialogInput {
-        if (!ID.matches(key.lowercase()) || key != key.lowercase()) throw GuiException("inputs.$key: names use only a-z, 0-9, _ and -.")
+        // The game takes only letters, digits and _ for an input's id, and the client sends the inputs in the same compound as the fields of the button's own action,
+        // so an input called token or button could pick which button runs.
+        if (!INPUT_NAME.matches(key)) throw GuiException("inputs.$key: names use only a-z, 0-9 and _.")
+        if (key in RESERVED_INPUTS) throw GuiException("inputs.$key: '$key' is a name the dialog uses itself.")
         val label = section.getString("label") ?: key
         val width = section.getInt("width", 200)
+        if (width !in 1..1024) throw GuiException("inputs.$key: width must be 1 to 1024.")
         return when (val type = section.getString("type", "text")!!.lowercase()) {
-            "text" -> DialogInput.Text(key, label, section.getString("initial").orEmpty(), section.getInt("max-length", 64), width, section.getInt("lines", 1))
+            "text" -> {
+                val maxLength = section.getInt("max-length", 64)
+                val lines = section.getInt("lines", 1)
+                if (maxLength < 1) throw GuiException("inputs.$key: max-length must be 1 or more.")
+                if (lines < 1) throw GuiException("inputs.$key: lines must be 1 or more.")
+                DialogInput.Text(key, label, section.getString("initial").orEmpty(), maxLength, width, lines)
+            }
             "number" -> {
                 val min = section.getDouble("min", 0.0).toFloat()
                 val max = section.getDouble("max", 100.0).toFloat()
-                if (min >= max) throw GuiException("inputs.$key: min must be less than max.")
-                DialogInput.Number(key, label, min, max, if (section.contains("initial")) section.getDouble("initial").toFloat() else null, if (section.contains("step")) section.getDouble("step").toFloat() else null, width)
+                if (!min.isFinite() || !max.isFinite() || min >= max) throw GuiException("inputs.$key: min must be less than max.")
+                val initial = if (section.contains("initial")) section.getDouble("initial").toFloat() else null
+                val step = if (section.contains("step")) section.getDouble("step").toFloat() else null
+                if (initial != null && (!initial.isFinite() || initial < min || initial > max)) throw GuiException("inputs.$key: initial must be between min and max.")
+                if (step != null && (!step.isFinite() || step <= 0f)) throw GuiException("inputs.$key: step must be above 0.")
+                DialogInput.Number(key, label, min, max, initial, step, width)
             }
             "boolean", "toggle", "checkbox" -> DialogInput.Toggle(key, label, section.getBoolean("initial", false))
             "options", "choice", "select" -> {
@@ -297,7 +317,10 @@ object GuiLoader {
                     else -> emptyList()
                 }
                 if (options.isEmpty()) throw GuiException("inputs.$key: options needs a list of choices.")
-                DialogInput.Options(key, label, options, section.getString("initial"), width)
+                if (options.map { it.first }.toSet().size != options.size) throw GuiException("inputs.$key: a choice is listed twice.")
+                val initial = section.getString("initial")
+                if (initial != null && options.none { it.first == initial }) throw GuiException("inputs.$key: initial '$initial' is not one of the choices.")
+                DialogInput.Options(key, label, options, initial, width)
             }
             else -> throw GuiException("inputs.$key: type '$type' is not text, number, boolean or options.")
         }

@@ -86,7 +86,14 @@ object BbParser {
     private fun JsonObject.numbers(key: String): List<Double>? {
         val array = array(key) ?: return null
         if (array.size() < 3) return null
-        return List(3) { array[it].asDouble }
+        return List(3) { array[it].finite() }
+    }
+
+    /** A number from the file; NaN and infinity (the strings "NaN", or 1e999) would be written into the pack's json as they are, which the game cannot read. */
+    private fun JsonElement.finite(): Double {
+        val value = asDouble
+        if (!value.isFinite()) throw BbParseException("A number in the model is not finite: $this.")
+        return value
     }
 
     private fun parseTextures(root: JsonObject, width: Int, height: Int, warnings: MutableList<String>): List<BbTexture> {
@@ -129,7 +136,7 @@ object BbParser {
                 warnings += "Cube '$label' face ${direction.key} uses texture $index, which does not exist."
                 continue
             }
-            val uv = face.array("uv")?.map { it.asDouble } ?: continue
+            val uv = face.array("uv")?.map { it.finite() } ?: continue
             if (uv.size != 4) continue
             faces[direction] = BbFace(uv, face.int("rotation", 0), index)
         }
@@ -168,7 +175,7 @@ object BbParser {
                         fun number(k: String): Double {
                             val raw = p.get(k)?.takeIf { it.isJsonPrimitive }?.asString?.trim().orEmpty()
                             if (raw.isEmpty()) return if (channel == "scale") 1.0 else 0.0
-                            return raw.toDoubleOrNull() ?: run { expressions = true; if (channel == "scale") 1.0 else 0.0 }
+                            return raw.toDoubleOrNull()?.takeIf { it.isFinite() } ?: run { expressions = true; if (channel == "scale") 1.0 else 0.0 }
                         }
                         return Vec3(number("x"), number("y"), number("z"))
                     }
@@ -251,12 +258,12 @@ object BbParser {
     private fun JsonObject.array(key: String): JsonArray? = get(key)?.takeIf { it.isJsonArray }?.asJsonArray
     private fun JsonObject.string(key: String): String? = get(key)?.takeIf { it.isJsonPrimitive }?.asString
     private fun JsonObject.int(key: String, default: Int): Int = get(key)?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isNumber }?.asInt ?: default
-    private fun JsonObject.double(key: String, default: Double): Double = get(key)?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isNumber }?.asDouble ?: default
+    private fun JsonObject.double(key: String, default: Double): Double = get(key)?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isNumber }?.asDouble?.takeIf { it.isFinite() } ?: default
     private fun JsonObject.bool(key: String, default: Boolean): Boolean = get(key)?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: default
 
     private fun JsonObject.vec3(key: String): Vec3 {
         val array = array(key) ?: return Vec3.ZERO
         if (array.size() < 3) return Vec3.ZERO
-        return Vec3(array[0].asDouble, array[1].asDouble, array[2].asDouble)
+        return Vec3(array[0].finite(), array[1].finite(), array[2].finite())
     }
 }

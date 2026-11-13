@@ -80,8 +80,8 @@ object EffectEditor {
         val match = HEX.matchEntire(text.trim()) ?: return "'$text' is not a color like #ff0cff."
         val color = match.groupValues[1].toInt(16)
         if (key == "trigger") {
-            val other = names(config).firstOrNull { it != name && color(config, it, "trigger") == color }
-            if (other != null) return "${hex(color)} already starts the effect $other."
+            val other = names(config).firstOrNull { it != name && color(config, it, "trigger")?.let { t -> TextEffects.bucket(t) == TextEffects.bucket(color) } == true }
+            if (other != null) return "${hex(color)} is too close to the trigger of the effect $other: the shader cannot tell them apart."
         }
         config.set(path(name, key), hex(color))
         return null
@@ -98,7 +98,7 @@ object EffectEditor {
         do {
             trigger = java.awt.Color.HSBtoRGB(hue / 360f, 0.75f, 0.9f) and 0xFFFFFF
             hue = (hue + 7) % 360
-        } while (trigger in taken)
+        } while (taken.any { TextEffects.bucket(it) == TextEffects.bucket(trigger) })
         val hue0 = (hue + 353) % 360
         config.set(path(name, "trigger"), hex(trigger))
         config.set(path(name, "from"), hex(scale(trigger, 0.55)))

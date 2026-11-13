@@ -18,6 +18,14 @@ internal object PostEffectsCompat {
     fun remove(player: Player, key: Key) = call(player, "remove", key)
 
     private fun call(player: Player, name: String, key: Key) {
+        try {
+            invoke(player, name, key)
+        } catch (e: ReflectiveOperationException) {
+            // A server whose post effect API is not what this expects: the effect just does not show, and nothing else is left half done.
+        }
+    }
+
+    private fun invoke(player: Player, name: String, key: Key) {
         val effects = accessor?.invoke(player) ?: return
         val method = effects.javaClass.methods.firstOrNull {
             it.name == name && it.parameterCount == 1 && it.parameterTypes[0].isAssignableFrom(key.javaClass)

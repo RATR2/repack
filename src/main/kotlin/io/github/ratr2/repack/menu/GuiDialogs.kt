@@ -37,7 +37,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class GuiDialogs(private val manager: GuiManager) {
 
-    private class Session(val gui: LiveGui, val spec: DialogSpec, val token: String)
+    private class Session(val gui: LiveGui, val spec: DialogSpec, val token: String, val created: Long = System.currentTimeMillis())
 
     private val sessions = ConcurrentHashMap<UUID, Session>()
 
@@ -49,6 +49,11 @@ class GuiDialogs(private val manager: GuiManager) {
             if (wrapper.id != ACTION) return
             val payload = wrapper.payload as? NBTCompound ?: return
             val session = sessions[uuid] ?: return
+            // A dialog that has been open for half an hour is not answered: the token is for the dialog the player was shown, not for good.
+            if (System.currentTimeMillis() - session.created > SESSION_MILLIS) {
+                sessions.remove(uuid, session)
+                return
+            }
             if (payload.getStringTagValueOrNull("token") != session.token) return
             val button = payload.getStringTagValueOrNull("button") ?: return
             val values = readInputs(session.spec, payload)
@@ -77,8 +82,19 @@ class GuiDialogs(private val manager: GuiManager) {
     fun supported(player: Player): Boolean =
         PacketEvents.getAPI().serverManager.version.protocolVersion >= DIALOG_PROTOCOL && manager.plugin.clientVersions.protocolOf(player) >= DIALOG_PROTOCOL
 
+    /**
+     * Switching from a chest GUI to an anvil or a dialog closes the chest on the client, which is not the player leaving it: for the moment it takes, the chest's
+     * close handlers (and its back history) are left alone, as they are when one GUI opens another.
+     */
+    private fun switching(player: Player, ticks: Long) {
+        val id = player.uniqueId
+        manager.navigating += id
+        manager.plugin.server.scheduler.runTaskLater(manager.plugin, Runnable { manager.navigating -= id }, ticks)
+    }
+
     fun openAnvil(player: Player, gui: LiveGui) {
         val spec = gui.definition?.anvil ?: return
+        switching(player, ANVIL_SWITCH_TICKS)
         manager.plugin.gui.askText(
             player, manager.text(player, gui.title), manager.text(player, spec.initial),
             accept = { text -> manager.run(player, gui, spec.submit, mapOf("input" to text)) },
@@ -94,7 +110,8 @@ class GuiDialogs(private val manager: GuiManager) {
             player.sendMessage(net.kyori.adventure.text.Component.text("This screen needs Minecraft 1.21.6 or newer.", net.kyori.adventure.text.format.NamedTextColor.RED))
             return
         }
-        val token = UUID.randomUUID().toString().take(8)
+        switching(player, DIALOG_SWITCH_TICKS)
+        val token = UUID.randomUUID().toString()
         sessions[player.uniqueId] = Session(gui, spec, token)
         fun text(s: String) = Colors.parse(manager.text(player, s))
         fun button(b: DialogButton, id: String) = ActionButton(
@@ -130,21 +147,31 @@ class GuiDialogs(private val manager: GuiManager) {
         val values = HashMap<String, String>()
         for (input in spec.inputs) {
             val tag: NBT = payload.getTagOrNull(input.key) ?: continue
-            values["input.${input.key}"] = when {
-                tag is NBTString -> tag.value
-                input is DialogInput.Toggle && tag is NBTNumber -> (tag.asInt != 0).toString()
-                tag is NBTNumber -> tag.asDouble.let { if (it == Math.rint(it)) it.toLong().toString() else it.toString() }
-                else -> tag.toString()
-            }
+            clean(input, tag)?.let { values["input.${input.key}"] = it }
         }
         return values
     }
 
-    private companion object {
-        val ACTION = ResourceLocation("repack", "gui")
-        const val EXIT = "exit"
+    companion object {
+        /**
+         * What a client sent for an input, held to what the dialog offered: the client is trusted with nothing, so a modified one cannot send a number past the
+         * range, text longer than the input takes, or a choice that was never offered. Null (the input is left out) when the value is not valid at all.
+         */
+        fun clean(input: DialogInput, tag: NBT): String? = when (input) {
+            is DialogInput.Text -> (tag as? NBTString)?.value?.take(input.maxLength)
+            is DialogInput.Toggle -> (tag as? NBTNumber)?.let { (it.asInt != 0).toString() } ?: (tag as? NBTString)?.value?.takeIf { it == "true" || it == "false" }
+            is DialogInput.Options -> (tag as? NBTString)?.value?.takeIf { value -> input.options.any { it.first == value } }
+            is DialogInput.Number -> (tag as? NBTNumber)?.asDouble?.takeIf { it.isFinite() }?.coerceIn(input.min.toDouble(), input.max.toDouble())
+                ?.let { if (it == Math.rint(it)) it.toLong().toString() else it.toString() }
+        }
+
+        private const val SESSION_MILLIS = 30L * 60 * 1000
+        private const val ANVIL_SWITCH_TICKS = 4L
+        private const val DIALOG_SWITCH_TICKS = 20L
+        private val ACTION = ResourceLocation("repack", "gui")
+        private const val EXIT = "exit"
 
         /** 1.21.6, the first game version with dialogs. */
-        const val DIALOG_PROTOCOL = 771
+        private const val DIALOG_PROTOCOL = 771
     }
 }

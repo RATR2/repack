@@ -25,7 +25,10 @@ class PlayerSettings(private val plugin: Repack) {
         yaml.set("$player.$key", if (value) null else false)
         if (yaml.getConfigurationSection(player.toString())?.getKeys(false)?.isEmpty() == true) yaml.set(player.toString(), null)
         try {
-            yaml.save(file)
+            // Through a temporary file and a move: a half written players.yml would be read as invalid, and every player's settings would start over.
+            val temp = File(file.parentFile, "${file.name}.tmp")
+            yaml.save(temp)
+            java.nio.file.Files.move(temp.toPath(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
         } catch (e: java.io.IOException) {
             plugin.logger.warning("Could not save players.yml: ${e.message}")
         }

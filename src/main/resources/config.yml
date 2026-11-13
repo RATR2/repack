@@ -52,8 +52,14 @@ resource-pack:
   required: false
   prompt: "This server uses a resource pack for custom blocks and effects."
 
-# Tell players when their client version is too old for the blocks.
+# Chat notices to players: their client version is too old for the blocks, shaderpacks are not compatible with the server (said a few seconds after they
+# join), and some effects need Fabulous! graphics. Each player can switch their own off with /repack notices off.
 client-notices: true
+# One switch for each kind of notice, for the whole server. A player can also switch each off for themselves with /repack notices.
+notices:
+  version: true       # their game version is too old for the blocks
+  shaderpacks: true   # shaderpacks do not work with this server
+  fabulous: true      # some effects need Fabulous! graphics on their version
 
 # The console says so when the server runs a version older than 26.3, where the ripple effects need Fabulous! graphics. false: say nothing.
 recommend-latest: true
@@ -96,6 +102,30 @@ text-effects:
       to: "#02bbde"
       type: shine
       speed: 200.0
+
+limbo:
+  # Login limbo: from joining until their client has the pack, a player is hidden from the tab list and from every other player, cannot be hurt, and their join
+  # message is held back, so nobody sees someone standing still while the pack downloads or fights a player who is about to leave. Only players who are sent the
+  # pack are held. They come out when their client has loaded the pack (or refused or failed to), or after timeout-seconds.
+  enabled: true
+  timeout-seconds: 30
+  # What the join message becomes when they come out. Empty: the normal one. {player} is their name and & codes work: "&e{player} has arrived"
+  join-message: ""
+  # false: no join message at all (their quit message is never sent while they are in limbo either way)
+  send-join-message: true
+  # Chat from a player in limbo is dropped (they are told once), since nobody can see who is talking. Commands are not blocked, so a login plugin still works.
+  block-chat: true
+
+dev:
+  # The address the links of /repack upload use, when the uploader is reached some other way than the pack server's own address: a domain with a reverse
+  # proxy (nginx, Caddy) in front, which can also give it HTTPS. Empty: the pack server's address (resource-pack.public-url or public-host). The proxy has
+  # to pass /uploader on to the pack server and allow uploads of the biggest kind (32 MB). Example: "https://dev.example.com"
+  public-url: ""
+  # 0: the uploader is served by the pack server, on its port. A port above 0 gives it a server of its own, which is only open while someone is in dev mode,
+  # and which works whichever plugin runs the pack server. Links then use that port (unless public-url is set).
+  port: 0
+  # The address the uploader's own server listens on; empty is every address. Use 127.0.0.1 to reach it through a reverse proxy on the same machine only.
+  bind: ""
 
 workflow:
   # Rebuild the pack when a model or block file changes, a few seconds after the last save. This is silent: nobody online is sent anything.

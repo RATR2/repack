@@ -27,17 +27,34 @@ object RepackAPI {
     internal fun <T> onMain(fallback: T, action: (Repack) -> T): T {
         val api = plugin ?: return fallback
         if (Bukkit.isPrimaryThread()) return action(api)
-        return api.server.scheduler.callSyncMethod(api, Callable { action(api) }).get(10, TimeUnit.SECONDS)
+        val future = api.server.scheduler.callSyncMethod(api, Callable { action(api) })
+        return try {
+            future.get(10, TimeUnit.SECONDS)
+        } catch (e: java.util.concurrent.TimeoutException) {
+            // The main thread did not get to it in time: it is called off, so it does not run later when the caller has long given up.
+            future.cancel(false)
+            api.logger.warning("A call to the Repack API from another thread waited 10 seconds for the main thread and was dropped.")
+            fallback
+        } catch (e: java.util.concurrent.ExecutionException) {
+            throw e.cause ?: e
+        }
+    }
+
+    /** Runs the task on the main thread: now when called from it, else at the next tick. For work that touches inventories, which cannot be done from another thread. */
+    @JvmStatic
+    fun onMainThread(task: Runnable) {
+        val api = plugin ?: return
+        if (Bukkit.isPrimaryThread()) task.run() else api.server.scheduler.runTask(api, task)
     }
 
     @JvmStatic
     fun place(location: Location, id: String): Boolean = place(location, id, 0f)
 
     @JvmStatic
-    fun place(location: Location, id: String, yaw: Float): Boolean = onMain(false) { it.blocks.place(location, id, yaw) }
+    fun place(location: Location, id: String, yaw: Float): Boolean = location.world != null && yaw.isFinite() && onMain(false) { it.blocks.place(location, id, yaw) }
 
     @JvmStatic
-    fun remove(location: Location): Boolean = onMain(false) { it.blocks.remove(location.block) }
+    fun remove(location: Location): Boolean = location.world != null && onMain(false) { it.blocks.remove(location.block) }
 
     @JvmStatic
     fun idAt(block: Block): String? = onMain(null) { it.blocks.idAt(block) }

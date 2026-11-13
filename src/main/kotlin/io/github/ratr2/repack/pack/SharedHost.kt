@@ -48,6 +48,9 @@ class SharedHost(
 
     private val sources = ConcurrentHashMap<String, Function<String, ByteArray?>>()
 
+    /** Pages of this plugin served under a path of their own (`/uploader`), before the pack files. Only a host can have them. */
+    private val routes = ConcurrentHashMap<String, com.sun.net.httpserver.HttpHandler>()
+
     @Volatile
     private var ownProvider: Function<UUID, Map<String, String>?>? = null
 
@@ -87,6 +90,26 @@ class SharedHost(
 
     fun start() {
         elect()
+    }
+
+    /** Whether this plugin runs the server (rather than sharing another plugin's, or not serving). */
+    val hosting: Boolean get() = mode == Mode.HOST
+
+    /** Who runs the server, for a message when this plugin does not. */
+    val ownerName: String? get() = if (mode == Mode.GUEST) remote?.get("owner")?.toString() else null
+
+    /**
+     * Serves [path] (like `/uploader`) with [handler], on the pack server's port. False when this plugin does not run the server: a guest has no
+     * way to add pages to another plugin's server. The page stays through a restart of the server.
+     */
+    fun addRoute(path: String, handler: com.sun.net.httpserver.HttpHandler): Boolean {
+        require(path.startsWith("/") && path.length > 1) { "a route is a path like /uploader" }
+        routes[path] = handler
+        return mode == Mode.HOST
+    }
+
+    fun removeRoute(path: String) {
+        routes.remove(path)
     }
 
     fun restart(): String? {
@@ -156,7 +179,8 @@ class SharedHost(
             // An offer can carry further packs under "more", one "id url sha1" per line, so a plugin with several packs has them
             // all downloaded and loaded together with everyone else's.
             val packs = offers.flatMap { offer ->
-                listOf(ResourcePackInfo.resourcePackInfo(UUID.fromString(offer["id"]), URI(offer["url"]!!), offer["sha1"]!!)) +
+                // One plugin's offer that is not valid (a bad address or id) is left out, and does not stop everyone else's packs.
+                listOfNotNull(runCatching { ResourcePackInfo.resourcePackInfo(UUID.fromString(offer["id"]), URI(offer["url"]!!), offer["sha1"]!!) }.getOrNull()) +
                     offer["more"].orEmpty().lines().mapNotNull { line ->
                         val parts = line.trim().split(' ')
                         if (parts.size != 3) null else runCatching { ResourcePackInfo.resourcePackInfo(UUID.fromString(parts[0]), URI(parts[1]), parts[2]) }.getOrNull()
@@ -338,6 +362,7 @@ class SharedHost(
 
     /** Opens a server on the configured port. The old one, if any, keeps running when the new one cannot start. */
     private fun bind(): HttpServer? {
+        HttpTimeouts.apply()
         val (address, port) = bindTarget()
         return try {
             HttpServer.create(InetSocketAddress(address, port), 0).apply {
@@ -464,6 +489,11 @@ class SharedHost(
 
     private fun handle(exchange: HttpExchange) {
         exchange.use {
+            val route = routes[exchange.requestURI.path]
+            if (route != null) {
+                route.handle(exchange)
+                return@use
+            }
             val parts = HostRoutes.parse(exchange.requestURI.path)
             val bytes = parts?.let { (name, file) -> sources[name]?.apply(file) }
             if (bytes == null) {
@@ -507,5 +537,20 @@ object HostRoutes {
         val (name, file) = parts
         if (!NAME.matches(name) || !NAME.matches(file) || file.startsWith(".") || name.startsWith(".")) return null
         return name to file
+    }
+}
+
+/**
+ * Time limits for the JDK's HTTP server, which has none of its own: a client that connects and stops reading would hold one of the few download threads for good,
+ * and a few of them would stop every download. The JDK reads these two properties (in seconds) once, when its server classes load, so they are set before the first
+ * server is made; when another plugin made one first, theirs stand.
+ */
+object HttpTimeouts {
+    const val REQUEST_SECONDS = "30"
+    const val RESPONSE_SECONDS = "120"
+
+    fun apply() {
+        if (System.getProperty("sun.net.httpserver.maxReqTime") == null) System.setProperty("sun.net.httpserver.maxReqTime", REQUEST_SECONDS)
+        if (System.getProperty("sun.net.httpserver.maxRspTime") == null) System.setProperty("sun.net.httpserver.maxRspTime", RESPONSE_SECONDS)
     }
 }

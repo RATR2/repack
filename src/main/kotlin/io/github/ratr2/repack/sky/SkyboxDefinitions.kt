@@ -14,10 +14,14 @@ object SkyboxDefinitions {
     const val MAX_SKYBOXES = 24
 
     private val ID = Regex("[a-z0-9_-]+")
-    private const val MAX_PICTURE_SIDE = 16384
+    // 8192 by 4096 is 128 MB decoded: a picture past it is more than the build can hold, and more than the client's block atlas can take.
+    private const val MAX_PICTURE_SIDE = 8192
+    private const val MAX_PICTURE_PIXELS = 8192L * 4096
     private const val MAX_SHADER_BYTES = 64 * 1024
 
-    private val FORBIDDEN = listOf("#version", "#extension", "#include", "#moj_import", "void main", "gl_Position", "gl_FragDepth")
+    private val FORBIDDEN = listOf("gl_Position", "gl_FragDepth")
+    private val DIRECTIVE = Regex("#\\s*(version|extension|include|moj_import)")
+    private val MAIN = Regex("\\bvoid\\s+main\\b")
 
     private val BUILTIN = Regex("builtin:([a-z0-9_-]+)")
 
@@ -86,6 +90,9 @@ object SkyboxDefinitions {
     private fun sourceOf(file: File): SkySource = when (file.extension.lowercase()) {
         "png" -> {
             val bytes = file.readBytes()
+            // The size is read from the header first, so a huge picture is refused before it is decoded.
+            val size = imageSize(bytes) ?: throw SkyboxException("${file.name} is not an image.")
+            pictureProblem(size.first, size.second)?.let { throw SkyboxException("${file.name}: $it") }
             val image = try {
                 ImageIO.read(ByteArrayInputStream(bytes))
             } catch (e: LinkageError) {
@@ -103,9 +110,68 @@ object SkyboxDefinitions {
     private fun checkShader(code: String): String {
         if (code.isBlank()) throw SkyboxException("the shader is empty.")
         if (code.toByteArray().size > MAX_SHADER_BYTES) throw SkyboxException("the shader is longer than ${MAX_SHADER_BYTES / 1024} KB.")
-        FORBIDDEN.firstOrNull { it in code }?.let { throw SkyboxException("the shader may not contain '$it': it is only the statements that work out the color, see _example.yml.") }
+        // Comments are taken out first: what is left is what the game compiles, and a comment may say anything.
+        val stripped = withoutComments(code) ?: throw SkyboxException("the shader has a /* comment that is never closed.")
+        DIRECTIVE.find(stripped)?.let { throw SkyboxException("the shader may not contain '${it.value}': it is only the statements that work out the color, see _example.yml.") }
+        if (MAIN.containsMatchIn(stripped)) throw SkyboxException("the shader may not contain 'void main': it is only the statements that work out the color, see _example.yml.")
+        FORBIDDEN.firstOrNull { it in stripped }?.let { throw SkyboxException("the shader may not contain '$it': it is only the statements that work out the color, see _example.yml.") }
+        // The code is pasted into a function: a brace that closes more than it opens, or one left open, would break the shader of every client.
+        var depth = 0
+        for (c in stripped) {
+            if (c == '{') depth++ else if (c == '}') depth--
+            if (depth < 0) throw SkyboxException("the shader has a } with no { before it.")
+        }
+        if (depth != 0) throw SkyboxException("the shader has a { that is never closed.")
         return code.replace("\r\n", "\n")
     }
+
+    /** The code without its comments, or null when a block comment is opened and never closed. */
+    private fun withoutComments(code: String): String? {
+        val out = StringBuilder()
+        var i = 0
+        while (i < code.length) {
+            if (code.startsWith("//", i)) {
+                while (i < code.length && code[i] != '\n') i++
+            } else if (code.startsWith("/*", i)) {
+                val end = code.indexOf("*/", i + 2)
+                if (end < 0) return null
+                out.append(' ')
+                i = end + 2
+            } else {
+                out.append(code[i++])
+            }
+        }
+        return out.toString()
+    }
+
+    /** The picture's width and height from its header, without decoding it; null when it is not an image. */
+    private fun imageSize(bytes: ByteArray): Pair<Int, Int>? = try {
+        ImageIO.createImageInputStream(ByteArrayInputStream(bytes))?.use { input ->
+            val reader = ImageIO.getImageReaders(input).asSequence().firstOrNull() ?: return@use null
+            try {
+                reader.setInput(input)
+                reader.getWidth(0) to reader.getHeight(0)
+            } finally {
+                reader.dispose()
+            }
+        }
+    } catch (e: LinkageError) {
+        throw SkyboxException("this server's Java has no image support (the java.desktop module), which texture skies need.")
+    } catch (e: Exception) {
+        null
+    }
+
+    /** What is wrong with a shader file's text, or null: the same checks the loader makes. */
+    fun shaderProblem(code: String): String? = try {
+        checkShader(code)
+        null
+    } catch (e: SkyboxException) {
+        e.message
+    }
+
+    /** What is wrong with a skybox picture's size, or null. */
+    fun pictureProblem(width: Int, height: Int): String? =
+        if (width < 8 || height < 4 || width > MAX_PICTURE_SIDE || height > MAX_PICTURE_SIDE || width.toLong() * height > MAX_PICTURE_PIXELS) "it is $width by $height: it must be at least 8 by 4 and at most $MAX_PICTURE_SIDE on each side and 8192 by 4096 in all." else null
 
     fun best(skies: List<SkyboxDefinition>, dimension: String, world: String, biome: String, has: (String) -> Boolean): SkyboxDefinition? =
         skies.filter { it.matches(dimension, world, biome) && (it.permission == null || has(it.permission)) }

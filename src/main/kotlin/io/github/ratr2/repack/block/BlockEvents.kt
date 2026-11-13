@@ -165,6 +165,8 @@ class BlockEvents(
     private fun place(event: PlayerInteractEvent, id: String, clicked: Block) {
         val definition = blocks.definitionOf(id) ?: return
         val player = event.player
+        // Adventure mode cannot place blocks, and a spectator is not in the world.
+        if (player.gameMode == GameMode.ADVENTURE || player.gameMode == GameMode.SPECTATOR) return
         val item = event.item ?: return
         val target = if (clicked.isReplaceable && blocks.idAt(clicked) == null) clicked else clicked.getRelative(event.blockFace)
         if ((!target.type.isAir && !target.isReplaceable) || blocks.idAt(target) != null) return
@@ -193,7 +195,9 @@ class BlockEvents(
      * refused. Called from the damage event and the left click, since some proxies (barrier) may never send the first.
      */
     private fun beginMining(player: Player, hit: Hit, cause: Event): Boolean {
-        if (player.gameMode != GameMode.SURVIVAL && player.gameMode != GameMode.ADVENTURE) return true
+        // Adventure mode cannot break blocks either, so the timer is not started for it (and the dig is refused).
+        if (player.gameMode == GameMode.ADVENTURE || player.gameMode == GameMode.SPECTATOR) return false
+        if (player.gameMode != GameMode.SURVIVAL) return true
         val now = System.currentTimeMillis()
         val running = mining[player.uniqueId]
         if (running != null && running.block == hit.block) {
@@ -292,6 +296,8 @@ class BlockEvents(
         }
         if (event.isCancelled) {
             player.sendBlockDamage(block.location, 0f)
+            // The break animation has played by now; a plugin that refused the break (a claim) leaves the model standing, so it must not stay in its last pose.
+            plugin.display.reset(block.location)
             return
         }
         block.setType(Material.AIR, false)
@@ -426,10 +432,39 @@ class BlockEvents(
         if (fire(hit, BlockAction.ENTITY_CHANGE, event.entity as? Player, event, cancelledByDefault = false).isCancelled) event.isCancelled = true
     }
 
+    // A proxy that falls (sand, gravel) becomes a falling block entity and, when it lands, a block again. The custom block rides along in the entity's own data
+    // ("id yaw") and is put back where the block lands, so it is not forgotten the moment it starts to fall.
+    private val fallingKey = org.bukkit.NamespacedKey(plugin, "falling-block")
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     fun onEntityChangeDone(event: EntityChangeBlockEvent) {
+        val entity = event.entity
+        if (entity is org.bukkit.entity.FallingBlock && !event.to.isAir) {
+            val carried = entity.persistentDataContainer.get(fallingKey, org.bukkit.persistence.PersistentDataType.STRING)
+            if (carried != null) {
+                landed(event.block, event.to, carried)
+                return
+            }
+        }
         val hit = hit(event.block) ?: return
-        if (event.to != hit.definition.proxyBlock) blocks.forget(event.block)
+        if (event.to != hit.definition.proxyBlock) {
+            if (entity is org.bukkit.entity.FallingBlock && event.to.isAir) {
+                entity.persistentDataContainer.set(fallingKey, org.bukkit.persistence.PersistentDataType.STRING, "${hit.id} ${blocks.dataAt(event.block)?.yaw ?: 0}")
+            }
+            blocks.forget(event.block)
+        }
+    }
+
+    /** A falling custom block has landed: it is a custom block again at the block of its proxy material nearest to where it came down. */
+    private fun landed(at: Block, material: Material, carried: String) {
+        val id = carried.substringBefore(' ')
+        val yaw = carried.substringAfter(' ', "0").toIntOrNull() ?: 0
+        // The block changes after the event, so it is looked for a tick on.
+        plugin.server.scheduler.runTask(plugin, Runnable {
+            val target = sequenceOf(at) + (-1..1).flatMap { dx -> (-1..1).flatMap { dy -> (-1..1).map { dz -> at.getRelative(dx, dy, dz) } } }.sortedBy { it.location.distanceSquared(at.location) }.asSequence()
+            val block = target.firstOrNull { it.type == material && blocks.idAt(it) == null }
+            if (block != null) blocks.adopt(block, id, yaw)
+        })
     }
 
     @EventHandler(ignoreCancelled = true)

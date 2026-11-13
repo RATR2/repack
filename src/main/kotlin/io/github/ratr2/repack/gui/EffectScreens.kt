@@ -166,6 +166,8 @@ class EffectScreen(gui: Gui, player: Player, private val name: String?) : Screen
                 changed()
             }
             name != null && slot in COLOR_SLOTS -> color(COLOR_SLOTS.getValue(slot))
+            // Building and sending the pack is for admins (as /repack build, push and test are): repack.settings alone only edits the numbers.
+            slot in listOf(28, 29, 30) && !player.hasPermission(RepackCommand.ADMIN) -> gui.say(player, "Building and sending the pack needs repack.admin.", NamedTextColor.RED)
             slot == 28 -> EffectTest.run(gui, player)
             slot == 29 -> EffectTest.revert(gui, player)
             slot == 30 -> if (was == "push") EffectTest.push(gui, player) else {

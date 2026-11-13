@@ -57,6 +57,28 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
         yaml.save(legacyFile)
     }
 
+    // The proxy each type had the last time the server ran, kept in a file: a proxy changed while the server was off (a hand edit, then a restart) is found by
+    // comparing with it, so the blocks placed with the old one are moved to the new instead of being forgotten with the old block left behind.
+    private val knownFile = File(plugin.dataFolder, "proxies.yml")
+
+    /** Compares each type's proxy with the one the file remembers, keeps the old one as a legacy proxy when it changed, and remembers the current ones. */
+    fun syncProxies(current: Map<String, BlockDefinition>) {
+        val known = if (knownFile.isFile) YamlConfiguration.loadConfiguration(knownFile) else YamlConfiguration()
+        var legacyChanged = false
+        for ((id, definition) in current) {
+            val before = known.getString(id)?.let { Material.matchMaterial(it) } ?: continue
+            if (before != definition.proxyBlock && legacyProxies.getOrPut(id) { HashSet() }.add(before)) legacyChanged = true
+        }
+        if (legacyChanged) saveLegacy()
+        // A type that has no definition now keeps what the file had, so it is still known if the definition comes back.
+        for ((id, definition) in current) known.set(id, definition.proxyBlock.name)
+        try {
+            known.save(knownFile)
+        } catch (e: java.io.IOException) {
+            plugin.logger.warning("Could not save proxies.yml: ${e.message}")
+        }
+    }
+
     fun proxyChanged(old: Map<String, BlockDefinition>, new: Map<String, BlockDefinition>): Set<String> {
         val changed = HashSet<String>()
         for ((id, definition) in new) {
@@ -69,6 +91,7 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
             saveLegacy()
             validate()
         }
+        syncProxies(new)
         return changed
     }
 
@@ -81,6 +104,7 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
     }
 
     fun start() {
+        syncProxies(definitions)
         plugin.server.worlds.forEach { world -> world.loadedChunks.forEach(::load) }
     }
 
@@ -121,6 +145,23 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
         chunks.getOrPut(ref) { HashMap() }[pos] = data
         save(chunk, ref)
         listeners.forEach { it.placed(world, pos, data, definition) }
+        return true
+    }
+
+    /**
+     * Makes a block that is already there (of the type's proxy material, with no custom block on it) the custom block [id]: what a custom block that fell and landed
+     * becomes. The block is not changed. False when the id is unknown, the block is another material, or it already holds one.
+     */
+    fun adopt(block: Block, id: String, yaw: Int): Boolean {
+        val definition = definitions[id] ?: return false
+        if (block.type != definition.proxyBlock || dataAt(block) != null) return false
+        val chunk = block.chunk
+        val ref = refOf(chunk)
+        val pos = BlockPos(block.x, block.y, block.z)
+        val data = PlacedBlock(id, if (definition.display.rotateToPlacer) snap(yaw.toFloat()) else 0)
+        chunks.getOrPut(ref) { HashMap() }[pos] = data
+        save(chunk, ref)
+        listeners.forEach { it.placed(block.world, pos, data, definition) }
         return true
     }
 

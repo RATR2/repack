@@ -110,17 +110,21 @@ class SkyboxManager(private val plugin: Repack, private val pack: PackSender) : 
 
     private fun canShow(player: Player): Boolean = definitions.isNotEmpty() && pack.loadedEra(player)?.let { SkyboxShaders.supports(it) } == true
 
+    /** Counts the runs of tick (every 2 ticks), so the every-10-ticks work does not depend on which ticks the scheduler happens to run on. */
+    private var runs = 0
+
     private fun tick() {
         val now = Bukkit.getCurrentTick()
+        runs++
         for (player in Bukkit.getOnlinePlayers()) {
             if (!canShow(player)) {
                 hide(player)
                 continue
             }
             // The sky that fits only needs working out again when the player has moved to another world or biome, and now and then for permissions.
-            if (now % 10 == 0) {
+            if (runs % 5 == 0) {
                 val key = "${player.world.uid}:${player.location.block.biome.key.asString()}"
-                if (location[player.uniqueId] != key || now % 100 == 0) {
+                if (location[player.uniqueId] != key || runs % 50 == 0) {
                     location[player.uniqueId] = key
                     update(player)
                     continue

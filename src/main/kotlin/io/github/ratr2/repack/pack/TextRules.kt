@@ -37,10 +37,15 @@ object TextRules {
         val color: Int,
     )
 
-    /** Marker colors are 0xFEFD00 plus a multiple of 4 in the blue channel, so a marker's drop shadow (a quarter of it) never matches another marker. */
+    /** Marker colors are 0xF0F100 plus a multiple of 4 in the blue channel, so a marker's drop shadow (a quarter of it) never matches another marker. */
     const val MAX_RULES = 64
-    private const val MARKER_BASE = 0xFEFD00
+    // The first two channels are 0xF0 and 0xF1: a quarter of each is 60, which no vanilla text color's drop shadow has in its first two channels (those are 0, 21, 42
+    // and 63), so a marker's shadow is never the shadow of ordinary text.
+    private const val MARKER_BASE = 0xF0F100
     private val ID = Regex("[a-z0-9_.:/-]+")
+    private const val MAX_OFFSET = 1.0e6
+    private const val MIN_SCALE = 0.001
+    private const val MAX_SCALE = 1000.0
 
     private val rules = ConcurrentHashMap<String, Rule>()
 
@@ -64,7 +69,8 @@ object TextRules {
         source: Anchor = Anchor.TOP_CENTER, sourceX: Double = 0.0, sourceY: Double = 0.0,
         scale: Double = 1.0, color: Int = 0xFFFFFF,
     ): Rule? {
-        if (!ID.matches(id) || listOf(offsetX, offsetY, sourceX, sourceY, scale).any { !it.isFinite() } || scale <= 0.0) return null
+        // The numbers are printed as GLSL float literals: a huge offset is not a float, and a scale under 0.001 prints as 0.0000 and collapses the text.
+        if (!ID.matches(id) || listOf(offsetX, offsetY, sourceX, sourceY).any { !it.isFinite() || Math.abs(it) > MAX_OFFSET } || !scale.isFinite() || scale < MIN_SCALE || scale > MAX_SCALE) return null
         val marker = rules[id]?.marker ?: free() ?: return null
         val rule = Rule(id, marker, anchor, offsetX, offsetY, source, sourceX, sourceY, scale, color and 0xFFFFFF)
         rules[id] = rule

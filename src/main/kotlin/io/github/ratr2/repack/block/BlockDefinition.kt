@@ -28,12 +28,14 @@ enum class ToolTier(val prefix: String) {
 }
 
 class AmountRange(val min: Int, val max: Int) {
-    fun roll(random: Random): Int = if (max <= min) min else min + random.nextInt(max - min + 1)
+    // The span is worked out in a long: max - min + 1 does not fit an int for a range like 0-2147483647.
+    fun roll(random: Random): Int = if (max <= min) min else (min + random.nextLong(max.toLong() - min + 1)).toInt()
 
     companion object {
         /** Accepts `3` and `1-3`. */
         fun parse(text: String): AmountRange? {
             val parts = text.trim().split('-')
+            if (parts.size > 2) return null
             val min = parts.getOrNull(0)?.trim()?.toIntOrNull() ?: return null
             val max = if (parts.size > 1) parts[1].trim().toIntOrNull() ?: return null else min
             return if (min < 0 || max < min) null else AmountRange(min, max)

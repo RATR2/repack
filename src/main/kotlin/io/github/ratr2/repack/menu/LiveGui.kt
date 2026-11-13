@@ -139,26 +139,29 @@ class LiveGui internal constructor(
         return if (glyph != null) GuiBackgrounds.title(glyph) else Colors.parse(manager.text(viewer, title))
     }
 
+    /** The player whose values a render uses: none for a shared GUI, whose one inventory is shown to everyone, so no one player's name or placeholders are in it. */
+    private fun renderFor(viewer: Player?): Player? = if (definition?.shared == true) null else viewer
+
     private fun create(viewer: Player?) {
         inv = when (kind) {
-            GuiKind.CHEST -> Bukkit.createInventory(this, rows * 9, titleFor(viewer))
-            GuiKind.HOPPER -> Bukkit.createInventory(this, InventoryType.HOPPER, titleFor(viewer))
-            GuiKind.DISPENSER -> Bukkit.createInventory(this, InventoryType.DISPENSER, titleFor(viewer))
-            GuiKind.DROPPER -> Bukkit.createInventory(this, InventoryType.DROPPER, titleFor(viewer))
+            GuiKind.CHEST -> Bukkit.createInventory(this, rows * 9, titleFor(renderFor(viewer)))
+            GuiKind.HOPPER -> Bukkit.createInventory(this, InventoryType.HOPPER, titleFor(renderFor(viewer)))
+            GuiKind.DISPENSER -> Bukkit.createInventory(this, InventoryType.DISPENSER, titleFor(renderFor(viewer)))
+            GuiKind.DROPPER -> Bukkit.createInventory(this, InventoryType.DROPPER, titleFor(renderFor(viewer)))
             else -> throw IllegalStateException("A ${kind.key} GUI has no inventory.")
         }
-        render(viewer)
+        render(renderFor(viewer))
     }
 
     internal fun prepare(viewer: Player) {
         if (!::inv.isInitialized || (stale && viewers.isEmpty())) {
             stale = false
             create(viewer)
-        } else if (definition?.shared != true || viewers.isEmpty()) render(viewer)
+        } else if (definition?.shared != true || viewers.isEmpty()) render(renderFor(viewer))
     }
 
     fun redraw(): LiveGui {
-        if (::inv.isInitialized) render(viewers.firstOrNull())
+        if (::inv.isInitialized) render(renderFor(viewers.firstOrNull()))
         return this
     }
 
@@ -180,7 +183,7 @@ class LiveGui internal constructor(
 
     internal fun tick(now: Long) {
         if (!::inv.isInitialized || inv.viewers.isEmpty()) return
-        val viewer = viewers.firstOrNull()
+        val viewer = renderFor(viewers.firstOrNull())
         if (update > 0 && now % update == 0L) {
             val before = HashMap(shown)
             render(viewer)
@@ -208,9 +211,12 @@ class LiveGui internal constructor(
         }
         val index = event.slot
         val found = slotAt(index)
-        val free = found?.second?.removable == true || (removable && (found == null || found.second.clicks.isEmpty))
+        // A slot made in code keeps its code in the handler, not in clicks: it is a button, not an item to take.
+        val free = found?.second?.removable == true || (removable && (found == null || (found.second.clicks.isEmpty && found.second.handler == null)))
         if (free) return
         event.isCancelled = true
+        // A fast double click is a click and then a double click: the first one did what the slot does, so the second does nothing.
+        if (event.click == org.bukkit.event.inventory.ClickType.DOUBLE_CLICK) return
         val (key, slot) = found ?: return
         if (manager.isPaused(player)) return
         val call = GuiClickEvent(player, this, index, key, event.click, slot.tags)
@@ -230,6 +236,6 @@ class LiveGui internal constructor(
             if (!removable) event.isCancelled = true
             return
         }
-        if (touched.any { slotAt(it)?.second?.removable != true && !(removable && slotAt(it)?.second?.clicks?.isEmpty != false) }) event.isCancelled = true
+        if (touched.any { slotAt(it)?.second?.removable != true && !(removable && slotAt(it)?.second?.let { slot -> slot.clicks.isEmpty && slot.handler == null } != false) }) event.isCancelled = true
     }
 }

@@ -38,7 +38,8 @@ class PersonalScreen(gui: Gui, player: Player) : Screen(gui, player, 3, "persona
     private fun mine(key: String) = settings.bool(player.uniqueId, key)
 
     override fun render() {
-        choice(11, "Client notices", PlayerSettings.NOTICES, config.getBoolean("client-notices", true), "Chat message when your game version is too old")
+        if (config.getBoolean("client-notices", true)) button(11, "settings", Material.BELL, "Notices", "The chat messages about your game version, shaderpacks and graphics", "Click to choose which you get")
+        else button(11, "cross", Material.GRAY_DYE, "Notices: off", "The server has all notices switched off")
         choice(13, "Black loading screen", PlayerSettings.LOADING_SCREEN, config.getBoolean("resource-pack.black-blocks-while-loading", true), "Blocks around you go black while the pack loads")
         if (admin) choice(15, "Build progress bar", PlayerSettings.PROGRESS_BAR, config.getBoolean("workflow.progress-bar", true), "The boss bar while the pack builds")
         back(18) { HubScreen(gui, player) }
@@ -50,13 +51,47 @@ class PersonalScreen(gui: Gui, player: Player) : Screen(gui, player, 3, "persona
 
     override fun click(slot: Int, event: InventoryClickEvent) {
         if (goBack(slot)) return
+        if (slot == 11 && config.getBoolean("client-notices", true)) {
+            gui.openLater(player, NoticesScreen(gui, player))
+            return
+        }
         val key = when (slot) {
-            11 -> PlayerSettings.NOTICES
             13 -> PlayerSettings.LOADING_SCREEN
             15 -> if (admin) PlayerSettings.PROGRESS_BAR else return
             else -> return
         }
         settings.set(player.uniqueId, key, !mine(key))
+        redraw()
+    }
+}
+
+/** Each notice with its own switch, and one for all of them. A notice the server has off shows as off and cannot be switched on here. */
+class NoticesScreen(gui: Gui, player: Player) : Screen(gui, player, 3, "notices", "Notices") {
+
+    private val notices get() = gui.plugin.notices
+    private val settings get() = gui.plugin.players
+
+    private val slots = listOf(11, 12, 13, 14, 15, 16)
+
+    override fun render() {
+        toggle(9, "All notices", settings.bool(player.uniqueId, PlayerSettings.NOTICES), "Off: none of the notices below reach you")
+        for ((index, notice) in notices.all.take(slots.size).withIndex()) {
+            if (notices.serverAllows(notice)) toggle(slots[index], notice.label, settings.bool(player.uniqueId, "notice-${notice.id}"), notice.note)
+            else button(slots[index], "cross", Material.GRAY_DYE, "${notice.label}: off", notice.note, "The server has this switched off")
+        }
+        back(18) { PersonalScreen(gui, player) }
+    }
+
+    override fun click(slot: Int, event: InventoryClickEvent) {
+        if (goBack(slot)) return
+        if (slot == 9) {
+            notices.set(player.uniqueId, null, !settings.bool(player.uniqueId, PlayerSettings.NOTICES))
+            redraw()
+            return
+        }
+        val notice = notices.all.getOrNull(slots.indexOf(slot)) ?: return
+        if (!notices.serverAllows(notice)) return
+        notices.set(player.uniqueId, notice, !settings.bool(player.uniqueId, "notice-${notice.id}"))
         redraw()
     }
 }
@@ -75,7 +110,7 @@ class ServerScreen(gui: Gui, player: Player) : Screen(gui, player, 4, "server", 
     private class Words(override val key: String, override val label: String, override val note: String, val fallback: Material, val default: String) : Option
 
     private val options: List<Option> = listOf(
-        Flag("client-notices", "Client notices", "Tell players their game version is too old"),
+        Flag("client-notices", "Client notices", "Tell players about their game version, shaderpacks and graphics"),
         Flag("resource-pack.join-latest-build", "Join gets the newest build", "Off: only the pack that was last pushed"),
         Flag("resource-pack.invulnerable-while-loading", "Hold while loading", "Players cannot be hurt or move while the pack loads"),
         Flag("resource-pack.black-blocks-while-loading", "Black loading screen", "Blocks around a loading player go black"),
