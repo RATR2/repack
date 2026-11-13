@@ -59,6 +59,7 @@ class RepackCommand(private val plugin: Repack) {
                         }
                 )
         )
+        .then(io.github.ratr2.repack.dimension.DimensionCommand(plugin).tree())
         .then(admin("status").executes(::status))
         .then(
             admin("place").then(

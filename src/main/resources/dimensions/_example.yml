@@ -1,0 +1,67 @@
+# A Repack dimension: a separate world Repack generates. Copy this file to dimensions/<name>.yml (files starting with _ are ignored)
+# and run /repack dimension load. /repack dimension tp <name> takes you there. Terrain of a world that exists is not changed by editing
+# the file: restart the server for a changed generator, and delete the world folder to regenerate it.
+#
+# A block is a vanilla material (stone) or a Repack custom block written repack:<id>.
+
+world: example_dimension      # the world's name (default: the file name)
+enabled: true
+# base: vanilla keeps the game's own terrain and adds features and structures on top.
+#       noise   makes terrain from the noise below.   void and flat are empty / flat worlds.
+base: noise
+environment: normal           # normal, nether or end
+# seed: 12345                 # default: the world's seed
+sea-level: 62
+fluid: water                  # water, lava or air
+bedrock: true
+base-height: 64               # noise terrain: the average height, and how far noise lifts or lowers it
+amplitude: 24
+terrain:
+  noise:
+    type: perlin              # perlin, value or cellular
+    fractal: fbm              # none, fbm, ridged or ping-pong
+    frequency: 0.01
+    octaves: 4
+    lacunarity: 2.0
+    gain: 0.5
+# Layers from the surface down. The last one goes to the bottom. A layer with blocks: picks by weight.
+layers:
+  - block: grass_block
+    depth: 1
+  - block: dirt
+    depth: 3
+  - blocks:
+      stone: 90
+      repack:example_ore: 1   # custom block, if you have one with this id
+caves:
+  threshold: 0.6
+  min-y: 5
+  max-y: 55
+  noise: { type: perlin, frequency: 0.035, fractal: fbm }
+biomes: [plains, forest]      # picked by low frequency noise; one biome: biome: plains
+biome-noise: { frequency: 0.004 }
+# Veins of blocks inside the terrain. replace: limits what they may replace.
+features:
+  - name: ore
+    block: coal_ore
+    replace: [stone]
+    count: 12                 # tries per chunk
+    size: 6
+    min-y: 0
+    max-y: 60
+# Small buildings from text: layers from the bottom up, each a list of rows. A structure fits in one chunk (up to 16 x 16).
+structures:
+  - name: pillar
+    chance: 0.1               # per try, with count tries per chunk
+    surface: true
+    rotate: true
+    palette: { S: stone_bricks, G: glowstone }
+    layers:
+      - ["SS", "SS"]
+      - ["S.", ".."]
+      - ["G."]
+# Do not send the model of a custom block that has solid blocks on every side: nobody can see it, and a cave full of them costs players frames.
+hide-buried: true
+# How far from a player (blocks) custom blocks have their model. Every model is an entity the client has to draw, so this is the main cost of a dimension full of
+# custom blocks. Default: display.render-distance in config.yml (48). 0 means no limit.
+# render-distance: 32

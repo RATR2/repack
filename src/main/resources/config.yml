@@ -103,6 +103,18 @@ text-effects:
       type: shine
       speed: 200.0
 
+display:
+  # How far from a player (blocks) custom blocks have their model. Each model is an entity the client has to draw, so lowering this is the
+  # first thing to do when many custom blocks cause lag. 0 means no limit. A dimension file can set its own render-distance.
+  render-distance: 48
+  # Blocks of one model that have no rotation, scale or offset share entities: one entity shows up to merge-size x merge-size of them (2 or 3), which is
+  # many times fewer entities on a flat surface. The pack gets a model for every combination, so this is left out for models with many cubes. 0 or 1
+  # turns it off. Changing it needs /repack build and /repack push.
+  merge-size: 3
+  # Gives each block's display a culling box, so the client skips drawing models that are off screen. A display without one (the vanilla default) is
+  # drawn even behind the player, which is most of the cost of many custom blocks.
+  culling: true
+
 limbo:
   # Login limbo: from joining until their client has the pack, a player is hidden from the tab list and from every other player, cannot be hurt, and their join
   # message is held back, so nobody sees someone standing still while the pack downloads or fights a player who is about to leave. Only players who are sent the

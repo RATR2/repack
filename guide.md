@@ -316,6 +316,25 @@ background:
 
 Repack makes the font, sizes and positions it for you at the next `/repack build`. The picture is fitted to the screen, so any size works, and one drawn at 2x or 4x stays sharp. `/repack gui template shop` writes a numbered guide picture to paint over. The game draws the picture on top of the items, so slots need see-through squares. If your picture already has them, leave `holes: off`. Otherwise `holes: container` cuts them over this GUI's slots, and `holes: all` over the player's inventory too.
 
+## Dimensions
+
+A dimension is an extra world Repack generates, from `plugins/Repack/dimensions/<name>.yml` (copy `_example.yml`, which is documented line by line) or from the API. Run `/repack dimension load` to make it, `/repack dimension tp <name>` to go there (it also takes any world name, and `overworld`), `/repack dimension back` to return, `/repack dimension list`, and `/repack dimension stats` for what generation costs. The world is created when the server starts too, and works with `bukkit.yml` through `generator: repack:<name>`. Changing a dimension's terrain needs a restart, and a world that has been generated keeps its chunks until you delete its folder.
+
+- `base: vanilla` keeps the game's terrain and adds features and structures on top. `noise` makes terrain from noise (perlin, value or cellular, with fbm, ridged or ping-pong fractals, the same knobs as FastNoise and SkNoise), `flat` and `void` are empty.
+- `layers` say what the ground is made of from the surface down, `features` are veins of a block inside the terrain, `structures` are small buildings written as layers of text. Any block can be a vanilla material or a custom block written `repack:<id>`.
+- Terrain is made off the main thread. Custom blocks are written as their proxy block and registered on the main thread when the chunk loads, within a small time budget per tick, so generating does not stall the server.
+- From code: `Repack.dimensions.define(name, section)` takes the same keys as a file (a `MemoryConfiguration` works), and returns the problems it found.
+
+### Keeping many custom blocks cheap
+
+Every custom block is an entity the player's client has to draw, which is what costs frames, not the server.
+
+- `display.render-distance` in `config.yml` (default 48 blocks, 0 for no limit) is how far from a player blocks have their model. A dimension file can set its own `render-distance`.
+- `hide-buried: true` in a dimension does not send the model of a block that has a solid block on every side. Breaking a neighbour sends it. A custom block counts as open, because its proxy does not hide what is behind it.
+- `display.merge-size` (default 3) lets blocks of one model that have no rotation, scale, offset or special light share entities: one entity shows up to 3 x 3 of them, so a flat surface is a ninth of the entities. The pack gets a model for every combination of blocks in a tile (511 for 3 x 3, 15 for 2 x 2), so a model is left out when its cubes would make that too many or when it reaches outside its own block. Changing the setting needs `/repack build` and `/repack push`.
+- A proxy that is a villager job site (smithing table, lectern, barrel, blast furnace and similar) makes vanilla search for villages every time one is placed. Thousands of them in a chunk freeze the server for seconds, so use barrier, light or a plain block for blocks that generate in bulk.
+- A chunk's custom block data is stored in the chunk. A chunk with a lot of them keeps the data compressed, because vanilla cannot save a string over 64 KB.
+
 ## Limits the plugin keeps
 
 These are checked when files are read, and a file that breaks one is reported by name instead of loading wrong. A drop gives at most 99 items. A skybox picture is at most 8192 by 4096, and a skybox shader may not have `#version`, `#include`, `void main`, unbalanced braces or an unclosed comment. A text effect's numbers are held to the ranges the editor offers, and two effects whose trigger colors are within 4 of each other in every channel are refused (the shader cannot tell them apart). A text rule marker color is `#F0F100` plus a multiple of 4 in the blue channel. An impact scene's `color` is six hex digits, and its offsets and angles stay within a million. Dialog inputs use only a-z, 0-9 and `_` for names (`token` and `button` are taken), and number, text and options inputs must have a start, step, length and choices the game accepts. Adventure mode players cannot place or mine custom blocks, and a model that is still used by another block's item or a custom item is not moved to the trash when a block is deleted.

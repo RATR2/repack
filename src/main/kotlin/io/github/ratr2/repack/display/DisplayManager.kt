@@ -46,7 +46,14 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
 
     private data class Key(val world: UUID, val pos: BlockPos)
 
-    private class Shown(val ids: IntArray, val rig: Rig?, val model: String, var clip: RigClip?, val look: RigLook?, var start: Int = 0, var mode: AnimationMode? = null, val definition: BlockDefinition? = null)
+    /** A tile of blocks of one model that share an entity (see [showTiled]): its size and position in tile units, and one entity per player. */
+    private data class TileKey(val world: UUID, val model: String, val tx: Int, val y: Int, val tz: Int)
+
+    private class Tile(val entityId: Int, var mask: Int, val size: Int, val definition: BlockDefinition)
+
+    private val tiles = HashMap<UUID, HashMap<TileKey, Tile>>()
+
+    private class Shown(val ids: IntArray, val rig: Rig?, val model: String, var clip: RigClip?, val look: RigLook?, var start: Int = 0, var mode: AnimationMode? = null, val definition: BlockDefinition? = null, val tile: TileKey? = null)
 
     private class Played(val clip: String?, val start: Int, val mode: AnimationMode?)
 
@@ -71,7 +78,13 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
         world.players.filter { it.isChunkSent(chunkKey) }.forEach { show(it, world, pos, block, definition) }
     }
 
+    override fun generated(world: World, pos: BlockPos, block: PlacedBlock, definition: BlockDefinition) {
+        val chunkKey = Chunk.getChunkKey(pos.x shr 4, pos.z shr 4)
+        world.players.filter { it.isChunkSent(chunkKey) }.forEach { show(it, world, pos, block, definition) }
+    }
+
     override fun removed(world: World, pos: BlockPos, block: PlacedBlock, definition: BlockDefinition) {
+        revealAround(world, pos.x, pos.y, pos.z)
         val key = Key(world.uid, pos)
         val already = played[key]?.clip == BREAK
         played.remove(key)
@@ -178,11 +191,17 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
     fun onWorldChange(event: PlayerChangedWorldEvent) {
         // The client discards every entity when it changes dimension, so there is nothing to destroy.
         shown[event.player.uniqueId]?.keys?.removeIf { it.world == event.from.uid }
+        tiles[event.player.uniqueId]?.keys?.removeIf { it.world == event.from.uid }
+        buriedKeys.remove(event.player.uniqueId)
+        scanned.remove(event.player.uniqueId)
     }
 
     @EventHandler
     fun onQuit(event: PlayerQuitEvent) {
         shown.remove(event.player.uniqueId)
+        tiles.remove(event.player.uniqueId)
+        buriedKeys.remove(event.player.uniqueId)
+        scanned.remove(event.player.uniqueId)
     }
 
     fun hideAllFor(player: Player) {
@@ -223,6 +242,11 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
         val key = Key(world.uid, pos)
         // Showing again without hiding first would spawn a second copy under the same entity id.
         hide(player, key)
+        if (far(player, pos, renderDistance(world))) return
+        if (buried(world, pos)) {
+            buriedKeys.getOrPut(player.uniqueId) { HashSet() } += key
+            return
+        }
         val ids = shown.getOrPut(player.uniqueId) { HashMap() }
 
         val options = definition.display
@@ -247,21 +271,171 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
             RigDisplays.spawn(player, definition.model, rig, entityIds, location, look, displaysOf(rig, clip, start, mode))
             return
         }
+        if (showTiled(player, key, pos, block, definition, ids)) return
         val entityId = SpigotReflectionUtil.generateEntityId()
         ids[key] = Shown(intArrayOf(entityId), null, definition.model, null, null)
+        // With culling the entity stands at the bottom of the block and the model is lifted half a block (see metadata), so its culling box starts where the block does.
+        val spot = if (cullable(definition)) PacketLocation(location.x, location.y - 0.5, location.z, location.yaw, location.pitch) else location
         // One bundle, so the client applies the spawn and the item in the same tick and never draws the display without its model.
         players.sendPacket(player, WrapperPlayServerBundle())
         players.sendPacket(
             player,
-            WrapperPlayServerSpawnEntity(entityId, UUID.randomUUID(), EntityTypes.ITEM_DISPLAY, location, block.yaw.toFloat(), 0, Vector3d.zero()),
+            WrapperPlayServerSpawnEntity(entityId, UUID.randomUUID(), EntityTypes.ITEM_DISPLAY, spot, block.yaw.toFloat(), 0, Vector3d.zero()),
         )
         players.sendPacket(player, WrapperPlayServerEntityMetadata(entityId, metadata(definition)))
         players.sendPacket(player, WrapperPlayServerBundle())
     }
 
+    /** In a dimension that hides buried blocks: whether every side of the block touches a solid block, so nobody could see its model. Unloaded neighbours count as open. */
+    private fun buried(world: World, pos: BlockPos): Boolean {
+        if (!plugin.dimensions.hidesBuried(world)) return false
+        for ((dx, dy, dz) in SIDES) {
+            val x = pos.x + dx
+            val z = pos.z + dz
+            if (!world.isChunkLoaded(x shr 4, z shr 4)) return false
+            val y = pos.y + dy
+            if (y < world.minHeight || y >= world.maxHeight) return false
+            if (!world.getType(x, y, z).isOccluding) return false
+        }
+        return true
+    }
+
+    /** A block next to these coordinates went away, so blocks that were buried may now be visible: sends the ones that are to the players who have the chunk. */
+    fun revealAround(world: World, x: Int, y: Int, z: Int) {
+        if (!plugin.dimensions.hidesBuried(world)) return
+        plugin.server.scheduler.runTask(plugin, Runnable {
+            for ((dx, dy, dz) in SIDES) {
+                val pos = BlockPos(x + dx, y + dy, z + dz)
+                if (!world.isChunkLoaded(pos.x shr 4, pos.z shr 4)) continue
+                val block = blocks.inChunk(world, pos.x shr 4, pos.z shr 4)[pos] ?: continue
+                val definition = blocks.definitionOf(block.id) ?: continue
+                val key = Key(world.uid, pos)
+                val chunkKey = Chunk.getChunkKey(pos.x shr 4, pos.z shr 4)
+                for (player in world.players) {
+                    if (!player.isChunkSent(chunkKey) || shown[player.uniqueId]?.containsKey(key) == true) continue
+                    buriedKeys[player.uniqueId]?.remove(key)
+                    show(player, world, pos, block, definition)
+                }
+            }
+        })
+    }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.MONITOR, ignoreCancelled = true)
+    fun onBreak(event: org.bukkit.event.block.BlockBreakEvent) = revealAround(event.block.world, event.block.x, event.block.y, event.block.z)
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.MONITOR, ignoreCancelled = true)
+    fun onEntityExplode(event: org.bukkit.event.entity.EntityExplodeEvent) = event.blockList().forEach { revealAround(it.world, it.x, it.y, it.z) }
+
+    @EventHandler(priority = org.bukkit.event.EventPriority.MONITOR, ignoreCancelled = true)
+    fun onBlockExplode(event: org.bukkit.event.block.BlockExplodeEvent) = event.blockList().forEach { revealAround(it.world, it.x, it.y, it.z) }
+
+    /** Keys a player has no display for because every side is covered, so the distance scan does not look at them again; [revealAround] clears them. */
+    private val buriedKeys = HashMap<UUID, HashSet<Key>>()
+
+    private class Spot(val world: UUID, val x: Double, val y: Double, val z: Double)
+
+    private val scanned = HashMap<UUID, Spot>()
+
+    /** How far from a player (blocks) custom blocks have their display: the dimension's own value, else `display.render-distance`. 0 means no limit. */
+    fun renderDistance(world: World): Int = plugin.dimensions.renderDistanceOf(world) ?: plugin.config.getInt("display.render-distance", 48)
+
+    private fun far(player: Player, pos: BlockPos, limit: Int): Boolean {
+        if (limit <= 0) return false
+        val at = player.location
+        val dx = pos.x + 0.5 - at.x
+        val dy = pos.y + 0.5 - at.y
+        val dz = pos.z + 0.5 - at.z
+        return dx * dx + dy * dy + dz * dz > limit.toDouble() * limit
+    }
+
+    /**
+     * Every few ticks: shows the blocks that came within the render distance of a player and hides the ones that left it (with a margin, so a block on the edge does
+     * not flicker). A player who has hardly moved since the last look is skipped.
+     */
+    fun scan() {
+        for (player in Bukkit.getOnlinePlayers()) {
+            if (hidden(player)) continue
+            val world = player.world
+            val limit = renderDistance(world)
+            if (limit <= 0) continue
+            val at = player.location
+            val last = scanned[player.uniqueId]
+            if (last != null && last.world == world.uid && (last.x - at.x).let { it * it } + (last.y - at.y).let { it * it } + (last.z - at.z).let { it * it } < MOVE_SQUARED) continue
+            scanned[player.uniqueId] = Spot(world.uid, at.x, at.y, at.z)
+
+            val mine = shown[player.uniqueId]
+            if (mine != null) {
+                val out = limit + HIDE_MARGIN
+                val gone = mine.keys.filter { it.world == world.uid && far(player, it.pos, out) }
+                gone.forEach { hide(player, it) }
+            }
+            val skip = buriedKeys[player.uniqueId]
+            val reach = limit / 16 + 1
+            val cx = at.blockX shr 4
+            val cz = at.blockZ shr 4
+            for (x in cx - reach..cx + reach) for (z in cz - reach..cz + reach) {
+                if (!world.isChunkLoaded(x, z) || !player.isChunkSent(Chunk.getChunkKey(x, z))) continue
+                for ((pos, block) in blocks.inChunk(world, x, z)) {
+                    if (far(player, pos, limit)) continue
+                    val key = Key(world.uid, pos)
+                    if (shown[player.uniqueId]?.containsKey(key) == true || skip?.contains(key) == true) continue
+                    val definition = blocks.definitionOf(block.id) ?: continue
+                    show(player, world, pos, block, definition)
+                }
+            }
+        }
+    }
+
     private fun hide(player: Player, key: Key) {
+        buriedKeys[player.uniqueId]?.remove(key)
         val entry = shown[player.uniqueId]?.remove(key) ?: return
-        RigDisplays.destroy(player, entry.ids)
+        if (entry.tile != null) untile(player, key, entry.tile) else RigDisplays.destroy(player, entry.ids)
+    }
+
+    private fun bitOf(pos: BlockPos, size: Int) = 1 shl (Math.floorMod(pos.x, size) + size * Math.floorMod(pos.z, size))
+
+    /**
+     * Blocks of a model that has tile models share an entity: one entity shows every block of its type in a tile of size x size blocks, as the item model for that
+     * combination (the pack has one for each). A flat surface of 3x3 tiles is a ninth of the entities. Only plain blocks qualify: no rotation, scale, offset or
+     * special light, since the tile is one model. Returns false when the block does not.
+     */
+    private fun showTiled(player: Player, key: Key, pos: BlockPos, block: PlacedBlock, definition: BlockDefinition, ids: HashMap<Key, Shown>): Boolean {
+        val size = plugin.merged[definition.model] ?: return false
+        val o = definition.display
+        if (block.yaw != 0 || o.scaleX != 1f || o.scaleY != 1f || o.scaleZ != 1f || o.offsetX != 0.0 || o.offsetY != 0.0 || o.offsetZ != 0.0 ||
+            o.brightness != null || o.viewRange != 1f || o.context != DisplayContext.NONE) return false
+        val tileKey = TileKey(key.world, definition.model, Math.floorDiv(pos.x, size), pos.y, Math.floorDiv(pos.z, size))
+        val bit = bitOf(pos, size)
+        val mine = tiles.getOrPut(player.uniqueId) { HashMap() }
+        val existing = mine[tileKey]
+        val players = PacketEvents.getAPI().playerManager
+        if (existing == null) {
+            val entityId = SpigotReflectionUtil.generateEntityId()
+            mine[tileKey] = Tile(entityId, bit, size, definition)
+            val at = PacketLocation(tileKey.tx * size + size / 2.0, if (cullable(definition)) pos.y.toDouble() else pos.y + 0.5, tileKey.tz * size + size / 2.0, 0f, 0f)
+            players.sendPacket(player, WrapperPlayServerBundle())
+            players.sendPacket(player, WrapperPlayServerSpawnEntity(entityId, UUID.randomUUID(), EntityTypes.ITEM_DISPLAY, at, 0f, 0, Vector3d.zero()))
+            players.sendPacket(player, WrapperPlayServerEntityMetadata(entityId, metadata(definition, ItemModelGenerator.tileModel(definition.model, size, bit), size)))
+            players.sendPacket(player, WrapperPlayServerBundle())
+        } else {
+            existing.mask = existing.mask or bit
+            players.sendPacket(player, WrapperPlayServerEntityMetadata(existing.entityId, metadata(definition, ItemModelGenerator.tileModel(definition.model, size, existing.mask), size)))
+        }
+        ids[key] = Shown(IntArray(0), null, definition.model, null, null, definition = definition, tile = tileKey)
+        return true
+    }
+
+    private fun untile(player: Player, key: Key, tileKey: TileKey) {
+        val mine = tiles[player.uniqueId] ?: return
+        val tile = mine[tileKey] ?: return
+        tile.mask = tile.mask and bitOf(key.pos, tile.size).inv()
+        val players = PacketEvents.getAPI().playerManager
+        if (tile.mask == 0) {
+            mine.remove(tileKey)
+            players.sendPacket(player, WrapperPlayServerDestroyEntities(tile.entityId))
+        } else {
+            players.sendPacket(player, WrapperPlayServerEntityMetadata(tile.entityId, metadata(tile.definition, ItemModelGenerator.tileModel(tile.definition.model, tile.size, tile.mask), tile.size)))
+        }
     }
 
     private fun lookOf(definition: BlockDefinition): RigLook {
@@ -356,12 +530,17 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
 
     private var lastSent: Map<String, List<BoneDisplay>> = emptyMap()
 
-    private fun metadata(definition: BlockDefinition): List<EntityData<*>> {
+    /** Whether a block's display gets a culling box: on in the config, and the model is not scaled taller than its block. */
+    private fun cullable(definition: BlockDefinition) = plugin.config.getBoolean("display.culling", true) && definition.display.scaleY <= 1f
+
+    private fun cullWidth(definition: BlockDefinition, tile: Int) = maxOf(definition.display.scaleX, definition.display.scaleZ, 1f) * 1.5f * tile
+
+    private fun metadata(definition: BlockDefinition, model: String = definition.model, tile: Int = 1): List<EntityData<*>> {
         val options = definition.display
         val item = com.github.retrooper.packetevents.protocol.item.ItemStack.builder()
             .type(ItemTypes.PAPER)
             .amount(1)
-            .component(ComponentTypes.ITEM_MODEL, ItemModel(ResourceLocation(ItemModelGenerator.NAMESPACE, definition.model)))
+            .component(ComponentTypes.ITEM_MODEL, ItemModel(ResourceLocation(ItemModelGenerator.NAMESPACE, model)))
             // Jade and similar mods show the item's name for an item display, which would be "Paper".
             .component(ComponentTypes.ITEM_NAME, io.github.ratr2.repack.text.Colors.parse(definition.item.name ?: definition.id.split('_', '-').joinToString(" ") { it.replaceFirstChar { c -> c.uppercase() } }))
             .build()
@@ -374,12 +553,21 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
         }
         options.brightness?.let { data += EntityData(BRIGHTNESS, EntityDataTypes.INT, it shl 4 or (it shl 20)) }
         if (options.viewRange != 1f) data += EntityData(VIEW_RANGE, EntityDataTypes.FLOAT, options.viewRange)
+        if (cullable(definition)) {
+            // The client never skips drawing a display whose culling box is 0 x 0 (the default), even when it is behind the player. The box runs from the entity up.
+            data += EntityData(TRANSLATION, EntityDataTypes.VECTOR3F, Vector3f(0f, 0.5f, 0f))
+            data += EntityData(WIDTH, EntityDataTypes.FLOAT, cullWidth(definition, tile))
+            data += EntityData(HEIGHT, EntityDataTypes.FLOAT, CULL_HEIGHT)
+        }
         data += EntityData(ITEM, EntityDataTypes.ITEMSTACK, item)
         if (options.context != DisplayContext.NONE) data += EntityData(ITEM_CONTEXT, EntityDataTypes.BYTE, options.context.value)
         return data
     }
 
     private companion object {
+        const val MOVE_SQUARED = 4.0
+        const val HIDE_MARGIN = 8
+        val SIDES = listOf(Triple(1, 0, 0), Triple(-1, 0, 0), Triple(0, 1, 0), Triple(0, -1, 0), Triple(0, 0, 1), Triple(0, 0, -1))
         const val IDLE = "idle"
         const val PLACE = "place"
         const val BREAK = "break"
@@ -387,10 +575,15 @@ class DisplayManager(private val plugin: io.github.ratr2.repack.Repack, private 
         // Display entity metadata indexes for Minecraft 1.21.4 to 26.3 (position/rotation interpolation exists from 1.21.2).
         const val FLAGS = 0
         const val INVISIBLE: Byte = 0x20
+        const val TRANSLATION = 11
         const val SCALE = 12
         const val BRIGHTNESS = 16
         const val VIEW_RANGE = 17
+        const val WIDTH = 20
+        const val HEIGHT = 21
         const val ITEM = 23
         const val ITEM_CONTEXT = 24
+        /** Tall enough for a model that reaches two blocks above its own (the vanilla limit is 32 pixels). */
+        const val CULL_HEIGHT = 2.5f
     }
 }

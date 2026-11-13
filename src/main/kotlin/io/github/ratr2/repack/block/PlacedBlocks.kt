@@ -19,6 +19,10 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 interface PlacementListener {
     fun placed(world: World, pos: BlockPos, block: PlacedBlock, definition: BlockDefinition)
+
+    /** A block that world generation made: like [placed], but nobody put it there, so nothing plays. */
+    fun generated(world: World, pos: BlockPos, block: PlacedBlock, definition: BlockDefinition) = placed(world, pos, block, definition)
+
     fun removed(world: World, pos: BlockPos, block: PlacedBlock, definition: BlockDefinition)
 }
 
@@ -28,6 +32,9 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
 
     private val chunks = HashMap<ChunkRef, MutableMap<BlockPos, PlacedBlock>>()
     private val dataKey = NamespacedKey(plugin, "blocks")
+
+    /** A chunk's NBT can only hold a string of 65535 bytes, so a chunk with more blocks than that keeps its text compressed in a byte array under this key. */
+    private val bigKey = NamespacedKey(plugin, "blocks-gz")
     val listeners = CopyOnWriteArrayList<PlacementListener>()
 
     @Volatile
@@ -165,6 +172,32 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
         return true
     }
 
+    /**
+     * Registers many blocks of one chunk at once (a generated chunk), saving the chunk's data once. Each is ((x, y, z), (id, yaw)); one that is not of its type's
+     * proxy material, or already holds a block, is skipped. Returns how many were added. Main thread only.
+     */
+    fun adoptAll(chunk: Chunk, list: List<Pair<Triple<Int, Int, Int>, Pair<String, Int>>>): Int {
+        val world = chunk.world
+        val ref = refOf(chunk)
+        val map = chunks.getOrPut(ref) { HashMap() }
+        val added = ArrayList<Triple<BlockPos, PlacedBlock, BlockDefinition>>(list.size)
+        for ((at, what) in list) {
+            val definition = definitions[what.first] ?: continue
+            val pos = BlockPos(at.first, at.second, at.third)
+            if (pos in map || world.getBlockAt(pos.x, pos.y, pos.z).type != definition.proxyBlock) continue
+            val data = PlacedBlock(what.first, if (definition.display.rotateToPlacer) snap(what.second.toFloat()) else 0)
+            map[pos] = data
+            added += Triple(pos, data, definition)
+        }
+        if (added.isEmpty()) {
+            if (map.isEmpty()) chunks.remove(ref)
+            return 0
+        }
+        save(chunk, ref)
+        for ((pos, data, definition) in added) listeners.forEach { it.generated(world, pos, data, definition) }
+        return added.size
+    }
+
     fun remove(block: Block): Boolean {
         if (dataAt(block) == null) return false
         forget(block)
@@ -204,13 +237,32 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
         if (blocks.isNullOrEmpty()) {
             chunks.remove(ref)
             data.remove(dataKey)
+            data.remove(bigKey)
         } else {
-            data.set(dataKey, PersistentDataType.STRING, BlockCodec.encode(blocks))
+            val text = BlockCodec.encode(blocks)
+            if (text.length <= SMALL_TEXT) {
+                data.set(dataKey, PersistentDataType.STRING, text)
+                data.remove(bigKey)
+            } else {
+                val out = java.io.ByteArrayOutputStream()
+                java.util.zip.GZIPOutputStream(out).use { it.write(text.toByteArray(Charsets.UTF_8)) }
+                data.set(bigKey, PersistentDataType.BYTE_ARRAY, out.toByteArray())
+                data.remove(dataKey)
+            }
         }
     }
 
     private fun load(chunk: Chunk) {
-        val text = chunk.persistentDataContainer.get(dataKey, PersistentDataType.STRING) ?: return
+        val text = chunk.persistentDataContainer.get(dataKey, PersistentDataType.STRING)
+            ?: chunk.persistentDataContainer.get(bigKey, PersistentDataType.BYTE_ARRAY)?.let { bytes ->
+                try {
+                    java.util.zip.GZIPInputStream(bytes.inputStream()).use { String(it.readBytes(), Charsets.UTF_8) }
+                } catch (e: java.io.IOException) {
+                    plugin.logger.warning("The custom block data of chunk ${chunk.x}, ${chunk.z} in ${chunk.world.name} is damaged: ${e.message}")
+                    null
+                }
+            }
+            ?: return
         val blocks = BlockCodec.decode(text)
         val before = blocks.size
         blocks.entries.removeIf { (pos, data) ->
@@ -220,6 +272,11 @@ class PlacedBlocks(private val plugin: Repack) : Listener {
         val ref = refOf(chunk)
         if (blocks.isNotEmpty()) chunks[ref] = blocks
         if (blocks.size != before) save(chunk, ref)
+    }
+
+    private companion object {
+        // Text is ASCII (digits, ids), so this many characters is under the 65535-byte limit with room to spare.
+        const val SMALL_TEXT = 60000
     }
 
     @EventHandler

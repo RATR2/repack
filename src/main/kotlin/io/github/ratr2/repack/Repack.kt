@@ -60,6 +60,9 @@ class Repack : JavaPlugin() {
     lateinit var customItems: io.github.ratr2.repack.item.CustomItems
         private set
 
+    /** The models that came with tile models in the last build, and the tile size: their blocks are shown merged (see DisplayManager). */
+    @Volatile var merged: Map<String, Int> = emptyMap()
+
     @Volatile
     var rigs: Map<String, io.github.ratr2.repack.model.Rig> = emptyMap()
         private set
@@ -118,6 +121,13 @@ class Repack : JavaPlugin() {
     lateinit var display: DisplayManager
         private set
 
+    lateinit var dimensions: io.github.ratr2.repack.dimension.Dimensions
+        private set
+
+    /** Lets bukkit.yml or another world plugin use a Repack dimension by name: `generator: repack:<name>`. */
+    override fun getDefaultWorldGenerator(worldName: String, id: String?): org.bukkit.generator.ChunkGenerator? =
+        if (::dimensions.isInitialized && id != null) dimensions.generatorFor(id.lowercase()) else null
+
     override fun onEnable() {
         saveDefaultConfig()
         migrateConfig()
@@ -125,6 +135,7 @@ class Repack : JavaPlugin() {
         saveResource("skyboxes/_example.yml", true)
         saveResource("guis/_example.yml", true)
         saveResource("impacts/_example.yml", true)
+        saveResource("dimensions/_example.yml", true)
         installDefaults()
         store = PackStore(dataFolder)
         sending = config.getBoolean("resource-pack.send", true)
@@ -171,6 +182,9 @@ class Repack : JavaPlugin() {
         }
         blocks.start()
         RepackAPI.plugin = this
+        dimensions = io.github.ratr2.repack.dimension.Dimensions(this)
+        dimensions.start()
+        server.scheduler.runTask(this, Runnable { dimensions.load().forEach { logger.warning(it) } })
         if (sending) {
             if (!store.hasPublished) logger.info("No pack published yet: run /repack build, then /repack push, to send players the pack.")
         } else {
@@ -179,6 +193,7 @@ class Repack : JavaPlugin() {
         lastStamp = stamp()
         pendingBuild = config.getBoolean("workflow.build-on-change", true)
         server.scheduler.runTaskTimer(this, Runnable { watch() }, WATCH_TICKS, WATCH_TICKS)
+        server.scheduler.runTaskTimer(this, Runnable { display.scan() }, 10L, 10L)
         server.scheduler.runTaskTimer(this, Runnable { display.animate() }, io.github.ratr2.repack.display.RigDisplays.STEP_TICKS.toLong(), io.github.ratr2.repack.display.RigDisplays.STEP_TICKS.toLong())
         if (server.pluginManager.isPluginEnabled("Skript")) {
             try {
@@ -580,6 +595,7 @@ class Repack : JavaPlugin() {
         // The async build reads a copy of the config and the export folder, both taken here on the main thread: the config can change while the build runs.
         val snap = org.bukkit.configuration.file.YamlConfiguration().apply { loadFromString(config.saveToString()) }
         val exportTo = exportFolder()
+        val mergeSize = snap.getInt("display.merge-size", 3)
         server.scheduler.runTaskAsynchronously(this, Runnable {
             var library: LibraryResult? = null
             var skies: io.github.ratr2.repack.sky.LoadedSkyboxes? = null
@@ -589,7 +605,7 @@ class Repack : JavaPlugin() {
             var universal: ByteArray? = null
             var failure: String? = null
             try {
-                library = ModelLibrary.build(folder, cache, fresh) { done, total ->
+                library = ModelLibrary.build(folder, cache, fresh, mergeSize) { done, total ->
                     progress.update(PARSE_SHARE * done / maxOf(total, 1), "converting models $done/$total")
                 }
                 // A model that failed to convert is missing from the pack, so a pack built around it could replace a working one.
@@ -665,6 +681,7 @@ class Repack : JavaPlugin() {
                     }
                 }
                 val rigFiles = library.files[PackVariant.MODERN].orEmpty()
+                merged = if (mergeSize < 2) emptyMap() else library.models.filter { "assets/repack/items/${io.github.ratr2.repack.model.ItemModelGenerator.tileModel(it, mergeSize, 1)}.json" in rigFiles }.associateWith { mergeSize }
                 rigs = rigFiles.mapNotNull { (path, bytes) ->
                     val id = path.removePrefix(io.github.ratr2.repack.model.ItemModelGenerator.RIG_FOLDER).removeSuffix(".json")
                     if (!path.startsWith(io.github.ratr2.repack.model.ItemModelGenerator.RIG_FOLDER) || '/' in id) null

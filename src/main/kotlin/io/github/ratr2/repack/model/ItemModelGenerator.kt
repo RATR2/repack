@@ -20,7 +20,7 @@ object ItemModelGenerator {
     private val ANGLES = setOf(-45.0, -22.5, 0.0, 22.5, 45.0)
 
     /** shelf keeps the `on_shelf` display setting, which only game versions from 1.21.9 know. */
-    fun generate(id: String, model: BbModel, shelf: Boolean = true): GeneratedModel {
+    fun generate(id: String, model: BbModel, shelf: Boolean = true, mergeSize: Int = 0): GeneratedModel {
         val files = HashMap<String, ByteArray>()
         val rigged = RigBuilder.needed(model)
         // A rigged model is shown in pieces in the world, so what a single model loses is only how it looks in a hand or an inventory.
@@ -55,7 +55,55 @@ object ItemModelGenerator {
         }
         files["assets/$NAMESPACE/items/$id.json"] = item.toString().toByteArray(Charsets.UTF_8)
         if (rigged) addRig(id, model, textures, files, warnings, errors)
+        else if (mergeSize in 2..MAX_MERGE && errors.isEmpty()) addTiles(id, model, textures, mergeSize, files, warnings)
         return GeneratedModel(files, warnings, errors)
+    }
+
+    /** Up to this many blocks per side in a tile: 3 is as far as one model reaches (-16 to 32 covers three blocks), and it is 511 models per block. */
+    const val MAX_MERGE = 3
+
+    /** A tile model with this many elements or more is too much to put in a pack for every combination. */
+    private const val MAX_TILE_ELEMENTS = 150_000
+
+    /** The item model of a tile of [size] x [size] blocks with the blocks in [mask] (bit x + size * z) present. */
+    fun tileModel(id: String, size: Int, mask: Int) = "$id/t${size}_$mask"
+
+    /**
+     * Models that show several blocks of this type at once, so a flat surface of them is one entity per tile instead of one per block. There is one for every
+     * combination of blocks present in a tile (an item model cannot be moved or repeated at run time, only picked), so it is left out for a model whose cubes
+     * would make that too many, or that leaves the block's own 16 x 16 footprint.
+     */
+    private fun addTiles(id: String, model: BbModel, textures: JsonObject, size: Int, files: MutableMap<String, ByteArray>, warnings: MutableList<String>) {
+        val cells = size * size
+        val masks = (1 shl cells) - 1
+        if (model.cubes.isEmpty() || model.cubes.size.toLong() * cells * (masks + 1) / 2 > MAX_TILE_ELEMENTS) return
+        for (cube in model.cubes) {
+            val grow = cube.inflate
+            if (cube.from.x - grow < 0 || cube.to.x + grow > 16 || cube.from.z - grow < 0 || cube.to.z + grow > 16) return
+        }
+        // One copy of the cubes per cell, moved to where the cell is in the tile; the tile's entity stands in the middle of it. The game turns an item display's
+        // model half a turn around its middle before drawing it (which is what a single block's display does to its own model), so the cells go to the opposite
+        // side of the middle, and end up where their blocks are.
+        val copies = (0 until cells).map { cell ->
+            val shift = Vec3(((cell % size) - (size - 1) / 2.0) * 16.0, 0.0, ((cell / size) - (size - 1) / 2.0) * 16.0)
+            model.cubes.mapNotNull { elementOf(it, model.textures, textures, ArrayList(), ArrayList(), shift = shift, lenient = true) }
+        }
+        if (copies.any { it.size != copies[0].size }) return
+        for (mask in 1..masks) {
+            val elements = JsonArray()
+            for (cell in 0 until cells) if (mask and (1 shl cell) != 0) copies[cell].forEach(elements::add)
+            val name = tileModel(id, size, mask)
+            files["assets/$NAMESPACE/models/block/$name.json"] = JsonObject().apply {
+                add("textures", textures)
+                add("elements", elements)
+            }.toString().toByteArray(Charsets.UTF_8)
+            files["assets/$NAMESPACE/items/$name.json"] = JsonObject().apply {
+                add("model", JsonObject().apply {
+                    addProperty("type", "minecraft:model")
+                    addProperty("model", "$NAMESPACE:block/$name")
+                })
+            }.toString().toByteArray(Charsets.UTF_8)
+        }
     }
 
     private fun addRig(id: String, model: BbModel, textures: JsonObject, files: MutableMap<String, ByteArray>, warnings: MutableList<String>, errors: MutableList<String>) {
