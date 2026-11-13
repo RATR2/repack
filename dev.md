@@ -126,6 +126,14 @@ Slots of a GUI made in Skript keep their code when the layout changes: `set cust
 
 ### Events
 
+`on repack join` fires once a joining player's client has loaded the resource pack. Skript's own `on join` fires the moment they connect, before the pack, when custom blocks, GUIs and screen effects do not work for them yet, so put that kind of script here. It also fires when the client declined or failed to load the pack, when nothing happened within `limbo.timeout-seconds`, and for a player who is not sent a pack at all, so a join is never missed. `the repack join reason` is `"loaded"`, `"failed"`, `"timeout"` or `"not sent"`. Event value: `event-player`. It fires after login limbo has let the player in and their join message is out.
+
+```
+on repack join:
+    if the repack join reason is "loaded":
+        open custom gui "welcome" to player
+```
+
 `on custom block interact [of %strings%]` (or `click`) fires when a player clicks a custom block, with right or left click. Event values: `event-block`, `event-player`, `event-location`, `event-string` (the id).
 
 ```
@@ -196,7 +204,9 @@ boolean placed = (boolean) api.getMethod("place", Location.class, String.class).
 
 ### Events
 
-Both are Bukkit events in `io.github.ratr2.repack.block`, fired on the main thread.
+**`RepackJoinEvent`** (in `io.github.ratr2.repack.pack`) is fired once a joining player's client has loaded the resource pack, declined or failed it, or took longer than `limbo.timeout-seconds`, or when the player is not sent a pack. `getPlayer()` and `getReason()` (`LOADED`, `FAILED`, `TIMEOUT`, `NOT_SENT`). Bukkit's `PlayerJoinEvent` fires before the pack, so listen to this one for anything that needs it.
+
+The block events are Bukkit events in `io.github.ratr2.repack.block`, fired on the main thread.
 
 **`CustomBlockInteractEvent`** (cancellable) is fired when a player clicks a custom block. Cancelling it cancels the click.
 

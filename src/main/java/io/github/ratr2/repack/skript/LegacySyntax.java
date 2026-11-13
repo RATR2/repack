@@ -5,6 +5,7 @@ import ch.njol.skript.lang.ExpressionType;
 import io.github.ratr2.repack.Repack;
 import io.github.ratr2.repack.block.CustomBlockEvent;
 import io.github.ratr2.repack.block.CustomBlockInteractEvent;
+import io.github.ratr2.repack.pack.RepackJoinEvent;
 import io.github.ratr2.repack.menu.GuiActionEvent;
 import io.github.ratr2.repack.menu.LiveGui;
 
@@ -55,6 +56,10 @@ final class LegacySyntax {
         Skript.registerEvent("Custom Block Interact", EvtCustomBlockInteract.class, CustomBlockInteractEvent.class, EvtCustomBlockInteract.PATTERNS)
                 .description("Fires when a player clicks a custom block.")
                 .examples("on custom block interact of \"table\":");
+        Skript.registerEvent("Repack Join", EvtRepackJoin.class, RepackJoinEvent.class, EvtRepackJoin.PATTERNS)
+                .description("Fires once a joining player's client has loaded the resource pack (or refused it, failed, timed out, or was never sent one). The normal join event fires before the pack, so use this for GUIs, screen effects and custom blocks. The repack join reason is loaded, failed, timeout or not sent.")
+                .examples("on repack join:", "    if the repack join reason is \"loaded\":", "        play an impact frame for player keeping 3 blocks lasting 4 ticks");
+        Skript.registerExpression(ExprRepackJoinReason.class, String.class, ExpressionType.SIMPLE, ExprRepackJoinReason.PATTERNS);
         Skript.registerEvent("Custom Block Action", EvtCustomBlockAction.class, CustomBlockEvent.class, EvtCustomBlockAction.PATTERNS)
                 .description("Fires for everything that happens to a custom block's proxy block: break, explode, piston, burn and more.")
                 .examples("on custom block explode of \"table\":");

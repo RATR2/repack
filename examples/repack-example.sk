@@ -1,6 +1,11 @@
 # Example Skript for Repack. Copy it to plugins/Skript/scripts/ and run /sk reload repack-example.
 # It uses the bundled "table" block (plugins/Repack/blocks/table.yml). Needs Skript 2.13 or newer.
 
+# Skript's "on join" fires before the player's client has the pack. This fires once it has (or it failed, timed out, or none is sent).
+on repack join:
+    if the repack join reason is "loaded":
+        send "&7Welcome. Your pack is loaded." to player
+
 # Any click on the table (left clicks too, since digging starts with one). The table's block file already stops the smithing table
 # menu from opening, so this is where you would open your own menu.
 on custom block interact of "table":

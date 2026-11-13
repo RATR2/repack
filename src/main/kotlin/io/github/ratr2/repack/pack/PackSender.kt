@@ -135,7 +135,7 @@ class PackSender(
                 sentAt.remove(playerId)
                 if (own) hold.end(playerId)
                 if (own) testing.remove(playerId)?.invoke(true)
-                plugin.limbo.release(event.player)
+                plugin.limbo.release(event.player, RepackJoinEvent.Reason.LOADED)
                 val era = variantOf(event.player)
                 if (era != null && loaded.put(playerId, era) == null) {
                     onLoaded(event.player)
@@ -149,7 +149,7 @@ class PackSender(
                 loaded.remove(playerId)
                 // A client that refused or could not load the pack never will, so it is let in. With a required pack the server is about to disconnect it
                 // instead, and a join message followed at once by a quit message is no use to anyone: it stays in limbo, and is never announced.
-                if (own && event.status != Status.DISCARDED && !plugin.config.getBoolean("resource-pack.required", false)) plugin.limbo.release(event.player)
+                if (own && event.status != Status.DISCARDED && !plugin.config.getBoolean("resource-pack.required", false)) plugin.limbo.release(event.player, RepackJoinEvent.Reason.FAILED)
                 // A discard is the client dropping a pack, not a failure to load one.
                 if (own && event.status != Status.DISCARDED) {
                     val test = testing.remove(playerId)

@@ -45,6 +45,9 @@ class LoginLimbo(private val plugin: Repack, private val willSend: (Player) -> B
     // this is how the next join knows to put it back instead of taking "invulnerable" for how they were.
     private val wasInvulnerableKey = NamespacedKey(plugin, "limbo-was-invulnerable")
 
+    /** Players whose client has not yet answered about the pack, with the task that gives up on it: they are owed a [RepackJoinEvent], limbo or not. */
+    private val awaiting = ConcurrentHashMap<UUID, org.bukkit.scheduler.BukkitTask>()
+
     fun isInLimbo(player: Player) = inLimbo.containsKey(player.uniqueId)
 
     /** What a player in limbo was before it (so the loading hold does not take limbo's invulnerability for theirs); null when they are not in limbo. */
@@ -63,7 +66,16 @@ class LoginLimbo(private val plugin: Repack, private val willSend: (Player) -> B
         // Someone who joins while others are in limbo must not see them either.
         for (id in inLimbo.keys) plugin.server.getPlayer(id)?.let { player.hidePlayer(plugin, it) }
         // A player who is not sent the pack has no shaders to clash with, so there is nothing to tell them and nothing to wait for.
-        if (!willSend(player)) return
+        if (!willSend(player)) {
+            val id = player.uniqueId
+            // A tick on, so scripts that run on the join itself go first.
+            plugin.server.scheduler.runTask(plugin, Runnable { plugin.server.getPlayer(id)?.let { fire(it, RepackJoinEvent.Reason.NOT_SENT) } })
+            return
+        }
+        val seconds = plugin.config.getInt("limbo.timeout-seconds", 30).coerceIn(1, 600)
+        val timeout = plugin.server.scheduler.runTaskLater(plugin, Runnable { release(player, RepackJoinEvent.Reason.TIMEOUT) }, seconds * 20L)
+        awaiting.remove(player.uniqueId)?.cancel()
+        awaiting[player.uniqueId] = timeout
         if (!enabled) {
             afterJoin(player)
             return
@@ -71,32 +83,40 @@ class LoginLimbo(private val plugin: Repack, private val willSend: (Player) -> B
         val original = event.joinMessage()
         event.joinMessage(null)
         for (other in plugin.server.onlinePlayers) if (other != player) other.hidePlayer(plugin, player)
-        val seconds = plugin.config.getInt("limbo.timeout-seconds", 30).coerceIn(1, 600)
-        val timeout = plugin.server.scheduler.runTaskLater(plugin, Runnable { release(player) }, seconds * 20L)
         val was = player.isInvulnerable
         inLimbo[player.uniqueId] = State(was, original, timeout)
         player.persistentDataContainer.set(wasInvulnerableKey, PersistentDataType.BYTE, if (was) 1 else 0)
         player.isInvulnerable = true
     }
 
+    private fun fire(player: Player, reason: RepackJoinEvent.Reason) {
+        if (plugin.isEnabled && player.isOnline) plugin.server.pluginManager.callEvent(RepackJoinEvent(player, reason))
+    }
+
     /**
      * Brings a player out of limbo: shows them, sends their join message, then the notices. Does nothing for a player who is not in limbo. While the loading
      * hold has the player it is the hold that gives their invulnerability back, so it is left alone here.
      */
-    fun release(player: Player) {
-        val state = inLimbo.remove(player.uniqueId) ?: return
-        state.timeout.cancel()
+    fun release(player: Player, reason: RepackJoinEvent.Reason = RepackJoinEvent.Reason.LOADED) {
+        val waiting = awaiting.remove(player.uniqueId)
+        waiting?.cancel()
+        val state = inLimbo.remove(player.uniqueId)
+        state?.timeout?.cancel()
+        if (state == null && waiting == null) return
         if (!player.isOnline) return
-        restore(player, state, keepInvulnerable = plugin.isLoadingHeld(player))
-        // With the plugin stopping nothing more can be scheduled or announced.
-        if (!plugin.isEnabled) return
-        // A join message that something else cleared before limbo (a vanish plugin) stays unsent, whatever limbo.join-message says.
-        if (!plugin.config.getBoolean("limbo.send-join-message", true)) {
-            quietQuits.add(player.uniqueId)
-        } else if (state.joinMessage != null) {
-            plugin.server.broadcast(joinText(plugin.config.getString("limbo.join-message"), player.name) ?: state.joinMessage)
+        if (state != null) {
+            restore(player, state, keepInvulnerable = plugin.isLoadingHeld(player))
+            // With the plugin stopping nothing more can be scheduled or announced.
+            if (!plugin.isEnabled) return
+            // A join message that something else cleared before limbo (a vanish plugin) stays unsent, whatever limbo.join-message says.
+            if (!plugin.config.getBoolean("limbo.send-join-message", true)) {
+                quietQuits.add(player.uniqueId)
+            } else if (state.joinMessage != null) {
+                plugin.server.broadcast(joinText(plugin.config.getString("limbo.join-message"), player.name) ?: state.joinMessage)
+            }
+            afterJoin(player)
         }
-        afterJoin(player)
+        fire(player, reason)
     }
 
     private fun restore(player: Player, state: State, keepInvulnerable: Boolean) {
@@ -119,6 +139,7 @@ class LoginLimbo(private val plugin: Repack, private val willSend: (Player) -> B
     @EventHandler(priority = EventPriority.HIGHEST)
     fun onQuit(event: PlayerQuitEvent) {
         noticeTasks.remove(event.player.uniqueId)?.cancel()
+        awaiting.remove(event.player.uniqueId)?.cancel()
         // Their join was not announced, so neither is their leaving.
         if (quietQuits.take(event.player.uniqueId)) event.quitMessage(null)
         val state = inLimbo.remove(event.player.uniqueId) ?: return
@@ -140,6 +161,8 @@ class LoginLimbo(private val plugin: Repack, private val willSend: (Player) -> B
     fun releaseAll() {
         noticeTasks.values.forEach { runCatching { it.cancel() } }
         noticeTasks.clear()
+        awaiting.values.forEach { runCatching { it.cancel() } }
+        awaiting.clear()
         for (id in inLimbo.keys.toList()) {
             val state = inLimbo.remove(id) ?: continue
             runCatching { state.timeout.cancel() }

@@ -5,6 +5,7 @@ import ch.njol.skript.aliases.ItemType;
 import io.github.ratr2.repack.Repack;
 import io.github.ratr2.repack.block.CustomBlockEvent;
 import io.github.ratr2.repack.block.CustomBlockInteractEvent;
+import io.github.ratr2.repack.pack.RepackJoinEvent;
 import io.github.ratr2.repack.menu.GuiActionEvent;
 import io.github.ratr2.repack.menu.LiveGui;
 import org.skriptlang.skript.addon.SkriptAddon;
@@ -95,6 +96,15 @@ final class ModernSyntax {
                 .addExample("on custom block interact of \"table\":")
                 .addPatterns(EvtCustomBlockInteract.PATTERNS)
                 .build());
+        registry.register(BukkitSyntaxInfos.Event.KEY, BukkitSyntaxInfos.Event.builder(EvtRepackJoin.class, "Repack Join")
+                .supplier(EvtRepackJoin::new)
+                .addEvent(RepackJoinEvent.class)
+                .addDescription("Fires once a joining player's client has loaded the resource pack (or refused it, failed, timed out, or was never sent one). The normal join event fires before the pack, so use this for GUIs, screen effects and custom blocks. The repack join reason is loaded, failed, timeout or not sent.")
+                .addExample("on repack join:")
+                .addPatterns(EvtRepackJoin.PATTERNS)
+                .build());
+        registry.register(SyntaxRegistry.EXPRESSION, SyntaxInfo.Expression.builder(ExprRepackJoinReason.class, String.class)
+                .supplier(ExprRepackJoinReason::new).addPatterns(ExprRepackJoinReason.PATTERNS).build());
         registry.register(BukkitSyntaxInfos.Event.KEY, BukkitSyntaxInfos.Event.builder(EvtCustomBlockAction.class, "Custom Block Action")
                 .supplier(EvtCustomBlockAction::new)
                 .addEvent(CustomBlockEvent.class)
