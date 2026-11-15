@@ -391,6 +391,12 @@ class Repack : JavaPlugin() {
         return null
     }
 
+    /** Drops the runtime copy of an item (registered from code, or hidden with unregister), so a file saved under the id is the item. */
+    fun forgetRegisteredItem(id: String) {
+        registeredItems.remove(id)
+        unregisteredItems.remove(id)
+    }
+
     fun unregisterItem(id: String): Boolean {
         if (id !in customItems.definitions) return false
         registeredItems.remove(id)

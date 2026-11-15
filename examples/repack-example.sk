@@ -104,11 +104,11 @@ command /sky [<string>]:
             set player's skybox to arg-1
 
 # ---- Custom items ----
-# Writes plugins/Repack/items/ruby.yml (or changes it). Run it once; the item is then in /repack give and the item screens.
+# Writes plugins/Repack/items/ruby.yml, replacing the item if it exists. Run it once; the item is then in /repack give and the item screens.
 command /makeruby:
     permission: example.items
     trigger:
-        create custom item "ruby" with base "EMERALD"
+        create custom item "ruby" with base item emerald named "&cRuby"
         set custom item "ruby"'s name to "&cRuby"
         set custom item "ruby"'s lore to "&7A shiny stone" and "&7found deep down"
         set custom item "ruby"'s glint to true

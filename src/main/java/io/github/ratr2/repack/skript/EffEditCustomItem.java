@@ -1,5 +1,6 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.aliases.ItemType;
 import ch.njol.skript.doc.Description;
 import ch.njol.skript.doc.Examples;
 import ch.njol.skript.doc.Name;
@@ -12,7 +13,9 @@ import io.github.ratr2.repack.RepackAPI;
 import io.github.ratr2.repack.edit.ItemBuilder;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.event.Event;
+import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -22,13 +25,13 @@ import java.util.List;
  * Creates, registers or changes a custom item: its name, lore, glint, base item, model, or any option of its item file.
  */
 @Name("Edit Custom Item")
-@Description({"Creates, registers or changes a custom item: its name, lore, glint, base item, model, or any option of its item file.", "`create` writes plugins/Repack/items/<id>.yml. `register` only lasts until the next reload."})
-@Examples({"create custom item \"ruby\" with base \"EMERALD\"", "set custom item \"ruby\"'s name to \"&cRuby\"", "set custom item \"ruby\"'s lore to \"&7A shiny stone\" and \"&7found deep down\"", "set custom item \"ruby\"'s glint to true", "clear custom item \"ruby\"'s lore"})
+@Description({"Creates, registers or changes a custom item: its name, lore, glint, base item, model, or any option of its item file.", "The base item of `create` is an item type, so `emerald named \"Ruby\"` makes an emerald based item that is called Ruby. `create` writes plugins/Repack/items/<id>.yml, replacing an item that already has the id. `register` only lasts until the next reload."})
+@Examples({"create custom item \"ruby\" with base item emerald", "create custom item \"ruby\" with base item emerald named \"&cRuby\"", "set custom item \"ruby\"'s name to \"&cRuby\"", "set custom item \"ruby\"'s lore to \"&7A shiny stone\" and \"&7found deep down\"", "set custom item \"ruby\"'s glint to true", "clear custom item \"ruby\"'s lore"})
 @Since("1.0.1")
 public class EffEditCustomItem extends Effect {
 
     static final String[] PATTERNS = {
-            "create [a] custom item %string% [(with|using) base %-string%] [(and|with) model %-string%]",
+            "create [a] custom item %string% [(with|using) base item %-itemtype%] [named %-string%] [(and|with) model %-string%]",
             "register [a] custom item %string% (with|using) base %string% [(and|with) model %-string%]",
             "unregister [a] custom item %string%",
             "set custom item %string%'s name to %string%",
@@ -44,12 +47,20 @@ public class EffEditCustomItem extends Effect {
     private Expression<String> id;
     private @Nullable Expression<?> first;
     private @Nullable Expression<?> second;
+    private @Nullable Expression<?> third;
     private String cleared = "";
 
     @Override
     public boolean init(Expression<?>[] exprs, int matchedPattern, Kleenean isDelayed, ParseResult parseResult) {
         pattern = matchedPattern;
         id = castString(exprs[0]);
+        if (matchedPattern == 0) {
+            // The base item, the name and the model.
+            first = exprs[1];
+            third = exprs[2];
+            second = exprs[3];
+            return true;
+        }
         if (exprs.length > 1) first = exprs[1];
         if (exprs.length > 2) second = exprs[2];
         if (matchedPattern == 9) {
@@ -96,13 +107,20 @@ public class EffEditCustomItem extends Effect {
     }
 
     private @Nullable String create(String item, Event event) {
-        ItemBuilder builder = RepackAPI.createItem(item);
-        String base = text(first, event);
+        ItemBuilder builder = RepackAPI.createItem(item, true);
+        Object given = first == null ? null : first.getSingle(event);
+        ItemStack stack = given instanceof ItemType type ? type.getRandom() : null;
         String model = text(second, event);
-        if (base != null) {
-            String problem = setBase(builder, base);
-            if (problem != null) return problem;
+        String name = text(third, event);
+        if (stack != null) {
+            if (!stack.getType().isItem()) return "'" + stack.getType() + "' is not an item";
+            builder.base(stack.getType());
+            // `emerald named "Ruby"` is one item type in Skript, so its name is the item's name too.
+            if (name == null && stack.hasItemMeta() && stack.getItemMeta().hasDisplayName()) {
+                name = LegacyComponentSerializer.builder().character('&').hexColors().build().serialize(stack.getItemMeta().displayName());
+            }
         }
+        if (name != null) builder.name(name);
         if (model != null) builder.model(model);
         return builder.save();
     }

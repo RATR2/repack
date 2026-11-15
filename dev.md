@@ -35,7 +35,7 @@ Needs Skript 2.13 or newer. Repack adds its syntax when it starts, using the new
 | `set %players%'s skybox to %string%`, `hide %players%'s skybox`, `reset %players%'s skybox` | Effects. |
 | `all skybox ids`, `all custom item ids`, `all animations of custom block %string%`, `all text rule ids` | Expressions: lists of texts. |
 | `custom item %string% [x %number%]` | Expression: the item, as an item. |
-| `create custom item %string% [with base %string%] [and model %string%]` | Effect. Writes `items/<id>.yml`. |
+| `create custom item %string% [with base item %itemtype%] [named %string%] [and model %string%]` | Effect. Writes `items/<id>.yml`, replacing an item that has the id. `with base item emerald named "Ruby"` works: the name of the item type is the custom item's name. |
 | `register custom item %string% with base %string% [and model %string%]` | Effect. Until the next reload. `unregister custom item %string%` removes it. |
 | `set custom item %string%'s name to %string%` | Effect. Also `lore to %strings%`, `glint to %boolean%`, `base to %string%`, `model to %string%` and `option %string% to %objects%` for any key of the item file. |
 | `clear custom item %string%'s name`, `lore` or `model` | Effect. |
@@ -56,7 +56,7 @@ command /table:
 
 ### Items
 
-`RepackAPI.item(id, amount)` gives the stack for a block or custom item id. `itemIds()`, `itemIdOf(stack)`, `registerItem(id, "EMERALD", model)` and `unregisterItem(id)` (until the next reload), and `createItem(id)` / `editItem(id)` return an `ItemBuilder`: chain `base`, `model`, `name`, `lore`, `glint`, `exact`, `components`, then `save()`, which writes `items/<id>.yml`. In Skript: `custom item "ruby"`, with `x 3` for a count.
+`RepackAPI.item(id, amount)` gives the stack for a block or custom item id. `itemIds()`, `itemIdOf(stack)`, `registerItem(id, "EMERALD", model)` and `unregisterItem(id)` (until the next reload), and `createItem(id)` / `editItem(id)` return an `ItemBuilder` (`createItem(id)` fails when the id is taken; `createItem(id, true)` replaces the item that has it as a whole): chain `base`, `model`, `name`, `lore`, `glint`, `exact`, `components`, then `save()`, which writes `items/<id>.yml`. In Skript: `custom item "ruby"`, with `x 3` for a count.
 
 ### Block animations
 

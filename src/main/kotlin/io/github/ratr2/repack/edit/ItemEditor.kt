@@ -29,10 +29,14 @@ class ItemEditor(private val plugin: Repack) {
         return ItemDraft(id, yaml, ::write)
     }
 
-    fun create(id: String): Result<ItemDraft> {
+    /** A new item. With [replace], an item that has the id is replaced as a whole (its file and any registered copy), not edited. */
+    fun create(id: String, replace: Boolean = false): Result<ItemDraft> {
         if (!idPattern.matches(id)) return Result.failure(IllegalArgumentException("Item ids use only a-z, 0-9, _ and -."))
-        if (id in plugin.customItems.ids || fileOf(id).exists()) return Result.failure(IllegalArgumentException("An item with the id '$id' already exists."))
-        seen[id] = 0L
+        val exists = id in plugin.customItems.ids || fileOf(id).exists()
+        if (exists && !replace) return Result.failure(IllegalArgumentException("An item with the id '$id' already exists."))
+        // What the draft is saved over is the file as it is now: replacing it is the point.
+        if (exists) plugin.forgetRegisteredItem(id)
+        seen[id] = stamp(id)
         return Result.success(ItemDraft(id, YamlConfiguration().apply { loadFromString(ItemTemplate.render(id)) }, ::write))
     }
 

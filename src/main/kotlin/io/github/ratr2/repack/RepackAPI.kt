@@ -121,9 +121,14 @@ object RepackAPI {
         io.github.ratr2.repack.edit.ItemBuilder(draft, if (draft == null) "There is no item '$id'." else null)
     }
 
+    /** A new item. It fails (save says why) when the id is taken; use [createItem] with replace to overwrite an item that has the id. */
     @JvmStatic
-    fun createItem(id: String): io.github.ratr2.repack.edit.ItemBuilder = onMain(io.github.ratr2.repack.edit.ItemBuilder(null, "Repack is not running.")) { api ->
-        api.itemEditor.create(id).fold(
+    fun createItem(id: String): io.github.ratr2.repack.edit.ItemBuilder = createItem(id, false)
+
+    /** With replace, an existing item of that id is replaced as a whole by the new one, not edited. */
+    @JvmStatic
+    fun createItem(id: String, replace: Boolean): io.github.ratr2.repack.edit.ItemBuilder = onMain(io.github.ratr2.repack.edit.ItemBuilder(null, "Repack is not running.")) { api ->
+        api.itemEditor.create(id, replace).fold(
             onSuccess = { io.github.ratr2.repack.edit.ItemBuilder(it, null) },
             onFailure = { io.github.ratr2.repack.edit.ItemBuilder(null, it.message ?: "Could not make the item.") },
         )
