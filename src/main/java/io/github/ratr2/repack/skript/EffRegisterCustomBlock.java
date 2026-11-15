@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -9,6 +13,13 @@ import org.bukkit.Bukkit;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * Registers a custom block for this run of the server (it is not saved), unregisters one, or reads the block files again.
+ */
+@Name("Register Custom Block")
+@Description({"Registers a custom block for this run of the server (it is not saved), unregisters one, or reads the block files again."})
+@Examples({"register custom block \"temp\" using model \"table\"", "unregister custom block \"temp\"", "reload custom blocks"})
+@Since("1.0.0")
 public class EffRegisterCustomBlock extends Effect {
 
     static final String[] PATTERNS = {

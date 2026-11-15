@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -8,6 +12,13 @@ import io.github.ratr2.repack.RepackAPI;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * How many ripples are showing, and the most that can show at once (256).
+ */
+@Name("Active / Maximum Ripples")
+@Description({"How many ripples are showing, and the most that can show at once (256)."})
+@Examples({"send \"%the number of active ripples% of %the maximum number of ripples% ripples are in use.\" to player"})
+@Since("1.0.1")
 public class ExprRipples extends SimpleExpression<Long> {
 
     static final String[] PATTERNS = {

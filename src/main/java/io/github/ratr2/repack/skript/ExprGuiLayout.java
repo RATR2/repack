@@ -1,6 +1,10 @@
 package io.github.ratr2.repack.skript;
 
 import ch.njol.skript.classes.Changer.ChangeMode;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -13,6 +17,13 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 
+/**
+ * The layout (one text per row, a character per slot) or the title of a custom GUI. Both can be set. Slots stay defined when the layout changes, so setting a layout can bring slots into view. A new title applies the next time the GUI opens.
+ */
+@Name("Custom GUI Layout / Title")
+@Description({"The layout (one text per row, a character per slot) or the title of a custom GUI. Both can be set. Slots stay defined when the layout changes, so setting a layout can bring slots into view. A new title applies the next time the GUI opens."})
+@Examples({"set custom gui layout of {_gui} to \"#########\" and \"#   a   #\" and \"#########\"", "set custom gui title of {_gui} to \"&6Shop\""})
+@Since("1.0.0")
 public class ExprGuiLayout extends SimpleExpression<String> {
 
     static final String[] PATTERNS = {

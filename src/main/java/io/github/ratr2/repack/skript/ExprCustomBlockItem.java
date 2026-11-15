@@ -1,6 +1,10 @@
 package io.github.ratr2.repack.skript;
 
 import ch.njol.skript.aliases.ItemType;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -10,6 +14,13 @@ import org.bukkit.event.Event;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * The item that places a custom block, or a custom item, in an amount.
+ */
+@Name("Custom Block / Item Item")
+@Description({"The item that places a custom block, or a custom item, in an amount."})
+@Examples({"give player custom block item \"table\" x 2", "give player custom item \"ruby\" x 3"})
+@Since("1.0.0")
 public class ExprCustomBlockItem extends SimpleExpression<ItemType> {
 
     static final String[] PATTERNS = {"[the] custom block item %string% [(x|times) %-number%]", "[the] custom item %string% [(x|times) %-number%]"};

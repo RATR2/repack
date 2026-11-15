@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Condition;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -11,6 +15,13 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Predicate;
 
+/**
+ * Whether blocks are Repack custom blocks, or one with a given id.
+ */
+@Name("Is Custom Block")
+@Description({"Checks whether a block is a Repack custom block, optionally one with a given id."})
+@Examples({"if event-block is a custom block:", "if target block is a custom block with id \"table\":", "if event-block is not a custom block:"})
+@Since("1.0.0")
 public class CondIsCustomBlock extends Condition {
 
     static final String[] PATTERNS = {

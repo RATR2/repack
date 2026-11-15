@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Literal;
 import ch.njol.skript.lang.SkriptEvent;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -9,6 +13,13 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 
+/**
+ * Fires when an {@code event: name} action of a GUI file runs (a slot, on-open, on-close, a dialog button). event-player, event-string (the name) and {@code the gui input} (what a dialog or anvil collected) are available.
+ */
+@Name("Custom GUI Action")
+@Description({"Fires when an `event: name` action of a GUI file runs (a slot, on-open, on-close, a dialog button). event-player, event-string (the name) and `the gui input` (what a dialog or anvil collected) are available."})
+@Examples({"on custom gui action of \"buy\":", "    send \"Amount: %the gui input \"amount\"%\" to event-player"})
+@Since("1.0.0")
 public class EvtGuiAction extends SkriptEvent {
 
     static final String[] PATTERNS = {"custom gui action [of %-strings%]"};

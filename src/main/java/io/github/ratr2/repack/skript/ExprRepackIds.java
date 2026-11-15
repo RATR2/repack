@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -10,6 +14,13 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.stream.Stream;
 
+/**
+ * Lists of ids: custom items, skyboxes, the animations of a custom block's model, text rules and impact scenes.
+ */
+@Name("Repack IDs")
+@Description({"Lists of ids: custom items, skyboxes, the animations of a custom block's model, text rules and impact scenes."})
+@Examples({"send \"Items: %all custom item ids%\" to player", "send \"Skies: %all skybox ids%\" to player", "send \"Animations: %all animations of custom block \"table\"%\" to player"})
+@Since("1.0.1")
 public class ExprRepackIds extends SimpleExpression<String> {
 
     static final String[] PATTERNS = {

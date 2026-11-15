@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -12,10 +16,17 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * Builds a named scene of focus points, plays it for players, or clears it. A scene is also loaded from plugins/Repack/impacts/<id>.yml.
+ */
+@Name("Impact Scene")
+@Description({"Builds a named scene of focus points, plays it for players, or clears it. A scene is also loaded from plugins/Repack/impacts/<id>.yml."})
+@Examples({"add a \"radial\" focus point of size 4 at player's location to the impact scene \"boom\"", "play the impact scene \"boom\" for player lasting 4 ticks in color \"FFFFFF\"", "clear the impact scene \"boom\""})
+@Since("1.0.1")
 public class EffImpactScene extends Effect {
 
     static final String[] PATTERNS = {
-            "add [an] %string% focus [point[s]] [of size %-number%] [angled %-number% degrees] at %locations% to [the] impact scene %string%",
+            "add [a|an] %string% focus [point[s]] [of size %-number%] [angled %-number% degrees] at %locations% to [the] impact scene %string%",
             "clear [the] impact scene %string%",
             "(play|show) [the] impact scene %string% for %players% [lasting %-number% tick[s]] [in colo[u]r %-string%]",
     };

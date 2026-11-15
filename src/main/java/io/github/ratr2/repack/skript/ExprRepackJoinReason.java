@@ -1,6 +1,10 @@
 package io.github.ratr2.repack.skript;
 
 import ch.njol.skript.Skript;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -9,6 +13,13 @@ import io.github.ratr2.repack.pack.RepackJoinEvent;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * Why an {@code on repack join} event fired: "loaded", or the reason the pack did not load (failed, timed out, none is sent).
+ */
+@Name("Repack Join Reason")
+@Description({"Why an `on repack join` event fired: \"loaded\", or the reason the pack did not load (failed, timed out, none is sent)."})
+@Examples({"on repack join:", "    send \"Pack: %the repack join reason%\" to player"})
+@Since("1.0.1")
 public class ExprRepackJoinReason extends SimpleExpression<String> {
 
     static final String[] PATTERNS = {"[the] repack join reason"};

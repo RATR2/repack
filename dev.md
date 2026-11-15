@@ -48,7 +48,7 @@ command /table:
     permission: example.table
     trigger:
         give player custom block item "table" x 2
-        set {_spot} to 2 meters in front of player
+        set {_spot} to location 2 meters in front of player
         place custom block "table" at {_spot} facing player's yaw
         if player's target block is a custom block with id "table":
             send "You are looking at a table." to player
@@ -115,7 +115,7 @@ command /shop:
 | `make custom gui slot[s] %integers/strings% [in %customgui%] with [removable] %itemtype%`, `make next custom gui slot ...` | Section, or just a line. With a colon, the code inside runs when the slot is clicked. A text names the slots of those layout characters, a number is a slot. |
 | `unmake custom gui slot[s] %integers/strings%`, `unmake all custom gui slots` | Effect. |
 | `run on custom gui open`, `run on custom gui close` | Section inside `create`. `cancel custom gui closing` keeps it open. |
-| `open [custom gui] %customgui% to %players%`, `close custom gui of %players%`, `refresh custom gui %customgui%` | Effects. |
+| `open [custom gui] %customgui% to %players%`, `open custom gui %string% to %players%`, `close custom gui of %players%`, `refresh custom gui %customgui%` | Effects. The text form opens a GUI by its id. |
 | `pause custom gui events of %players%`, `resume custom gui events of %players%` | Hold a player's open and close code and slot actions while you switch screens, then resume. |
 | `the last created custom gui`, `the custom gui with id %string%`, `the custom gui of %player%`, `all custom gui ids` | Expressions. The second one works for the files in the guis folder too. |
 | `custom gui layout of %customgui%`, `custom gui title of %customgui%` | Expressions you can read and set. A new title applies the next time it opens. |
@@ -277,10 +277,10 @@ String error = RepackAPI.create("chair", "chair")
 ```
 create custom block "chair" using model "chair"
 set custom block "chair"'s option "breaking.time" to 2.5
-set custom block "chair"'s option "display.scale" to 1, 1.2, 1
+set custom block "chair"'s option "display.scale" to 1, 1.2 and 1
 set custom block "chair"'s item to {_sword}
 set custom block "chair"'s item to {_sword} without the block's model
-set custom block "chair"'s recipe to {_a}, {_b}, {_a}, air, {_b}, air, air, air, air with amount 2
+set custom block "chair"'s recipe to {_a}, {_b}, {_a}, air, {_b}, air, air, air and air with amount 2
 clear custom block "chair"'s item
 clear custom block "chair"'s recipe
 ```

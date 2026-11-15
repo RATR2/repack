@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -8,6 +12,13 @@ import io.github.ratr2.repack.RepackAPI;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * The ids of all custom blocks.
+ */
+@Name("Custom Block IDs")
+@Description({"The ids of all custom blocks."})
+@Examples({"send \"Custom blocks: %all custom block ids%\" to player"})
+@Since("1.0.0")
 public class ExprCustomBlockIds extends SimpleExpression<String> {
 
     static final String[] PATTERNS = {"[all [of the]] custom block ids"};

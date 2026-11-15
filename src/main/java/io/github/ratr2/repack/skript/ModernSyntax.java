@@ -13,6 +13,7 @@ import org.skriptlang.skript.bukkit.registration.BukkitSyntaxInfos;
 import org.skriptlang.skript.registration.SyntaxInfo;
 import org.skriptlang.skript.registration.SyntaxRegistry;
 
+/** Registers every Repack syntax element with the registration API of Skript 2.14 and newer. */
 final class ModernSyntax {
 
     private ModernSyntax() {

@@ -1,6 +1,10 @@
 package io.github.ratr2.repack.skript;
 
 import ch.njol.skript.aliases.ItemType;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -17,6 +21,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * Creates a custom block from a model in the models folder, or changes a block file: any option of a block file, its item, its recipe.
+ */
+@Name("Edit Custom Block")
+@Description({"Creates a custom block from a model in the models folder, or changes a block file: any option of a block file, its item, its recipe.", "Changes are saved to plugins/Repack/blocks/<id>.yml and loaded at once. A problem with a value is written to the console."})
+@Examples({"create custom block \"chair\" with model \"chair\"", "set custom block \"chair\"'s option \"breaking.time\" to 2", "set custom block \"chair\"'s item to a stick", "set custom block \"chair\"'s recipe to 4 oak planks and a stick", "clear custom block \"chair\"'s recipe"})
+@Since("1.0.0")
 public class EffEditCustomBlock extends Effect {
 
     static final String[] PATTERNS = {

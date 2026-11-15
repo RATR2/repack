@@ -32,7 +32,7 @@ layers:
     depth: 3
   - blocks:
       stone: 90
-      repack:example_ore: 1   # custom block, if you have one with this id
+      repack:table: 1         # a custom block (the table that comes with Repack; use any block id you have)
 caves:
   threshold: 0.6
   min-y: 5

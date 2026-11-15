@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -9,6 +13,13 @@ import org.bukkit.Location;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * Plays a Blockbench animation of a custom block's model on the block at a location, or stops it. The mode says how it repeats: loop, once (then settles back into the model's own pose) or hold (stays in the last pose).
+ */
+@Name("Play Block Animation")
+@Description({"Plays a Blockbench animation of a custom block's model on the block at a location, or stops it. The mode says how it repeats: loop, once (then settles back into the model's own pose) or hold (stays in the last pose).", "Not saved: the block goes back to its idle animation or pose when it is shown again."})
+@Examples({"play the animation \"spin\" on the custom block at player's target block", "play the animation \"open\" as once on the custom block at {_spot}", "stop the animation of the custom block at {_spot}"})
+@Since("1.0.0")
 public class EffBlockAnimation extends Effect {
 
     static final String[] PATTERNS = {

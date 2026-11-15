@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -9,6 +13,13 @@ import org.bukkit.Location;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * Spawns a ripple in the world that distorts the screen of players who have the pack, in a color (hex) and growing to a radius in blocks over a number of ticks. Up to 256 ripples show at once.
+ */
+@Name("Spawn Ripple")
+@Description({"Spawns a ripple in the world that distorts the screen of players who have the pack, in a color (hex) and growing to a radius in blocks over a number of ticks. Up to 256 ripples show at once."})
+@Examples({"spawn a ripple at victim's location with color \"55CCFF\" radius 6 lasting 30 ticks"})
+@Since("1.0.0")
 public class EffSpawnRipple extends Effect {
 
     static final String[] PATTERNS = {"spawn [a] ripple at %locations% with colo[u]r %string% radius %number% lasting %number% tick[s]"};

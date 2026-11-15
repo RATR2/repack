@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -14,6 +18,13 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Creates, registers or changes a custom item: its name, lore, glint, base item, model, or any option of its item file.
+ */
+@Name("Edit Custom Item")
+@Description({"Creates, registers or changes a custom item: its name, lore, glint, base item, model, or any option of its item file.", "`create` writes plugins/Repack/items/<id>.yml. `register` only lasts until the next reload."})
+@Examples({"create custom item \"ruby\" with base \"EMERALD\"", "set custom item \"ruby\"'s name to \"&cRuby\"", "set custom item \"ruby\"'s lore to \"&7A shiny stone\" and \"&7found deep down\"", "set custom item \"ruby\"'s glint to true", "clear custom item \"ruby\"'s lore"})
+@Since("1.0.1")
 public class EffEditCustomItem extends Effect {
 
     static final String[] PATTERNS = {

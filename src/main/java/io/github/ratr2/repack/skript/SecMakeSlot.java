@@ -2,6 +2,10 @@ package io.github.ratr2.repack.skript;
 
 import ch.njol.skript.aliases.ItemType;
 import ch.njol.skript.config.SectionNode;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.EffectSection;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -19,6 +23,13 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.function.Consumer;
 
+/**
+ * Puts an item in the slots a layout character stands for (a text), in a slot number, or in the next free slot. With a colon, the code inside runs when the slot is clicked. A slot is locked unless it says removable.
+ */
+@Name("Make Custom GUI Slot")
+@Description({"Puts an item in the slots a layout character stands for (a text), in a slot number, or in the next free slot. With a colon, the code inside runs when the slot is clicked. A slot is locked unless it says removable."})
+@Examples({"make custom gui slot \"a\" with diamond named \"&bBuy\":", "    send \"slot %gui slot index%\" to player", "make next custom gui slot with emerald", "make custom gui slot 13 with removable air"})
+@Since("1.0.0")
 public class SecMakeSlot extends EffectSection {
 
     static final String[] PATTERNS = {

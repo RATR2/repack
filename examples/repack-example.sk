@@ -6,8 +6,7 @@ on repack join:
     if the repack join reason is "loaded":
         send "&7Welcome. Your pack is loaded." to player
 
-# Any click on the table (left clicks too, since digging starts with one). The table's block file already stops the smithing table
-# menu from opening, so this is where you would open your own menu.
+# Any click on the table (left clicks too, since digging starts with one).
 on custom block interact of "table":
     send "&7You touched the table." to player
 
@@ -55,10 +54,7 @@ command /customblocks:
         send "Custom blocks: %all custom block ids%" to player
 
 # ---- Screen effects ----
-# Shake, impact frames and ripples need the pack loaded on a 1.21.6 or newer client (Fabulous! graphics before 26.3); the condition tells.
-
-# A heavy hit: for three ticks the screen becomes a black and white impact frame, then a shake that fades out. Hitting with a stick as an example.
-# A focus point has to be in front of the camera, so a scene is built around the victim's own view: the attacker's spot, with a slash pointing across it.
+# Shake, impact frames and ripples need the pack loaded on a 1.21.6 or newer client (Fabulous! graphics before 26.3);
 on damage of player:
     attacker is a player
     if attacker's tool is a stick:
@@ -114,7 +110,7 @@ command /makeruby:
     trigger:
         create custom item "ruby" with base "EMERALD"
         set custom item "ruby"'s name to "&cRuby"
-        set custom item "ruby"'s lore to "&7A shiny stone", "&7found deep down"
+        set custom item "ruby"'s lore to "&7A shiny stone" and "&7found deep down"
         set custom item "ruby"'s glint to true
         give player custom item "ruby" x 3
         send "Items: %all custom item ids%" to player
@@ -131,4 +127,5 @@ on unload:
 command /mana:
     trigger:
         # The marker only does something once the pack with the rule is built and pushed: /repack build, then /repack push.
-        send "%the text rule marker of ""myscript:mana""%Mana 20/20" to player
+        set {_marker} to the text rule marker of "myscript:mana"
+        send "%{_marker}%Mana 20/20" to player

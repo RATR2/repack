@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -9,6 +13,13 @@ import net.kyori.adventure.text.format.TextColor;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * The marker color text must be drawn in for a text rule to move it, as a color code to put in front of the text. Empty when there is no such rule.
+ */
+@Name("Text Rule Marker")
+@Description({"The marker color text must be drawn in for a text rule to move it, as a color code to put in front of the text. Empty when there is no such rule."})
+@Examples({"set {_marker} to the text rule marker of \"myscript:mana\"", "send \"%{_marker}%Mana 20/20\" to player"})
+@Since("1.0.1")
 public class ExprTextRuleMarker extends SimpleExpression<String> {
 
     static final String[] PATTERNS = {"[the] text rule marker [colo[u]r] of %string%"};

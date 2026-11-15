@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Literal;
 import ch.njol.skript.lang.SkriptEvent;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -10,6 +14,13 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
 
+/**
+ * Fires for everything that happens to a custom block's proxy block: break start, break, explode, piston, burn, entity change, entity interact, fade, fluid, bucket, grow, physics and broken by block. The event starts cancelled when the block's file says it resists that action, so you can uncancel it.
+ */
+@Name("Custom Block Action")
+@Description({"Fires for everything that happens to a custom block's proxy block: break start, break, explode, piston, burn, entity change, entity interact, fade, fluid, bucket, grow, physics and broken by block. The event starts cancelled when the block's file says it resists that action, so you can uncancel it."})
+@Examples({"on custom block explode of \"table\":", "    uncancel event", "on custom block break start of \"table\":", "    if player does not have permission \"staff\":", "        cancel event"})
+@Since("1.0.0")
 public class EvtCustomBlockAction extends SkriptEvent {
 
     static final String[] PATTERNS;

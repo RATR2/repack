@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Literal;
 import ch.njol.skript.lang.SkriptEvent;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -9,6 +13,13 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
 
+/**
+ * Fires when a player clicks a custom block. Left clicks too, since digging starts with one. event-block, event-player and event-string (the block's id) are available.
+ */
+@Name("Custom Block Interact")
+@Description({"Fires when a player clicks a custom block. Left clicks too, since digging starts with one. event-block, event-player and event-string (the block's id) are available."})
+@Examples({"on custom block interact of \"table\":", "    send \"You touched the table.\" to player"})
+@Since("1.0.0")
 public class EvtCustomBlockInteract extends SkriptEvent {
 
     static final String[] PATTERNS = {"custom block (interact|click) [of %-strings%]"};

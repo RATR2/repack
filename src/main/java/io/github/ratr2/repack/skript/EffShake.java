@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -9,6 +13,13 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * Shakes players' screens at a strength from 0 to 1 for a number of ticks, fading out. Rate (how fast it jitters), balance (up and down against sideways; 0.5 is even) and roll (how much it turns the picture) are optional, each 0 to 1.
+ */
+@Name("Screen Shake")
+@Description({"Shakes players' screens at a strength from 0 to 1 for a number of ticks, fading out. Rate (how fast it jitters), balance (up and down against sideways; 0.5 is even) and roll (how much it turns the picture) are optional, each 0 to 1.", "Needs the pack loaded on a 1.21.6 or newer client (Fabulous! graphics before 26.3), and the repack.distortion.shake permission for the command."})
+@Examples({"shake player's screen with strength 0.5 for 20 ticks", "shake victim's screen with strength 0.6 for 12 ticks at rate 0.8 with balance 0.3 with roll 0.5", "stop shaking player's screen"})
+@Since("1.0.0")
 public class EffShake extends Effect {
 
     static final String[] PATTERNS = {

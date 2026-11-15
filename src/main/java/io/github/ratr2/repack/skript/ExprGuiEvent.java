@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -10,6 +14,13 @@ import io.github.ratr2.repack.menu.SlotKey;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * In a slot's code, the slot that was clicked: its index, its layout character, and the {@code tags} of its slot. In a custom gui action event, what a dialog or anvil collected ({@code the gui input "amount"}, or {@code the gui input} for an anvil's text).
+ */
+@Name("Custom GUI Click Values")
+@Description({"In a slot's code, the slot that was clicked: its index, its layout character, and the `tags` of its slot. In a custom gui action event, what a dialog or anvil collected (`the gui input \"amount\"`, or `the gui input` for an anvil's text)."})
+@Examples({"send \"slot %gui slot index%, character %gui slot id%\" to player", "send \"price: %gui slot tag \"price\"%\" to player"})
+@Since("1.0.0")
 public class ExprGuiEvent extends SimpleExpression<Object> {
 
     static final String[] PATTERNS = {

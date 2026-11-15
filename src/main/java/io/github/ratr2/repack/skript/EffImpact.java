@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -15,11 +19,18 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Plays a short black and white impact frame on players' screens: focus points of a type (radial, explosion, lightning, splotch, slash, lines, shatter, stretched) pointing at locations. More focus points can be added to the frame that is running.
+ */
+@Name("Impact Frame")
+@Description({"Plays a short black and white impact frame on players' screens: focus points of a type (radial, explosion, lightning, splotch, slash, lines, shatter, stretched) pointing at locations. More focus points can be added to the frame that is running.", "Needs the pack loaded on a 1.21.6 or newer client (Fabulous! graphics before 26.3)."})
+@Examples({"play an impact frame for player lasting 4 ticks with an \"explosion\" focus point of size 6 at player's location", "add a \"lightning\" focus point of size 8 at player's location to the impact frame of player", "stop the impact frame of player"})
+@Since("1.0.1")
 public class EffImpact extends Effect {
 
     static final String[] PATTERNS = {
-            "(play|show) [an] impact frame for %players% lasting %number% tick[s] [in colo[u]r %-string%] with [an] %string% focus [point[s]] [of size %-number%] [angled %-number% degrees] at %locations%",
-            "add [an] %string% focus [point[s]] [of size %-number%] [angled %-number% degrees] at %locations% to [the] impact frame of %players%",
+            "(play|show) [a|an] impact frame for %players% lasting %number% tick[s] [in colo[u]r %-string%] with [a|an] %string% focus [point[s]] [of size %-number%] [angled %-number% degrees] at %locations%",
+            "add [a|an] %string% focus [point[s]] [of size %-number%] [angled %-number% degrees] at %locations% to [the] impact frame of %players%",
             "stop [the] impact frame[s] of %players%",
     };
 

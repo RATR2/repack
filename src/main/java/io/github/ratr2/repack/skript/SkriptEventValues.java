@@ -8,6 +8,7 @@ import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 
+/** The values Repack's events hold for Skript: event-block, event-player, event-location and event-string. */
 final class SkriptEventValues {
 
     private SkriptEventValues() {

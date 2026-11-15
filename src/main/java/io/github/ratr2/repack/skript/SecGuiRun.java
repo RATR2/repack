@@ -1,6 +1,10 @@
 package io.github.ratr2.repack.skript;
 
 import ch.njol.skript.config.SectionNode;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.Section;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -16,6 +20,13 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
+/**
+ * Code a custom GUI runs when it opens or closes, written inside the {@code create custom gui} section. {@code cancel custom gui closing} in the close code keeps the screen open.
+ */
+@Name("Custom GUI Open / Close Code")
+@Description({"Code a custom GUI runs when it opens or closes, written inside the `create custom gui` section. `cancel custom gui closing` in the close code keeps the screen open."})
+@Examples({"create a custom gui with a chest with 3 rows:", "    run on custom gui close:", "        send \"Come back soon!\" to player"})
+@Since("1.0.0")
 public class SecGuiRun extends Section {
 
     static final String[] PATTERNS = {"run (on|when) [custom] gui (:open|:close)"};

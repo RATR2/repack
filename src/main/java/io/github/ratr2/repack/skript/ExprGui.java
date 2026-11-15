@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
 import ch.njol.skript.lang.util.SimpleExpression;
@@ -12,6 +16,13 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
 
+/**
+ * A custom GUI: the one the code is about (the last created, or the one a click happened in), one by its id (a GUI made in code, or a copy of a file in the guis folder), or the one a player has open.
+ */
+@Name("Custom GUI")
+@Description({"A custom GUI: the one the code is about (the last created, or the one a click happened in), one by its id (a GUI made in code, or a copy of a file in the guis folder), or the one a player has open."})
+@Examples({"set {_gui} to the custom gui with id \"shop\"", "open the last created custom gui to player", "close the custom gui of player"})
+@Since("1.0.0")
 public class ExprGui extends SimpleExpression<LiveGui> {
 
     static final String[] PATTERNS = {

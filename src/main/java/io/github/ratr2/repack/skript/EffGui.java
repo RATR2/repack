@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -13,6 +17,13 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Event;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * Opens, closes and refreshes custom GUIs, removes their slots, pauses and resumes a player's GUI code, and cancels a close.
+ */
+@Name("Custom GUI Effects")
+@Description({"Opens, closes and refreshes custom GUIs, removes their slots, pauses and resumes a player's GUI code, and cancels a close.", "Pausing holds the open and close code and slot actions of a player's GUIs while you switch screens, so the old one's close code does not run. Always resume."})
+@Examples({"open custom gui \"shop\" to player", "open the last created custom gui to player", "close custom gui for player", "refresh custom gui {_gui}", "unmake custom gui slot \"a\"", "pause custom gui events of player", "resume custom gui events of player", "create a custom gui with a chest with 3 rows:", "    run on custom gui close:", "        cancel custom gui closing"})
+@Since("1.0.0")
 public class EffGui extends Effect {
 
     static final String[] PATTERNS = {
@@ -23,6 +34,7 @@ public class EffGui extends Effect {
             "(unmake|unformat|remove) [the] [custom] gui slot[s] %integers/strings% [in %-customgui%]",
             "(unmake|unformat|remove) all [[of] the] [custom] gui slots [in %-customgui%]",
             "(cancel|:uncancel) [the] [custom] gui clos(e|ing)",
+            "(open|show|display) [custom] gui %string% (to|for) %players%",
     };
 
     private int pattern;
@@ -39,7 +51,7 @@ public class EffGui extends Effect {
         resume = parseResult.hasTag("resume");
         uncancel = parseResult.hasTag("uncancel");
         if (pattern == 6 && !getParser().isCurrentEvent(GuiCloseEvent.class)) {
-            ch.njol.skript.Skript.error("`cancel gui closing` only works in `run on gui close`.");
+            ch.njol.skript.Skript.error("`cancel custom gui closing` only works in `run on custom gui close`.");
             return false;
         }
         return true;
@@ -82,8 +94,16 @@ public class EffGui extends Effect {
                     task = () -> { for (SlotKey key : keys) gui.unmakeSlot(key); };
                 }
             }
-            default -> {
+            case 6 -> {
                 if (event instanceof GuiCloseEvent close) close.setCancelled(!uncancel);
+            }
+            default -> {
+                String id = (String) first.getSingle(event);
+                if (id == null) return;
+                for (Player player : (Player[]) second.getArray(event)) {
+                    String problem = manager.open(player, id, true);
+                    if (problem != null) player.sendMessage(net.kyori.adventure.text.Component.text(problem, net.kyori.adventure.text.format.NamedTextColor.RED));
+                }
             }
         }
         if (task != null) io.github.ratr2.repack.RepackAPI.onMainThread(task);

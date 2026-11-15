@@ -1,6 +1,10 @@
 package io.github.ratr2.repack.skript;
 
 import ch.njol.skript.config.SectionNode;
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.EffectSection;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -18,6 +22,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * Creates a custom GUI: a chest, hopper, dispenser or dropper with a layout, or a copy of a GUI file or template. Code inside the section fills it in with {@code make custom gui slot} and {@code run on custom gui open/close}. Open it with {@code open ... to player}.
+ */
+@Name("Create Custom GUI")
+@Description({"Creates a custom GUI: a chest, hopper, dispenser or dropper with a layout, or a copy of a GUI file or template. Code inside the section fills it in with `make custom gui slot` and `run on custom gui open/close`. Open it with `open ... to player`."})
+@Examples({"create a custom gui with id \"shop\" with a chest with 3 rows named \"&6Shop\" with layout \"#########\", \"#  a b  #\" and \"####c####\":", "    make custom gui slot \"#\" with gray stained glass pane named \" \"", "    make custom gui slot \"a\" with diamond named \"&bBuy\":", "        give player a diamond", "open the last created custom gui to player"})
+@Since("1.0.0")
 public class SecCreateGui extends EffectSection {
 
     static final String[] PATTERNS = {

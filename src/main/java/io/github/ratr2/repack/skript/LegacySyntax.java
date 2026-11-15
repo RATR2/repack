@@ -10,6 +10,7 @@ import io.github.ratr2.repack.menu.GuiActionEvent;
 import io.github.ratr2.repack.menu.LiveGui;
 
 @SuppressWarnings({"deprecation", "removal"})
+/** Registers every Repack syntax element with the static registration methods of Skript before 2.14. */
 final class LegacySyntax {
 
     private LegacySyntax() {

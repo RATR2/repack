@@ -1,5 +1,9 @@
 package io.github.ratr2.repack.skript;
 
+import ch.njol.skript.doc.Description;
+import ch.njol.skript.doc.Examples;
+import ch.njol.skript.doc.Name;
+import ch.njol.skript.doc.Since;
 import ch.njol.skript.lang.Effect;
 import ch.njol.skript.lang.Expression;
 import ch.njol.skript.lang.SkriptParser.ParseResult;
@@ -12,6 +16,13 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Locale;
 
+/**
+ * Registers a text rule: text drawn in the rule's marker color is moved to an anchor of the screen (like the middle bottom), with an offset, scale and color. Or unregisters rules. Needs a pack build and push to take effect.
+ */
+@Name("Text Rule")
+@Description({"Registers a text rule: text drawn in the rule's marker color is moved to an anchor of the screen (like the middle bottom), with an offset, scale and color. Or unregisters rules. Needs a pack build and push to take effect."})
+@Examples({"register a text rule \"myscript:mana\" at \"bottom center\" offset -91, -40 from \"top center\" colored \"55AAFF\"", "unregister the text rule \"myscript:mana\""})
+@Since("1.0.1")
 public class EffTextRule extends Effect {
 
     static final String[] PATTERNS = {
